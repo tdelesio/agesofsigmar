@@ -1,7 +1,7 @@
 import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { factions } from '@/app/factions';
+import { factions } from '@/app/spearhead/factions';
 
 interface AbilityTableProps {
   passedFaction: number;

@@ -1,0 +1,112 @@
+{
+  "units": [
+    {
+      "name": "Askurgan Trueblades",
+      "unit_size": 8,
+      "points": 150,
+      "keywords": ["Infantry"],
+      "notes": "This unit cannot be reinforced.",
+      "base_size": ["40mm [1]", "32mm [4]", "28.5mm [3]"]
+    },
+    {
+      "name": "Black Knights",
+      "unit_size": 5,
+      "points": 180,
+      "keywords": ["Deathrattle, Cavalry"],
+      "base_size": "60 x 35mm"
+    },
+    {
+      "name": "Blood Knights",
+      "unit_size": 5,
+      "points": 230,
+      "keywords": ["Cavalry"],
+      "base_size": "75 x 42mm"
+    },
+    {
+      "name": "Corpse Cart",
+      "unit_size": 1,
+      "points": 90,
+      "keywords": ["Deadwalkers, War Machine"],
+      "base_size": "105 x 70mm"
+    },
+    {
+      "name": "Deadwalker Zombies",
+      "unit_size": 20,
+      "points": 150,
+      "keywords": ["Deadwalkers, Infantry"],
+      "base_size": "25mm"
+    },
+    {
+      "name": "Deathrattle Skeletons",
+      "unit_size": 10,
+      "points": 100,
+      "keywords": ["Deathrattle, Infantry"],
+      "base_size": "25mm"
+    },
+    {
+      "name": "Dire Wolves",
+      "unit_size": 10,
+      "points": 140,
+      "keywords": ["Deadwalkers, Beast"],
+      "base_size": "60 x 35mm"
+    },
+    {
+      "name": "Fell Bats",
+      "unit_size": 3,
+      "points": 100,
+      "keywords": ["Deadwalkers, Beast"],
+      "base_size": "40mm"
+    },
+    {
+      "name": "Grave Guard",
+      "unit_size": 10,
+      "points": 160,
+      "keywords": ["Deathrattle, Infantry"],
+      "base_size": "25mm"
+    },
+    {
+      "name": "Kosargi Nightguard",
+      "unit_size": 2,
+      "points": 120,
+      "keywords": ["Deadwalkers, Infantry"],
+      "notes": "This unit cannot be reinforced.",
+      "base_size": "40mm"
+    },
+    {
+      "name": "Terrorgheist",
+      "unit_size": 1,
+      "points": 260,
+      "keywords": ["Monster"],
+      "base_size": "130mm"
+    },
+    {
+      "name": "Vargheists",
+      "unit_size": 3,
+      "points": 150,
+      "keywords": ["Infantry"],
+      "base_size": "50mm"
+    },
+    {
+      "name": "Vargskyr",
+      "unit_size": 1,
+      "points": 180,
+      "keywords": ["Beast"],
+      "base_size": "50mm"
+    },
+    {
+      "name": "Vyrkos Blood-born",
+      "unit_size": 3,
+      "points": 150,
+      "keywords": ["Infantry"],
+      "notes": "This unit cannot be reinforced.",
+      "base_size": "32mm"
+    },
+    {
+      "name": "Zombie Dragon",
+      "unit_size": 1,
+      "points": 270,
+      "keywords": ["Monster"],
+      "base_size": "130mm"
+    }
+  ]
+}

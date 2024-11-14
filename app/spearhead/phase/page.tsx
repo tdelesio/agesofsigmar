@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { Ability, getAttacksForRound, Unit, Units } from "../units";
-import { BattleTrait, battleTraitSpecials, Enhancement, Faction, Factions, onces, RegimentAbilitiy } from "@/app/factions";
+import { BattleTrait, battleTraitSpecials, Enhancement, Faction, Factions, onces, RegimentAbilitiy } from "@/app/spearhead/factions";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { renderBattleTraitCard, renderAbilityCard, renderPhaseCard, renderUnitCard } from './render-card';
 import {
@@ -231,7 +231,7 @@ export default function StartOfRoundPage() {
                   <section className="w-full mx-auto">
                     <h2 className="text-xl font-semibold mb-4">Regiment Ability</h2>
                     <div className="space-y-4">
-                      {renderAbilityCardWrapper(selectedRegimentAbility, false)}
+                      {renderAbilityCardWrapper(selectedRegimentAbility)}
                     </div>
                   </section>
                 )}

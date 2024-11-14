@@ -1,5 +1,5 @@
-import { factions, onces } from "@/app/factions";
-import { phases } from "@/app/phase";
+import { factions, onces } from "@/app/spearhead/factions";
+import { phases } from "@/app/spearhead/phase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableHeader } from "@/components/ui/table";
 

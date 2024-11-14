@@ -1,8 +1,8 @@
 "use client"
 
-import { BattleTrait, onces, RegimentAbilitiy } from "@/app/factions";
-import { convertEnumToString, convertStringToEnum, getAbilityForRound, Phase, phases } from "@/app/phase";
-import { Ability, Unit, Units } from "@/app/units";
+import { BattleTrait, onces, RegimentAbilitiy } from "@/app/spearhead/factions";
+import { convertEnumToString, convertStringToEnum, getAbilityForRound, Phase, phases } from "@/app/spearhead/phase";
+import { Ability, Unit, Units } from "@/app/spearhead/units";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DialogFooter, DialogHeader } from "@/components/ui/dialog";

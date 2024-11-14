@@ -1,0 +1,187 @@
+{
+  "heroes": [
+    {
+      "name": "Belladamma Volga, First of the Vyrkos",
+      "unit_size": 1,
+      "points": 230,
+      "regiment_options": ["0-1 Vyrkos Retainer, Any Soulblight Gravelords"],
+      "base_size": "60mm"
+    },
+    {
+      "name": "Bloodseeker Palanquin",
+      "unit_size": 1,
+      "points": 250,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "base_size": "120 x 92mm"
+    },
+    {
+      "name": "Cado Ezechiar, the Hollow King",
+      "unit_size": 1,
+      "points": 170,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "base_size": "40mm"
+    },
+    {
+      "name": "Cowen Throne",
+      "unit_size": 1,
+      "points": 270,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "base_size": "120 x 92mm"
+    },
+    {
+      "name": "Gorslav the Gravekeeper",
+      "unit_size": 1,
+      "points": 120,
+      "regiment_options": ["Any Deadwalkers"],
+      "notes": "This Hero can join an eligible regiment as a Vyrkos Retainer.",
+      "base_size": "40mm"
+    },
+    {
+      "name": "Ivys Volga, the Outcast",
+      "unit_size": 1,
+      "points": 160,
+      "regiment_options": ["Any Dire Wolves, Any Fell Bats"],
+      "notes": "This Hero can join an eligible regiment as a Vyrkos Retainer.",
+      "base_size": "32mm"
+    },
+    {
+      "name": "Kritza, the Rat Prince",
+      "unit_size": 1,
+      "points": 100,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "notes": "This Hero can join an eligible regiment as a Vyrkos Retainer.",
+      "base_size": "60 x 35mm"
+    },
+    {
+      "name": "Lady Annika, the Thirsting Blade",
+      "unit_size": 1,
+      "points": 130,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "notes": "This Hero can join an eligible regiment as a Vyrkos Retainer.",
+      "base_size": "60 x 35mm"
+    },
+    {
+      "name": "Lauka Vai, Mother of Nightmares",
+      "unit_size": 1,
+      "points": 320,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "base_size": "80mm"
+    },
+    {
+      "name": "Mannfred von Carstein, Mortarch of Night",
+      "unit_size": 1,
+      "points": 430,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "base_size": "120 x 92mm"
+    },
+    {
+      "name": "Mortis Engine",
+      "unit_size": 1,
+      "points": 240,
+      "regiment_options": ["Any Deadwalkers"],
+      "base_size": "120 x 92mm"
+    },
+    {
+      "name": "Nagash, Supreme Lord of the Undead",
+      "unit_size": 1,
+      "points": 880,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "base_size": "130mm"
+    },
+    {
+      "name": "Necromancer",
+      "unit_size": 1,
+      "points": 140,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "base_size": "32mm"
+    },
+    {
+      "name": "Neferata, Mortarch of Blood",
+      "unit_size": 1,
+      "points": 460,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "base_size": "120 x 92mm"
+    },
+    {
+      "name": "Prince Vhordrai",
+      "unit_size": 1,
+      "points": 480,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "base_size": "130mm"
+    },
+    {
+      "name": "Radukar the Beast",
+      "unit_size": 1,
+      "points": 330,
+      "regiment_options": ["0-1 Vyrkos Retainer, Any Soulblight Gravelords"],
+      "notes": "You cannot include this unit and Radukar the Wolf in the same army.",
+      "base_size": "60mm"
+    },
+    {
+      "name": "Radukar the Wolf",
+      "unit_size": 1,
+      "points": 170,
+      "regiment_options": ["0-1 Vyrkos Retainer, Any Soulblight Gravelords"],
+      "notes": "You cannot include this unit and Radukar the Beast in the same army.",
+      "base_size": "40mm"
+    },
+    {
+      "name": "Sekhar, Fang of Nulahkmia",
+      "unit_size": 1,
+      "points": 240,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "base_size": "60 x 35mm"
+    },
+    {
+      "name": "Torgillius the Chamberlain",
+      "unit_size": 1,
+      "points": 180,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "notes": "This Hero can join an eligible regiment as a Vyrkos Retainer.",
+      "base_size": "40mm"
+    },
+    {
+      "name": "Vampire Lord",
+      "unit_size": 1,
+      "points": 160,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "base_size": "40mm"
+    },
+    {
+      "name": "Vampire Lord on Zombie Dragon",
+      "unit_size": 1,
+      "points": 400,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "base_size": "130mm"
+    },
+    {
+      "name": "Vengorian Lord",
+      "unit_size": 1,
+      "points": 300,
+      "regiment_options": ["Any Soulblight Gravelords"],
+      "base_size": "80mm"
+    },
+    {
+      "name": "Watch Captain Halgrim",
+      "unit_size": 1,
+      "points": 110,
+      "regiment_options": ["Any Deathrattle"],
+      "notes": "This Hero can join an eligible regiment as a Vyrkos Retainer.",
+      "base_size": "32mm"
+    },
+    {
+      "name": "Wight King",
+      "unit_size": 1,
+      "points": 120,
+      "regiment_options": ["Any Deathrattle"],
+      "base_size": "32mm"
+    },
+    {
+      "name": "Wight King on Skeletal Steed",
+      "unit_size": 1,
+      "points": 170,
+      "regiment_options": ["Any Deathrattle"],
+      "base_size": "75 x 42mm"
+    }
+  ]
+}
