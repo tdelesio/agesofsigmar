@@ -1,6 +1,6 @@
 "use client"
 
-import { useRouter } from 'next/navigation'
+// import { useRouter } from 'next/navigation'
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -40,7 +40,7 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>
 export default function SelectFactionForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [availableFactions, setAvailableFactions] = useState<NVP[]>([])
-  const router = useRouter()
+  // const router = useRouter()
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
