@@ -1,0 +1,517 @@
+{
+    "faction": "Soulblight Gravelords",
+    "heros": [
+        {
+            "name": "Nagash",
+            "title": "Supreme Lord of the Undead",
+            "stats": {
+              "move": "10\"",
+              "save": "3+",
+              "control": "10",
+              "health": "18",
+              "ward": "5+",
+              "wizard_level": "9"
+            },
+            "weapons": {
+              "melee": [
+                {
+                  "name": "Alakanash",
+                  "attacks": "4",
+                  "hit": "3+",
+                  "wound": "3+",
+                  "rend": "-2",
+                  "damage": "D6"
+                },
+                {
+                  "name": "Zefet-nebtar",
+                  "attacks": "4", 
+                  "hit": "3+",
+                  "wound": "3+",
+                  "rend": "-2",
+                  "damage": "3"
+                }
+              ]
+            },
+            "abilities": [
+              {
+                "name": "Battle Damaged",
+                "phase": "Passive",
+                "effect": "While this unit has 10 or more damage points, subtract 3 from its power level."
+              },
+              {
+                "name": "The Staff of Power",
+                "phase": "Passive", 
+                "effect": "Alakanash is capped with gems of purest grave-sand. Add 2 to casting rolls for this unit while it has not miscast any spells this turn. If this unit miscasts a spell, ignore the restriction that would stop this unit from casting any more spells this turn."
+              },
+              {
+                "name": "Supreme Lord of the Undead",
+                "phase": "Your Hero Phase",
+                "timing": "Once Per Battle",
+                "declare": "Pick a friendly non-Hero non-Unique Death unit that has been destroyed to be the target.",
+                "effect": "Set up a replacement unit identical to the target wholly within 12\" of this unit and more than 9\" from all enemy units.",
+                "casting_value": 7,
+                "keywords": ["Spell"]
+              },
+              {
+                "name": "Hand of Dust",
+                "phase": "End of Any Turn",
+                "timing": "Once Per Turn (Army)",
+                "declare": "Pick a visible enemy Hero or Monster in combat with this unit to be the target.",
+                "effect": "Hide a dice in one of your hands or under one of two appropriate containers. Your opponent must pick one of your hands or containers. If they pick the one hiding the dice, this ability has no effect. If they pick the empty one, the target is automatically destroyed.",
+                "keywords": ["Rampage"]
+              },
+              {
+                "name": "Invocation of Nagash",
+                "phase": "Your Hero Phase",
+                "declare": "This unit can cast this spell more than once per phase. Pick a visible unit within 12\" of this unit that has not been picked to be the target of this spell this turn to be the target, then make a casting roll of 2D6.",
+                "effect": "If the target is an enemy unit, inflict D3 mortal damage on it. If the target is a friendly Death unit, pick 1 of the following effects: • Return a number of slain models to the target unit with a combined Health characteristic of up to 3. • The target has Ward (5+) until the start of your next turn.",
+                "casting_value": 7,
+                "keywords": ["Spell"]
+              }
+            ],
+            "keywords": [
+              "Warmaster",
+              "Unique",
+              "Hero",
+              "Monster",
+              "Wizard (9)",
+              "Fly",
+              "Ward (5+)",
+              "Death",
+              "Soulblight Gravelords"
+            ]
+           },
+           {
+            "name": "Mannfred von Carstein",
+            "title": "Mortarch of Night",
+            "stats": {
+              "move": "12\"",
+              "save": "3+",
+              "control": "5",
+              "health": "14",
+              "ward": "6+",
+              "wizard_level": "2"
+            },
+            "weapons": {
+              "melee": [
+                {
+                  "name": "Gheistvor",
+                  "attacks": "6",
+                  "hit": "3+", 
+                  "wound": "3+",
+                  "rend": "-1",
+                  "damage": "2"
+                },
+                {
+                  "name": "Ashigaroth's Claws",
+                  "attacks": "5",
+                  "hit": "4+",
+                  "wound": "2+", 
+                  "rend": "-3",
+                  "damage": "3",
+                  "ability": "Companion"
+                }
+              ]
+            },
+            "abilities": [
+              {
+                "name": "Battle Damaged",
+                "phase": "Passive",
+                "effect": "While this unit has 10 or more damage points, the Attacks characteristic of Ashigaroth's Claws is 3."
+              },
+              {
+                "name": "The Sword of Unholy Power",
+                "phase": "Passive",
+                "effect": "If this unit has slain any enemy models this turn, for the rest of the turn, add 1 to the Attacks characteristic of melee weapons used by friendly Deathrattle and Deadwalkers units while they are wholly within 12\" of this unit."
+              },
+              {
+                "name": "Wind of Death",
+                "phase": "Your Hero Phase",
+                "declare": "Pick a point on the battlefield within 18\" of the caster. Pick up to 3 visible enemy units within 6\" of that point to be the targets.",
+                "effect": "Roll a D3 for each target. On a 2+, inflict an amount of mortal damage on the target equal to the roll.",
+                "casting_value": 7,
+                "keywords": ["Spell"]
+              },
+              {
+                "name": "The Mortarch of Night",
+                "phase": "Reaction",
+                "declare": "You declared the 'Redeploy' command for a Soulblight Gravelords unit wholly within 12\" of this unit",
+                "effect": "The unit using the 'Redeploy' command can move into combat when using that ability."
+              },
+              {
+                "name": "Ashigaroth's Hunger",
+                "phase": "Any Combat Phase",
+                "timing": "Once Per Turn (Army)",
+                "declare": "If this unit charged this turn",
+                "effect": "Roll a dice. On a 3+, this unit has Strike-first for the rest of the turn.",
+                "keywords": ["Rampage"]
+              }
+            ],
+            "keywords": [
+              "Warmaster",
+              "Unique",
+              "Hero",
+              "Monster",
+              "Wizard (2)",
+              "Ward (6+)",
+              "Death",
+              "Soulblight Gravelords",
+              "Vampire"
+            ]
+          },
+          {
+            "name": "Prince Vhordrai",
+            "stats": {
+              "move": "12\"",
+              "save": "3+", 
+              "control": "5",
+              "health": "16",
+              "ward": "6+",
+              "wizard_level": "2"
+            },
+            "weapons": {
+              "ranged": [
+                {
+                  "name": "Shordemaire's Miasma",
+                  "range": "10\"",
+                  "attacks": "D6",
+                  "hit": "3+",
+                  "wound": "3+", 
+                  "rend": "-2",
+                  "damage": "2",
+                  "ability": "Shoot in Combat, Companion"
+                }
+              ],
+              "melee": [
+                {
+                  "name": "The Bloodlance",
+                  "attacks": "6",
+                  "hit": "3+",
+                  "wound": "3+",
+                  "rend": "-2",
+                  "damage": "2",
+                  "ability": "Charge (+1 Damage)"
+                },
+                {
+                  "name": "Shordemaire's Maw",
+                  "attacks": "3",
+                  "hit": "4+", 
+                  "wound": "2+",
+                  "rend": "-2",
+                  "damage": "3",
+                  "ability": "Companion"
+                },
+                {
+                  "name": "Shordemaire's Claws",
+                  "attacks": "7",
+                  "hit": "4+",
+                  "wound": "2+",
+                  "rend": "-1", 
+                  "damage": "2",
+                  "ability": "Companion"
+                }
+              ]
+            },
+            "abilities": [
+              {
+                "name": "Battle Damaged",
+                "phase": "Passive",
+                "effect": "While this unit has 10 or more damage points, the Attacks characteristic of Shordemaire's Claws is 5."
+              },
+              {
+                "name": "Saint of Slaughter",
+                "phase": "End of Any Turn",
+                "declare": "Pick a friendly non-Monster Vampire unit that destroyed a unit this turn using a Fight ability and is wholly within 12\" of this unit to be the target.",
+                "effect": "Pick 1 of the following effects to apply for the rest of the battle: • Add 2\" to the target's Move characteristic • Add 1 to the Attacks characteristic of the target's melee weapons • Add 1 to the Damage characteristic of the target's melee weapons. More than 1 effect can apply to a unit at the same time; however, each effect can only be applied to a unit once."
+              },
+              {
+                "name": "Quickblood", 
+                "phase": "Your Hero Phase",
+                "effect": "This unit has Strike-first until the start of your next turn.",
+                "casting_value": 7,
+                "keywords": ["Spell"]
+              },
+              {
+                "name": "Snapping Jaws",
+                "phase": "Any Combat Phase", 
+                "timing": "Once Per Turn (Army)",
+                "declare": "If this unit charged this turn, pick an enemy unit in combat with it to be the target.",
+                "effect": "Roll a dice. On a 4+, inflict an amount of mortal damage equal to the target unit equal to the roll.",
+                "keywords": ["Rampage"]
+              }
+            ],
+            "keywords": [
+              "Unique",
+              "Hero",
+              "Monster", 
+              "Wizard (2)",
+              "Ward (6+)",
+              "Death",
+              "Soulblight Gravelords",
+              "Vampire"
+            ]
+           },
+           {
+            "name": "Neferata",
+            "title": "Mortarch of Blood",
+            "stats": {
+              "move": "12\"",
+              "save": "3+",
+              "control": "5", 
+              "health": "14",
+              "ward": "6+",
+              "wizard_level": "2"
+            },
+            "weapons": {
+              "melee": [
+                {
+                  "name": "Akmet-har",
+                  "attacks": "5",
+                  "hit": "3+",
+                  "wound": "3+",
+                  "rend": "-2",
+                  "damage": "1",
+                  "ability": "Anti-Hero (+1 Rend)"
+                },
+                {
+                  "name": "Aken-seth",
+                  "attacks": "3",
+                  "hit": "2+",
+                  "wound": "3+",
+                  "rend": "-2",
+                  "damage": "2"
+                },
+                {
+                  "name": "Nagadron's Claws",
+                  "attacks": "5",
+                  "hit": "4+",
+                  "wound": "2+",
+                  "rend": "-3", 
+                  "damage": "3",
+                  "ability": "Companion"
+                }
+              ]
+            },
+            "abilities": [
+              {
+                "name": "Battle Damaged",
+                "phase": "Passive",
+                "effect": "While this unit has 10 or more damage points, the Attacks characteristic of Nagadron's Claws is 3."
+              },
+              {
+                "name": "The Mortarch of Blood",
+                "phase": "Deployment Phase",
+                "declare": "Pick up to 3 friendly Deathrattle Infantry or Deadwalkers Infantry units to be the targets.",
+                "effect": "Each target can use the 'Normal Move' ability as if it were your movement phase."
+              },
+              {
+                "name": "Dark Mist",
+                "phase": "Your Hero Phase",
+                "declare": "Pick a visible friendly non-Monster Soulblight Gravelords unit wholly within 12\" of this unit to be the target then make a casting roll of 2D6.",
+                "effect": "Ignore modifiers to save rolls for the target (positive and negative) until the start of your next turn.",
+                "casting_value": 7,
+                "keywords": ["Spell"]
+              },
+              {
+                "name": "The Advoke",
+                "phase": "End of Any Turn",
+                "timing": "Once Per Turn (Army)",
+                "declare": "Pick an enemy Hero that was allocated any damage points inflicted by this unit's Akmet-har this turn to be the target.", 
+                "effect": "Roll a dice. On a 5+, the target is automatically destroyed.",
+                "keywords": ["Rampage"]
+              },
+              {
+                "name": "Twilight's Allure",
+                "phase": "Passive",
+                "effect": "Subtract 1 from hit rolls for combat attacks that target friendly Soulblight Gravelords units while they are wholly within 6\" of this unit."
+              }
+            ],
+            "keywords": [
+              "Warmaster",
+              "Unique",
+              "Hero",
+              "Monster",
+              "Wizard (2)", 
+              "Ward (6+)",
+              "Death",
+              "Soulblight Gravelords", 
+              "Vampire"
+            ]
+           },
+           {
+            "name": "Lauka Vai",
+            "title": "Mother of Nightmares",
+            "stats": {
+              "move": "10\"",
+              "save": "4+",
+              "control": "5",
+              "health": "11",
+              "ward": "6+",
+              "wizard_level": "1"
+            },
+            "weapons": {
+              "melee": [
+                {
+                  "name": "Askurga Rapier",
+                  "attacks": "5",
+                  "hit": "3+",
+                  "wound": "3+",
+                  "rend": "-2",
+                  "damage": "2"
+                },
+                {
+                  "name": "Gore-drenched Talons",
+                  "attacks": "3",
+                  "hit": "3+",
+                  "wound": "2+",
+                  "rend": "-3",
+                  "damage": "3",
+                  "ability": "Critical"
+                }
+              ]
+            },
+            "abilities": [
+              {
+                "name": "Nightmare's Miasma",
+                "phase": "Passive",
+                "effect": "Subtract 1 from the Rend characteristic of melee weapons used by enemy units while they are in combat with this unit."
+              },
+              {
+                "name": "The Queen's Dictat",
+                "phase": "Your Hero Phase",
+                "declare": "Pick a visible friendly Soulblight Gravelords Monster wholly within 12\" of this unit to be the target then make a casting roll of 2D6.",
+                "effect": "Pick 1 of the target's Companion melee weapons. Add D3 to the Attacks characteristic of that weapon for the rest of the turn.",
+                "casting_value": 6,
+                "keywords": ["Spell"]  
+              },
+              {
+                "name": "Impaling Talons",
+                "phase": "Any Combat Phase",
+                "timing": "Once Per Turn (Army)",
+                "declare": "If this unit charged this phase, pick an enemy unit in combat with it to be the target.",
+                "effect": "Roll a dice. If the roll is equal to or less than the target's Health characteristic, inflict an amount of mortal damage on the target equal to the roll.",
+                "keywords": ["Rampage"]
+              }
+            ],
+            "keywords": [
+              "Unique",
+              "Hero",
+              "Monster",
+              "Wizard (1)",
+              "Fly",
+              "Ward (6+)", 
+              "Death",
+              "Soulblight Gravelords",
+              "Vampire"
+            ]
+           },
+           {
+            "name": "Vengorian Lord",
+            "stats": {
+              "move": "10\"",
+              "save": "3+",
+              "control": "5",
+              "health": "11",
+              "ward": "6+"
+            },
+            "weapons": {
+              "melee": [
+                {
+                  "name": "Nightmare Sabre",
+                  "attacks": "4",
+                  "hit": "3+",
+                  "wound": "3+",
+                  "rend": "-1",
+                  "damage": "2" 
+                },
+                {
+                  "name": "Gore-drenched Talons",
+                  "attacks": "3",
+                  "hit": "3+",
+                  "wound": "2+",
+                  "rend": "-3",
+                  "damage": "3"
+                }
+              ]
+            },
+            "abilities": [
+              {
+                "name": "Festering Feast",
+                "phase": "End of Any Turn",
+                "declare": "Pick a visible friendly non-Hero Soulblight Gravelords Monster that destroyed an enemy unit this turn and that is wholly within 12\" of this unit to be the target.",
+                "effect": "Heal (6) the target."
+              },
+              {
+                "name": "Nightmare's Miasma",
+                "phase": "Passive",
+                "effect": "Subtract 1 from the Rend characteristic of melee weapons used by enemy units while they are in combat with this unit."
+              },
+              {
+                "name": "Scything Talons",
+                "phase": "Any Combat Phase",
+                "timing": "Once Per Turn (Army)",
+                "declare": "If this unit charged this turn, pick an enemy unit in combat with it to be the target.",
+                "effect": "Roll a dice. On a 3+, roll a dice for each model in the target unit. For each 5+, inflict 1 mortal damage on the target.",
+                "keywords": ["Rampage"]
+              }
+            ],
+            "keywords": [
+              "Hero",
+              "Monster",
+              "Ward (6+)",
+              "Death",
+              "Soulblight Gravelords",
+              "Vampire"
+            ]
+           },
+           {
+            "name": "Radukar the Wolf",
+            "stats": {
+              "move": "6\"",
+              "save": "4+",
+              "control": "7",
+              "health": "2",
+              "ward": "6+",
+              "wizard_level": "1"
+            },
+            "weapons": {
+              "melee": [
+                {
+                  "name": "Vyrkos Barrow-blade",
+                  "attacks": "5",
+                  "hit": "3+",
+                  "wound": "3+",
+                  "rend": "-1",
+                  "damage": "2",
+                  "ability": "Crit (Mortal)"
+                }
+              ]
+            },
+            "abilities": [
+              {
+                "name": "Call to the Hunt",
+                "phase": "Passive",
+                "effect": "If this unit charged this turn, for the rest of the turn, add 1 to wound rolls for combat attacks made by friendly Deathrattle, Deadwalkers and Vyrkos Blood-born units while they are wholly within 12\" of this unit."
+              },
+              {
+                "name": "Master of the Pack",
+                "phase": "Your Hero Phase",
+                "declare": "Make a casting roll of 2D6.",
+                "effect": "Until the start of your next turn, you can re-roll charge rolls for friendly Soulblight Gravelords Infantry units while they are wholly within 12\" of this unit.",
+                "casting_value": 6,
+                "keywords": ["Spell"]
+              }
+            ],
+            "keywords": [
+              "Unique",
+              "Hero",
+              "Wizard (1)",
+              "Infantry",
+              "Ward (6+)",
+              "Death",
+              "Soulblight Gravelords",
+              "Vampire"
+            ]
+           }
+    ]
+}
