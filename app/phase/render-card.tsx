@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react";
+import React, { useState, useEffect  } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Ability, getAttacksForRound, Unit, Units } from "../units";
 import { AbilityTable } from "./special-battle-tactics/table"
@@ -112,18 +112,47 @@ export const renderPhaseCard = (phase: Phase, selectedFactionId: number, renderU
     </section>
   )
 }
-
-export const renderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enhancement | undefined, selectedFactionId: number, renderAbilityCard: (item: any, skipCommands?: boolean) => JSX.Element | null) => {
+export const renderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enhancement | undefined, selectedFactionId: number, renderAbilityCard: (item: any, skipCommands?: boolean) => JSX.Element | null, resetTrigger: number) => {
 
   const factionUnits = Units.factions.find(faction => faction.id === selectedFactionId);
+  const [clickCount, setClickCount] = useState(0);
+ 
+  const handleClick = () => {
+    setClickCount((prevCount) => prevCount + 1);
+  };
+
+  const getBackgroundColor = () => {
+    if (clickCount === 0) {
+      return 'white';
+    }
+    const baseColor = 200 - (clickCount - 1) * 50;
+    return `rgb(${baseColor}, 200, 200)`;
+  };
+
+  useEffect(() => {
+    setClickCount(0);
+  }, [resetTrigger]);
 
   return (
 
     <section className="w-full  mx-auto" key={unit.id}>
 
-      <div className="space-y-4 pb-2">
+<div className="space-y-4 pb-2">
 
-        <Card key={unit.id} className="bg-white text-black w-full  overflow-hidden">
+    
+{/* <div 
+      className="space-y-4 pb-2 cursor-pointer transition-colors duration-300 ease-in-out" 
+      onClick={handleClick}
+      style={{ backgroundColor: getBackgroundColor() }}
+    > */}
+
+        <Card key={unit.id} className="cursor-pointer hover:bg-gray-50 transition-colors duration-200 text-black w-full  overflow-hidden" onClick={(e) => {
+              e.stopPropagation();
+              handleClick()
+            }}
+            style={{ backgroundColor: getBackgroundColor() }}
+            role="button"
+            aria-label="View attack details">
           <CardHeader>
             <CardTitle>{unit.name}  <section className="pt-2">
               {unit.keywords.map((keyword: string, index: number) => (<span key={index}>({keyword}) </span>))}
@@ -135,9 +164,12 @@ export const renderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enh
 
           {/* Combat Round */}
           {isCombatPhase(phase) && (
-            <CardContent>
+            <CardContent
+        
+          >
               {getAttacksForRound(unit as Unit, phase.id || 0).map((attr) => (
-                <div key={attr.id} className="mb-4 bg-white rounded-lg shadow-md overflow-hidden border-black-100 border-2">
+                <div key={attr.id} className="mb-4 bg-white rounded-lg shadow-md overflow-hidden border-black-100 border-2"
+                >
                   <div className="bg-gray-100 px-4 py-2 border-b-2 border-gray-300">
                     <h3 className="text-lg font-semibold text-gray-800">{attr.name}</h3>
                   </div>
@@ -181,29 +213,7 @@ export const renderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enh
                   </div>
                 </div>
               ))}
-              {/* {getAttacksForRound(unit as Unit, phase.id || 0).map((attr) => (
-                    <div key={attr.id} className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="border-gray-300 pt-5">Name</div><div className="border-gray-300 pt-5">{attr.name}</div>
-                      {phase.id === phases.shooting && (
-                        <>
-                          <div>Range</div><div>{attr.range}</div>
-                        </>
-                      )}
-                      <div className="border-b-2">Attacks</div><div className="border-b-2">{attr.attacks}</div>
-                      <div className="border-b-2">Hit</div><div className="border-b-2">{attr.hit}+</div>
-                      <div className="border-b-2">Wound</div><div className="border-b-2">{attr.wound}+</div>
-                      <div className="border-b-2">Rend</div><div className="border-b-2">{attr.rend}</div>
-                      <div className="border-b-2">Damage</div><div className="border-b-2">{attr.damage}</div>
-                      {attr.ability && (
-                      <div className="border-b-4 border-red-300">Ability</div>
-                      )}
-                      {attr.ability && (
-                      <div className="border-b-4  border-red-300 "><span className=" font-bold text-red-600 px-2 py-1 rounded">
-                      {attr.ability}
-                    </span></div>
-                    )}
-                    </div>
-                  ))} */}
+
 
               <section className="w-full mx-auto pt-2">
                 {/* Display Enhancements for General*/}

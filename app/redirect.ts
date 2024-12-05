@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { Phase } from './phase'
  
 export async function navigateToTactics(faction: number) {
-  redirect(`?faction=${faction}`)
+  redirect(`/?faction=${faction}`)
 }
 
 export async function navigateToStart(faction: number, battleTraits: string, regimentAbilities: string, enhancements: string, usecards: string) {

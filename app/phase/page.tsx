@@ -37,7 +37,7 @@ export default function StartOfRoundPage() {
   }, []);
 
   const [round, setRound] = useState(1)
-
+  const [resetTrigger, setResetTrigger] = useState(0); // Update 1: Add resetTrigger state
 
 
   const params = useSearchParams();
@@ -101,14 +101,20 @@ export default function StartOfRoundPage() {
 
   const handleRoundIncrement = () => {
     if (round < 4) {
-      setRound(round + 1)
+      setRound(round + 1);
+      setResetTrigger(prev => prev + 1); // Update 2: Increment resetTrigger
     } else {
-      setShowDonateModal(true)
+      setShowDonateModal(true);
+      setRound(round + 1);
+      setResetTrigger(prev => prev + 1); // Update 2: Increment resetTrigger
     }
-  }
+  };
 
   const handleNextRound = () => {
-    setShowConfirmDialog(true);
+    if (usecards)
+      setShowConfirmDialog(true);
+    else
+      handleRoundIncrement();
   };
 
   const handleConfirmNextRound = (confirm: boolean) => {
@@ -140,8 +146,9 @@ export default function StartOfRoundPage() {
   const renderAbilityCardWrapper = (item: any, skipCommands: boolean = true) =>
     renderAbilityCard(item, usedAbilities, handleAbilityClick, skipCommands);
 
+  
   const renderUnitCardWrapper = (phase: Phase, unit: any) =>
-    renderUnitCard(phase, unit, selectedEnhancement, selectedFactionId, renderAbilityCardWrapper);
+    renderUnitCard(phase, unit, selectedEnhancement, selectedFactionId, renderAbilityCardWrapper, resetTrigger);
 
 
   const [showDonateModal, setShowDonateModal] = useState(false)
