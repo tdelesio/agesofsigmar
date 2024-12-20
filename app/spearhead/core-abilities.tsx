@@ -1,5 +1,5 @@
-import { onces } from "./factions";
-import { phases } from "./phase";
+import { onces } from "../shared/factions";
+import { phases } from "../shared/phase";
 
 export const Alliances = {
     "coreabilities": [

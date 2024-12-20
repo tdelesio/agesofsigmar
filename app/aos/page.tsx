@@ -14,7 +14,7 @@ export default function HomePage() {
     <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-900">
       <header className="sticky top-0 z-10 w-full bg-white dark:bg-gray-800 shadow-md">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-lg font-bold text-gray-900 dark:text-white">Spearhead Helper</h1>
+          <h1 className="text-lg font-bold text-gray-900 dark:text-white">Age of Sigmar Helper</h1>
           <Link href="https://warhammer.com" target="_blank" rel="noopener noreferrer">
             <Image
               src="/wh.jpg"

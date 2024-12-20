@@ -1,6 +1,6 @@
 "use client"
 
-import { factions } from "@/app/spearhead/factions";
+import { factions } from "@/app/shared/factions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import React, { useState } from "react";

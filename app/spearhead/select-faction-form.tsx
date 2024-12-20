@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { Alliances, NVP } from "./alliances"
+import { Alliances, NVP } from "../shared/alliances"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from 'react'
 import {

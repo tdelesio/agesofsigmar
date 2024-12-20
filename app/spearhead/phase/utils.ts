@@ -1,5 +1,5 @@
-import { Enhancement } from "../factions";
-import { Phase, phases } from "../phase";
+import { Enhancement } from "../../shared/factions";
+import { Phase, phases } from "../../shared/phase";
 
 export function showAbility(currentPhase: Phase | null, item: any): boolean {
     //return true if 

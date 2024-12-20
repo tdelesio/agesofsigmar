@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { Alliances, NVP } from "./alliances"
+import { Alliances, NVP } from "../shared/alliances"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from 'react'
 import {
@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from '@radix-ui/react-select'
-import { redirectToSpearheadTacticsPage } from './redirect'
+import { redirectToSpearheadTacticsPage, redirectToUnitPicker } from './redirect'
 
 const profileFormSchema = z.object({
   faction: z.number({
@@ -50,7 +50,7 @@ export default function SelectFactionAndAlliance() {
   const handleFactionSelectionSubmit = async (data: ProfileFormValues) => {
     setIsFormSubmitting(true)
     try {
-      await redirectToSpearheadTacticsPage(data.faction)
+      await redirectToUnitPicker(data.faction)
     } catch (error) {
       console.error("Navigation error:", error)
     } finally {

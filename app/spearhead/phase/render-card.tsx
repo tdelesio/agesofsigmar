@@ -6,8 +6,8 @@ import { Ability, getAttacksForRound, Unit, Units } from "../units";
 import { AbilityTable } from "./special-battle-tactics/table"
 import { multiples } from "./special-battle-tactics/multiple";
 import { isCombatPhase, showAbility, showEnhancement, showEnhancementOnCombatPhase } from "./utils";
-import { getAbilityForRound, Phase, phases } from "../phase";
-import { BattleTrait, battleTraitSpecials, Enhancement, onces } from "../factions";
+import { getAbilityForRound, Phase, phases } from "../../shared/phase";
+import { BattleTrait, battleTraitSpecials, Enhancement, onces } from "../../shared/factions";
 
 
 export const renderBattleTraitCard = (factionId: number, bt: BattleTrait, phase: Phase, renderAbilityCard: (item: any, skipCommands?: boolean) => JSX.Element | null) => {

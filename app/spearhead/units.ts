@@ -1,5 +1,5 @@
-import { factions, onces } from "./factions";
-import { phases } from "./phase";
+import { factions, onces } from "../shared/factions";
+import { phases } from "../shared/phase";
 
 export interface FactionUnits {
     id: string;

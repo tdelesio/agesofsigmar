@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Phase } from './phase'
+import { Phase } from '../shared/phase'
 
   //Link to return to home page
   export function Home() {

@@ -7,8 +7,8 @@ import { ReactNode, Suspense } from "react";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Warhammer AoS: Spearhead Helper",
-  description: "A Warhammer AoS Spearhead tool to help you keep track of your abilities and tactics.  ",
+  title: "Warhammer AoS: Age of Sigmar Helper",
+  description: "A Warhammer AoS tool to help you keep track of your abilities and tactics.  ",
 };
 
 

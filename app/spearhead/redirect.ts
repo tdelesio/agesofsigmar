@@ -1,7 +1,7 @@
 'use server'
  
 import { redirect } from 'next/navigation'
-import { Phase } from './phase'
+import { Phase } from '../shared/phase'
  
 export async function redirectToSpearheadTacticsPage(factionId: number) {
   redirect(`/spearhead?faction=${factionId}`)

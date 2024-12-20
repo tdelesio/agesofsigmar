@@ -1,4 +1,4 @@
-import { Ability, Unit } from "./units";
+import { Ability, Unit } from "../spearhead/units";
 
 export type Phase = {
     id: number;

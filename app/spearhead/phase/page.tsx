@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { Ability, getAttacksForRound, Unit, Units } from "../units";
-import { BattleTrait, battleTraitSpecials, Enhancement, Faction, Factions, onces, RegimentAbilitiy } from "@/app/spearhead/factions";
+import { BattleTrait, battleTraitSpecials, Enhancement, Faction, Factions, onces, RegimentAbilitiy } from "@/app/shared/factions";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { renderBattleTraitCard, renderAbilityCard, renderPhaseCard, renderUnitCard } from './render-card';
 import {
@@ -19,7 +19,7 @@ import DialogCommandAbilities from "./special-battle-tactics/dialog";
 import { isCombatPhase, showAbility, showEnhancement, showEnhancementOnCombatPhase } from "./utils";
 import Donations from "./donation";
 import PlayerCards from "./player-cards";
-import { Phase, phases } from "../phase";
+import { Phase, phases } from "../../shared/phase";
 import { Dialog, DialogContent, DialogOverlay } from "@radix-ui/react-dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@radix-ui/react-accordion";
 import { DialogFooter } from "@/components/ui/dialog";

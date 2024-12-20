@@ -5,7 +5,6 @@ import { useState } from 'react'
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { BattleTrait, Factions, onces } from "./factions"
 import { redirectToSpearheadStartPhaseWithParameters } from './redirect'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,8 +32,9 @@ import {
 } from "@/components/ui/accordion"
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { convertEnumToString } from './phase'
 import { Checkbox } from "@/components/ui/checkbox"
+import { Factions, onces } from '../shared/factions'
+import { convertEnumToString } from '../shared/phase'
 
 
 
