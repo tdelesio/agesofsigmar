@@ -8,6 +8,7 @@ import { multiples } from "./special-battle-tactics/multiple";
 import { isCombatPhase, showAbility, showEnhancement, showEnhancementOnCombatPhase } from "./utils";
 import { getAbilityForRound, Phase, phases } from "../phase";
 import { BattleTrait, battleTraitSpecials, Enhancement, onces } from "../factions";
+import { CoreAbilities } from "../core";
 
 
 export const renderBattleTraitCard = (factionId: number, bt: BattleTrait, phase: Phase, renderAbilityCard: (item: any, skipCommands?: boolean) => JSX.Element | null) => {
@@ -58,6 +59,7 @@ export const renderBattleTraitCard = (factionId: number, bt: BattleTrait, phase:
     return renderAbilityCard(bt)
   }
 }
+
 
 export const renderAbilityCard = (item: any, usedAbilities: Set<string>, handleAbilityClick: (id: string, once: boolean) => void, skipCommands: boolean = true) => {
   const isUsed = usedAbilities.has(item?.id || '')
@@ -113,29 +115,12 @@ export const renderPhaseCard = (phase: Phase, selectedFactionId: number, renderU
   )
 }
 
-export const renderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enhancement | undefined, selectedFactionId: number, renderAbilityCard: (item: any, skipCommands?: boolean) => JSX.Element | null) => {
+export const renderAttacks = (phase: Phase, unit: any, selectedEnhancement: Enhancement | undefined, selectedFactionId: number, renderAbilityCard: (item: any, skipCommands?: boolean) => JSX.Element | null) => {
 
   const factionUnits = Units.factions.find(faction => faction.id === selectedFactionId);
-
   return (
 
-    <section className="w-full  mx-auto" key={unit.id}>
-
-      <div className="space-y-4 pb-2">
-
-        <Card key={unit.id} className="bg-white text-black w-full  overflow-hidden">
-          <CardHeader>
-            <CardTitle>{unit.name}  <section className="pt-2">
-              {unit.keywords.map((keyword: string, index: number) => (<span key={index}>({keyword}) </span>))}
-            </section></CardTitle>
-            <CardDescription className="border-b-2 border-gray-300 flex justify-between py-2"><span>Health: {unit.health}</span> <span>Save: {unit.save}+</span> <span>Ward: {unit.ward}+</span></CardDescription>
-          </CardHeader>
-
-
-
-          {/* Combat Round */}
-          {isCombatPhase(phase) && (
-            <CardContent>
+    <CardContent>
               {getAttacksForRound(unit as Unit, phase.id || 0).map((attr) => (
                 <div key={attr.id} className="mb-4 bg-white rounded-lg shadow-md overflow-hidden border-black-100 border-2">
                   <div className="bg-gray-100 px-4 py-2 border-b-2 border-gray-300">
@@ -181,29 +166,7 @@ export const renderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enh
                   </div>
                 </div>
               ))}
-              {/* {getAttacksForRound(unit as Unit, phase.id || 0).map((attr) => (
-                    <div key={attr.id} className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="border-gray-300 pt-5">Name</div><div className="border-gray-300 pt-5">{attr.name}</div>
-                      {phase.id === phases.shooting && (
-                        <>
-                          <div>Range</div><div>{attr.range}</div>
-                        </>
-                      )}
-                      <div className="border-b-2">Attacks</div><div className="border-b-2">{attr.attacks}</div>
-                      <div className="border-b-2">Hit</div><div className="border-b-2">{attr.hit}+</div>
-                      <div className="border-b-2">Wound</div><div className="border-b-2">{attr.wound}+</div>
-                      <div className="border-b-2">Rend</div><div className="border-b-2">{attr.rend}</div>
-                      <div className="border-b-2">Damage</div><div className="border-b-2">{attr.damage}</div>
-                      {attr.ability && (
-                      <div className="border-b-4 border-red-300">Ability</div>
-                      )}
-                      {attr.ability && (
-                      <div className="border-b-4  border-red-300 "><span className=" font-bold text-red-600 px-2 py-1 rounded">
-                      {attr.ability}
-                    </span></div>
-                    )}
-                    </div>
-                  ))} */}
+              
 
               <section className="w-full mx-auto pt-2">
                 {/* Display Enhancements for General*/}
@@ -231,22 +194,46 @@ export const renderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enh
               </div>}
 
             </CardContent>
-          )
+  )
+}
+
+export const renderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enhancement | undefined, selectedFactionId: number, renderAbilityCard: (item: any, skipCommands?: boolean) => JSX.Element | null) => {
+
+  
+
+  return (
+
+    <section className="w-full  mx-auto" key={unit.id}>
+
+      <div className="space-y-4 pb-2">
+
+        <Card key={unit.id} className="bg-white text-black w-full  overflow-hidden">
+          <CardHeader>
+            <CardTitle>{unit.name}  <section className="pt-2">
+              {unit.keywords.map((keyword: string, index: number) => (<span key={index}>({keyword}) </span>))}
+            </section></CardTitle>
+            <CardDescription className="border-b-2 border-gray-300 flex justify-between py-2"><span>Health: {unit.health}</span> <span>Save: {unit.save}+</span> <span>Ward: {unit.ward}+</span></CardDescription>
+          </CardHeader>
+
+
+         {/* Start of Round */}
+         {phase.id === phases.start && (
+            renderAttacks(phase, unit, selectedEnhancement, selectedFactionId, renderAbilityCard))
           }
 
-          {/* Non-Combat Round */}
-          {!isCombatPhase(phase) && phase.id != phases.movement && (
+          {/* Hero Phase */}
+         {phase.id === phases.hero && (
             <CardContent>
 
-              <div className="space-y-4 pb-4" key={unit.id}>
-                {
-                  getAbilityForRound(unit as Unit, phase.id).map(ability =>
-                    renderAbilityCard(ability)
+            <div className="space-y-4 pb-4" key={unit.id}>
+              {
+                getAbilityForRound(unit as Unit, phase.id).map(ability =>
+                  renderAbilityCard(ability)
 
-                  )}
-              </div>
+                )}
+            </div>
 
-            </CardContent>
+          </CardContent>
           )}
 
           {/* Movement Round */}
@@ -263,6 +250,36 @@ export const renderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enh
             </CardContent>
           )
           }
+
+
+
+          {/* Shooting Round */}
+          {phase.id === phases.shooting && (
+            renderAttacks(phase, unit, selectedEnhancement, selectedFactionId, renderAbilityCard))
+          
+          }
+
+          {/* Charge Phase */}
+          {phase.id === phases.charge && (
+            <CardContent>
+
+              <div className="space-y-4 pb-4" key={unit.id}>
+                {
+                  getAbilityForRound(unit as Unit, phase.id).map(ability =>
+                    renderAbilityCard(ability)
+
+                  )}
+              </div>
+
+            </CardContent>
+          )}
+
+          {/* Combat Round */}
+          {phase.id === phases.combat && (
+                      renderAttacks(phase, unit, selectedEnhancement, selectedFactionId, renderAbilityCard))
+                    
+                    }
+          
 
           {/* End of Round */}
           {phase.id === phases.end && (

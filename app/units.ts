@@ -61,6 +61,8 @@ export function getAttacksForRound(unit: Unit, phase: number): Attack[] {
             return unit.Shooting.attacks;
         case phases.combat:
             return unit.Combat.attacks;
+        case phases.start:
+            return unit.Combat.attacks;    
         default:
             return [];
     }
