@@ -147,8 +147,6 @@ export default function StartOfRoundPage() {
   const [showDonateModal, setShowDonateModal] = useState(false)
   /********************************** */
 
-
-
   //Start of HTML
   return (
 
@@ -174,7 +172,7 @@ export default function StartOfRoundPage() {
               <section className="w-full  mx-auto">
                 <div className="flex justify-between items-center mb-4">
                   <h1 className="text-xl font-semibold">{selectedPhase?.name}</h1>
-                  Round: {round}
+                  Round: {round} VP: 
                   <div className="flex items-center space-x-2">
                     <CarouselPrevious />
                     <CarouselNext />
