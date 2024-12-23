@@ -8,6 +8,7 @@ import { multiples } from "./special-battle-tactics/multiple";
 import { isCombatPhase, showAbility, showEnhancement, showEnhancementOnCombatPhase } from "./utils";
 import { getAbilityForRound, Phase, phases } from "../phase";
 import { BattleTrait, battleTraitSpecials, Enhancement, onces } from "../factions";
+import { CoreAbilities } from "../core";
 
 
 export const renderBattleTraitCard = (factionId: number, bt: BattleTrait, phase: Phase, renderAbilityCard: (item: any, skipCommands?: boolean) => JSX.Element | null) => {
@@ -59,6 +60,7 @@ export const renderBattleTraitCard = (factionId: number, bt: BattleTrait, phase:
   }
 }
 
+
 export const renderAbilityCard = (item: any, usedAbilities: Set<string>, handleAbilityClick: (id: string, once: boolean) => void, skipCommands: boolean = true) => {
   const isUsed = usedAbilities.has(item?.id || '')
 
@@ -98,78 +100,14 @@ export const renderAbilityCard = (item: any, usedAbilities: Set<string>, handleA
   )
 }
 
-export const renderPhaseCard = (phase: Phase, selectedFactionId: number, renderUnitCard: (phase: Phase, unit: any) => JSX.Element) => {
+export const renderAttacks = (phase: Phase, unit: any, selectedEnhancement: Enhancement | undefined, selectedFactionId: number, renderAbilityCard: (item: any, skipCommands?: boolean) => JSX.Element | null) => {
 
   const factionUnits = Units.factions.find(faction => faction.id === selectedFactionId);
-
-  return (
-    <section className="w-full  mx-auto">
-      <h2 className="text-xl font-semibold mb-4">{phase.name}</h2>
-      <div className="space-y-4"></div>
-      {factionUnits?.units?.map((unit: any) => (
-        renderUnitCard(phase, unit)
-      ))}
-    </section>
-  )
-}
-export const renderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enhancement | undefined, selectedFactionId: number, renderAbilityCard: (item: any, skipCommands?: boolean) => JSX.Element | null, resetTrigger: number) => {
-
-  const factionUnits = Units.factions.find(faction => faction.id === selectedFactionId);
-  const [clickCount, setClickCount] = useState(0);
- 
-  const handleClick = () => {
-    setClickCount((prevCount) => prevCount + 1);
-  };
-
-  const getBackgroundColor = () => {
-    if (clickCount === 0) {
-      return 'white';
-    }
-    const baseColor = 200 - (clickCount - 1) * 50;
-    return `rgb(${baseColor}, 200, 200)`;
-  };
-
-  useEffect(() => {
-    setClickCount(0);
-  }, [resetTrigger]);
-
   return (
 
-    <section className="w-full  mx-auto" key={unit.id}>
-
-<div className="space-y-4 pb-2">
-
-    
-{/* <div 
-      className="space-y-4 pb-2 cursor-pointer transition-colors duration-300 ease-in-out" 
-      onClick={handleClick}
-      style={{ backgroundColor: getBackgroundColor() }}
-    > */}
-
-        <Card key={unit.id} className="cursor-pointer hover:bg-gray-50 transition-colors duration-200 text-black w-full  overflow-hidden" onClick={(e) => {
-              e.stopPropagation();
-              handleClick()
-            }}
-            style={{ backgroundColor: getBackgroundColor() }}
-            role="button"
-            aria-label="View attack details">
-          <CardHeader>
-            <CardTitle>{unit.name}  <section className="pt-2">
-              {unit.keywords.map((keyword: string, index: number) => (<span key={index}>({keyword}) </span>))}
-            </section></CardTitle>
-            <CardDescription className="border-b-2 border-gray-300 flex justify-between py-2"><span>Health: {unit.health}</span> <span>Save: {unit.save}+</span> <span>Ward: {unit.ward}+</span></CardDescription>
-          </CardHeader>
-
-
-
-          {/* Combat Round */}
-          {isCombatPhase(phase) && (
-            <CardContent
-        
-          >
+    <CardContent>
               {getAttacksForRound(unit as Unit, phase.id || 0).map((attr) => (
-                <div key={attr.id} className="mb-4 bg-white rounded-lg shadow-md overflow-hidden border-black-100 border-2"
-                >
+                <div key={attr.id} className="mb-4 bg-white rounded-lg shadow-md overflow-hidden border-black-100 border-2">
                   <div className="bg-gray-100 px-4 py-2 border-b-2 border-gray-300">
                     <h3 className="text-lg font-semibold text-gray-800">{attr.name}</h3>
                   </div>
@@ -213,7 +151,7 @@ export const renderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enh
                   </div>
                 </div>
               ))}
-
+              
 
               <section className="w-full mx-auto pt-2">
                 {/* Display Enhancements for General*/}
@@ -241,22 +179,79 @@ export const renderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enh
               </div>}
 
             </CardContent>
-          )
+  )
+}
+
+export const renderPhaseCard = (phase: Phase, selectedFactionId: number, renderUnitCard: (phase: Phase, unit: any) => JSX.Element) => {
+
+  const factionUnits = Units.factions.find(faction => faction.id === selectedFactionId);
+
+  return (
+    <section className="w-full  mx-auto">
+      <h2 className="text-xl font-semibold mb-4">{phase.name}</h2>
+      <div className="space-y-4"></div>
+      {factionUnits?.units?.map((unit: any) => (
+        renderUnitCard(phase, unit)
+      ))}
+    </section>
+  )
+}
+export const renderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enhancement | undefined, selectedFactionId: number, renderAbilityCard: (item: any, skipCommands?: boolean) => JSX.Element | null, resetTrigger: number) => {
+
+  const factionUnits = Units.factions.find(faction => faction.id === selectedFactionId);
+  const [clickCount, setClickCount] = useState(0);
+ 
+  const handleClick = () => {
+    setClickCount((prevCount) => prevCount + 1);
+  };
+
+  const getBackgroundColor = () => {
+    if (clickCount === 0) {
+      return 'white';
+    }
+    const baseColor = 200 - (clickCount - 1) * 50;
+    return `rgb(${baseColor}, 200, 200)`;
+  };
+
+  useEffect(() => {
+    setClickCount(0);
+  }, [resetTrigger]);
+
+  
+
+  return (
+
+    <section className="w-full  mx-auto" key={unit.id}>
+
+      <div className="space-y-4 pb-2">
+
+        <Card key={unit.id} className="bg-white text-black w-full  overflow-hidden">
+          <CardHeader>
+            <CardTitle>{unit.name}  <section className="pt-2">
+              {unit.keywords.map((keyword: string, index: number) => (<span key={index}>({keyword}) </span>))}
+            </section></CardTitle>
+            <CardDescription className="border-b-2 border-gray-300 flex justify-between py-2"><span>Health: {unit.health}</span> <span>Save: {unit.save}+</span> <span>Ward: {unit.ward}+</span></CardDescription>
+          </CardHeader>
+
+
+         {/* Start of Round */}
+         {phase.id === phases.start && (
+            renderAttacks(phase, unit, selectedEnhancement, selectedFactionId, renderAbilityCard))
           }
 
-          {/* Non-Combat Round */}
-          {!isCombatPhase(phase) && phase.id != phases.movement && (
+          {/* Hero Phase */}
+         {phase.id === phases.hero && (
             <CardContent>
 
-              <div className="space-y-4 pb-4" key={unit.id}>
-                {
-                  getAbilityForRound(unit as Unit, phase.id).map(ability =>
-                    renderAbilityCard(ability)
+            <div className="space-y-4 pb-4" key={unit.id}>
+              {
+                getAbilityForRound(unit as Unit, phase.id).map(ability =>
+                  renderAbilityCard(ability)
 
-                  )}
-              </div>
+                )}
+            </div>
 
-            </CardContent>
+          </CardContent>
           )}
 
           {/* Movement Round */}
@@ -273,6 +268,36 @@ export const renderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enh
             </CardContent>
           )
           }
+
+
+
+          {/* Shooting Round */}
+          {phase.id === phases.shooting && (
+            renderAttacks(phase, unit, selectedEnhancement, selectedFactionId, renderAbilityCard))
+          
+          }
+
+          {/* Charge Phase */}
+          {phase.id === phases.charge && (
+            <CardContent>
+
+              <div className="space-y-4 pb-4" key={unit.id}>
+                {
+                  getAbilityForRound(unit as Unit, phase.id).map(ability =>
+                    renderAbilityCard(ability)
+
+                  )}
+              </div>
+
+            </CardContent>
+          )}
+
+          {/* Combat Round */}
+          {phase.id === phases.combat && (
+                      renderAttacks(phase, unit, selectedEnhancement, selectedFactionId, renderAbilityCard))
+                    
+                    }
+          
 
           {/* End of Round */}
           {phase.id === phases.end && (

@@ -19,11 +19,12 @@ import DialogCommandAbilities from "./special-battle-tactics/dialog";
 import { isCombatPhase, showAbility, showEnhancement, showEnhancementOnCombatPhase } from "./utils";
 import Donations from "./donation";
 import PlayerCards from "./player-cards";
-import { Phase, phases } from "../phase";
+import { convertEnumToString, Phase, phases } from "../phase";
 import { Dialog, DialogContent, DialogOverlay } from "@radix-ui/react-dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@radix-ui/react-accordion";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { CoreAbilitiesComponent } from "./core-abilities";
 
 
 
@@ -111,14 +112,15 @@ export default function StartOfRoundPage() {
   };
 
   const handleNextRound = () => {
-    if (usecards)
-      setShowConfirmDialog(true);
-    else
-      handleRoundIncrement();
+    if (usecards) {
+     setShowConfirmDialog(true);
+    }
+    else {handleRoundIncrement()}
   };
 
   const handleConfirmNextRound = (confirm: boolean) => {
     setShowConfirmDialog(false);
+    
     if (confirm) {
       handleRoundIncrement();
       if (redrawCards) {
@@ -154,8 +156,6 @@ export default function StartOfRoundPage() {
   const [showDonateModal, setShowDonateModal] = useState(false)
   /********************************** */
 
-
-
   //Start of HTML
   return (
 
@@ -181,7 +181,7 @@ export default function StartOfRoundPage() {
               <section className="w-full  mx-auto">
                 <div className="flex justify-between items-center mb-4">
                   <h1 className="text-xl font-semibold">{selectedPhase?.name}</h1>
-                  Round: {round}
+                  Round: {round} VP: 
                   <div className="flex items-center space-x-2">
                     <CarouselPrevious />
                     <CarouselNext />
@@ -281,6 +281,7 @@ export default function StartOfRoundPage() {
               />
 
 
+              <CoreAbilitiesComponent selectedPhase={convertEnumToString(selectedPhase.id)} />
 
             </CarouselItem>
           ))}
