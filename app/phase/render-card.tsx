@@ -196,7 +196,7 @@ export const renderPhaseCard = (phase: Phase, selectedFactionId: number, renderU
     </section>
   )
 }
-export const renderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enhancement | undefined, selectedFactionId: number, renderAbilityCard: (item: any, skipCommands?: boolean) => JSX.Element | null, resetTrigger: number) => {
+export const RenderUnitCard = (phase: Phase, unit: any, selectedEnhancement: Enhancement | undefined, selectedFactionId: number, renderAbilityCard: (item: any, skipCommands?: boolean) => JSX.Element | null, resetTrigger: number) => {
 
   const factionUnits = Units.factions.find(faction => faction.id === selectedFactionId);
   const [clickCount, setClickCount] = useState(0);

@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Ability, getAttacksForRound, Unit, Units } from "../units";
 import { BattleTrait, battleTraitSpecials, Enhancement, Faction, Factions, onces, RegimentAbilitiy } from "@/app/factions";
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { renderBattleTraitCard, renderAbilityCard, renderPhaseCard, renderUnitCard } from './render-card';
+import { renderBattleTraitCard, renderAbilityCard, renderPhaseCard, RenderUnitCard } from './render-card';
 import {
   Carousel,
   CarouselContent,
@@ -150,7 +150,7 @@ export default function StartOfRoundPage() {
 
   
   const renderUnitCardWrapper = (phase: Phase, unit: any) =>
-    renderUnitCard(phase, unit, selectedEnhancement, selectedFactionId, renderAbilityCardWrapper, resetTrigger);
+    RenderUnitCard(phase, unit, selectedEnhancement, selectedFactionId, renderAbilityCardWrapper, resetTrigger);
 
 
   const [showDonateModal, setShowDonateModal] = useState(false)
