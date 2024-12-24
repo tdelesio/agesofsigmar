@@ -32,6 +32,7 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.0",
     "react-number-input": "^15.5.1",
+    "styled-components": "^6.1.13",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^3.23.8"

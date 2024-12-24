@@ -1,17 +1,29 @@
+
 "use client"
 
-
-import React, { useState } from 'react'
-import { Label } from "@/components/ui/label"
-import {RadioGroup, Radio} from "@nextui-org/radio";
+import React from 'react';
+import styled from 'styled-components';
+import TurnPhases from './TurnPhases';
+import PointsDisplay from './PointsDisplay';
+import GlobalStyles from './GlobalStyles';
  
+const AppContainer = styled.div`
+  display: flex;
+  background-color: #f0f0f0;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+`;
 
-
-
-
-export default function TrackerPage() {
-  
+const App = () => {
   return (
-   <div></div>
+    <>
+      <GlobalStyles />
+      <AppContainer>
+        <TurnPhases />
+        <PointsDisplay />
+      </AppContainer>
+    </>
   );
-}
+};
+
+export default App;
