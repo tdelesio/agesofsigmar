@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    const imagesDirectory = join(process.cwd(), "public", "malediction", "images")
+    const imagesDirectory = join(process.cwd(), "public", "warhammer", "images")
     const filenames = await readdir(imagesDirectory)
 
     // Filter for common image extensions
@@ -12,7 +12,7 @@ export async function GET() {
     const imageFiles = filenames.filter((name) => imageExtensions.some((ext) => name.toLowerCase().endsWith(ext)))
 
     const images = imageFiles.map((name) => ({
-      src: `/malediction/images/${name}`,
+      src: `/warhammer/images/${name}`,
       alt: name.replace(/\.[^/.]+$/, ""), // Remove file extension for alt text
       filename: name,
     }))
@@ -23,3 +23,5 @@ export async function GET() {
     return NextResponse.json({ images: [] })
   }
 }
+
+

@@ -18,7 +18,7 @@ export default function MaledictionPage() {
   useEffect(() => {
     const fetchImages = async () => {
       try {
-        const response = await fetch("/api/images/malediction")
+        const response = await fetch("/api/images/warhammer")
         if (!response.ok) {
           throw new Error("Failed to fetch images")
         }
@@ -81,7 +81,7 @@ export default function MaledictionPage() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         <header className="mb-8">
-          <h1 className="text-4xl font-bold text-foreground mb-2">Malediction Gallery</h1>
+          <h1 className="text-4xl font-bold text-foreground mb-2">Warhammer Age of Simar Gallery</h1>
           <p className="text-muted-foreground">
             {images.length > 0
               ? `Displaying ${images.length} image${images.length === 1 ? "" : "s"}`
