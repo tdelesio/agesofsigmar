@@ -1,82 +1,393 @@
-"use client"
+'use client';
 
-import { useSearchParams } from 'next/navigation'
-import Image from "next/image"
-import Link from "next/link"
-import SelectFactionForm from "./select-faction-form"
-import SelectFactionTacticsForm from "./select-tactics"
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { 
+  Sparkles, Shield, Sword, ShieldAlert, Play, Plus, 
+  Trash, Swords, User, Users, RefreshCw
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { DEFAULT_FACTIONS } from './data/default-factions';
+import { Faction, GameState, UnitState } from './types';
 
 export default function HomePage() {
-  const faction = useSearchParams().get('faction')
+  const router = useRouter();
+
+  // Factions list (default + custom from localStorage)
+  const [factions, setFactions] = useState<Faction[]>(DEFAULT_FACTIONS);
+  const [hasActiveGame, setHasActiveGame] = useState(false);
+
+  // Single Player (User) Choices
+  const [factionId, setFactionId] = useState('');
+  const [traitId, setTraitId] = useState('');
+  const [regimentId, setRegimentId] = useState('');
+  const [enhancementId, setEnhancementId] = useState('');
+
+  // First Turn Choice
+  const [firstPlayer, setFirstPlayer] = useState<'me' | 'opponent'>('me');
+  const [unitCounts, setUnitCounts] = useState<{ [unitId: string]: number }>({});
+
+  // Load factions and active game on mount
+  useEffect(() => {
+    const savedFactionsStr = localStorage.getItem('custom_factions');
+    if (savedFactionsStr) {
+      try {
+        const customFactions: Faction[] = JSON.parse(savedFactionsStr);
+        setFactions([...DEFAULT_FACTIONS, ...customFactions]);
+      } catch (err) {
+        console.error('Failed to parse custom factions from storage:', err);
+      }
+    }
+
+    const activeGame = localStorage.getItem('active_spearhead_game');
+    if (activeGame) {
+      setHasActiveGame(true);
+    }
+  }, []);
+
+  const faction = factions.find(f => f.id === factionId);
+
+  useEffect(() => {
+    if (faction) {
+      setTraitId('all');
+      setRegimentId(faction.regimentAbilities[0]?.id || '');
+      setEnhancementId(faction.enhancements[0]?.id || '');
+
+      const counts: { [unitId: string]: number } = {};
+      faction.units.forEach(u => {
+        counts[u.id] = 1;
+      });
+      setUnitCounts(counts);
+    } else {
+      setTraitId('');
+      setRegimentId('');
+      setEnhancementId('');
+      setUnitCounts({});
+    }
+  }, [factionId, factions, faction]);
+
+  // Clean custom factions
+  const handleClearCustomFactions = () => {
+    if (confirm('Are you sure you want to delete all uploaded/custom factions? This cannot be undone.')) {
+      localStorage.removeItem('custom_factions');
+      setFactions(DEFAULT_FACTIONS);
+      setFactionId('');
+    }
+  };
+
+  // Start new match
+  const handleStartGame = () => {
+    if (!faction) {
+      alert('Please select your faction.');
+      return;
+    }
+
+    // Build UnitState array for our units supporting duplicate instances and model counts
+    const unitStates: UnitState[] = [];
+    faction.units.forEach(unit => {
+      const count = unitCounts[unit.id] || 0;
+      for (let i = 0; i < count; i++) {
+        unitStates.push({
+          id: `${unit.id}-${i}-${Date.now()}`, // unique ID across matches
+          unitId: unit.id,
+          currentWounds: 0,
+          isSlain: false,
+          modelsCount: unit.models ?? 1,
+          maxModels: unit.models ?? 1,
+          moved: false,
+          ran: false,
+          retreated: false,
+          shot: false,
+          charged: false,
+          fought: false,
+        });
+      }
+    });
+
+    if (unitStates.length === 0) {
+      alert('Your starting army roster must contain at least 1 unit.');
+      return;
+    }
+
+    // Create full simplified GameState
+    const initialGameState: GameState = {
+      round: 1,
+      activeTurn: firstPlayer,
+      currentPhase: 'start',
+      factionId: faction.id,
+      selectedBattleTraitId: traitId,
+      selectedRegimentAbilityId: regimentId,
+      selectedEnhancementId: enhancementId,
+      units: unitStates,
+      victoryPoints: 0,
+      usedAbilities: {},
+      logs: [`Match initialized! Playing as ${faction.name}. Turn 1 goes to ${firstPlayer === 'me' ? 'Player (Me)' : 'Opponent'}`],
+    };
+
+    localStorage.setItem('active_spearhead_game', JSON.stringify(initialGameState));
+    router.push('/tracker');
+  };
+
+  const handleResumeGame = () => {
+    router.push('/tracker');
+  };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-900">
-      <header className="sticky top-0 z-10 w-full bg-white dark:bg-gray-800 shadow-md">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-lg font-bold text-gray-900 dark:text-white">Spearhead Helper</h1>
-          <Link href="https://warhammer.com" target="_blank" rel="noopener noreferrer">
-            <Image
-              src="/wh.jpg"
-              alt="Warhammer Logo"
-              width={50}
-              height={12}
-              className="dark:invert"
-              priority
-            />
-          </Link>
+    <div className="min-h-screen bg-[#11141A] text-gray-100 flex flex-col font-sans">
+      
+      {/* Hero Header Banner */}
+      <header className="relative overflow-hidden bg-[#151923] border-b border-[#222834] py-16 text-center">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(245,158,11,0.05)_0%,transparent_70%)]" />
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-amber-500/20 bg-amber-500/5 text-amber-500 text-xs font-bold mb-4 animate-pulse uppercase tracking-wider">
+            <Swords className="h-3.5 w-3.5" /> Spearhead Solo Companion v2.0
+          </div>
+          <h1 className="text-4xl md:text-5xl font-black tracking-tight text-white mb-3">
+            SPEARHEAD HELPER
+          </h1>
+          <p className="text-gray-400 max-w-lg mx-auto text-sm md:text-base leading-relaxed">
+            Your personal tabletop game companion. Select your faction, track your wounds, and trigger your rules & reactive abilities at the perfect moments.
+          </p>
         </div>
       </header>
 
-      <main className="flex-grow container mx-auto px-4 py-8 space-y-8">
-        {faction ? <SelectFactionTacticsForm /> : <SelectFactionForm />}
+      {/* Main Grid */}
+      <main className="flex-grow container mx-auto px-4 py-12 max-w-4xl space-y-10">
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {[
-            {
-              href: "https://www.warhammer-community.com/warhammer-age-of-sigmar-downloads/",
-              title: "Downloads",
-              description: "Find faction packs and game rules.",
-            },
-            {
-              href: "https://www.warhammer.com/en-GB/spearhead",
-              title: "Models",
-              description: "See available models for your faction or start a new one.",
-            },
-            {
-              href: "https://www.blacklibrary.com/",
-              title: "Lore",
-              description: "Want to go deeper? Check out the lore.",
-            },
-            {
-              href: "#",
-              title: "Thank Me",
-              description: "Like what you see? Buy me a coffee.",
-            },
-          ].map((item, index) => (
-            <Link
-              key={index}
-              href={item.href}
-              className="group block p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow"
-              target="_blank"
-              rel="noopener noreferrer"
+        {/* Active Game Resume Card */}
+        <Card className="border-[#222834] bg-gradient-to-br from-[#151923] to-[#1c2230] text-white flex flex-col justify-between shadow-xl">
+          <CardHeader>
+            <Badge variant="outline" className="border-cyan-500/30 text-cyan-400 w-fit mb-2">State Engine</Badge>
+            <CardTitle className="text-xl font-bold">Active Battle State</CardTitle>
+            <CardDescription className="text-gray-400 text-xs">
+              Spearhead helper keeps your active game saved locally in real time.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex-grow">
+            <p className="text-xs text-gray-400 leading-relaxed">
+              {hasActiveGame 
+                ? 'There is an ongoing match saved on your device. You can jump straight back into the current phase and round without losing any progress.'
+                : 'No ongoing match detected. Configure your match parameters in the panel below and start your Spearhead battle!'}
+            </p>
+          </CardContent>
+          <CardFooter className="bg-[#0f121a] py-4 border-t border-[#1d222d]">
+            {hasActiveGame ? (
+              <Button onClick={handleResumeGame} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-sm">
+                <Play className="h-4 w-4 mr-2" /> Resume Saved Match
+              </Button>
+            ) : (
+              <div className="text-xs text-gray-500 text-center w-full font-medium">Configure your army below to start.</div>
+            )}
+          </CardFooter>
+        </Card>
+
+        {/* Quick Match Setup Form */}
+        <Card className="border-[#222834] bg-[#151923] text-white shadow-2xl">
+          <CardHeader className="border-b border-[#222834] py-6">
+            <CardTitle className="text-2xl font-black text-center flex items-center justify-center gap-2">
+              <User className="h-6 w-6 text-amber-500" /> Configure Your Army
+            </CardTitle>
+            <CardDescription className="text-center text-gray-400 text-xs">
+              Select your faction, chosen tactics, general enhancements, and configure first-turn priority.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-8 space-y-6">
+            
+            {/* Faction Select */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-400 uppercase">Select Your Faction</label>
+              <select
+                value={factionId}
+                onChange={(e) => setFactionId(e.target.value)}
+                className="w-full h-11 bg-[#1c2230] border border-[#2c3548] rounded-xl px-3 text-sm focus:border-amber-500 text-white font-medium"
+              >
+                <option value="">-- Choose Your Faction --</option>
+                {factions.map(f => (
+                  <option key={f.id} value={f.id}>{f.name} ({f.spearheadName})</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Faction Customizer */}
+            {faction && (
+              <div className="space-y-4 p-5 bg-[#1c2230] rounded-xl border border-[#2c3548] animate-fadeIn">
+                
+                {/* Informational Battle Traits (Active Faction Rules) */}
+                <div className="space-y-2 p-3 bg-[#151923] rounded-lg border border-[#2c3548]/40">
+                  <label className="text-xxs font-black text-amber-500 uppercase flex items-center gap-1">
+                    <Sparkles className="h-3.5 w-3.5" /> Faction Battle Traits (All Active)
+                  </label>
+                  {faction.battleTraits.length === 0 ? (
+                    <p className="text-xxs text-gray-500 italic">No general battle traits defined for this faction.</p>
+                  ) : (
+                    <div className="space-y-3.5 divide-y divide-[#2c3548]/25">
+                      {faction.battleTraits.map((t, idx) => (
+                        <div key={t.id} className={idx > 0 ? "pt-3" : ""}>
+                          <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <span className="text-xs font-extrabold text-white">{t.name}</span>
+                            <Badge variant="outline" className="text-[9px] font-bold text-amber-400 border-amber-500/20 bg-amber-500/5 px-2 py-0">
+                              {t.timing || 'Passive'}
+                            </Badge>
+                          </div>
+                          <p className="text-xxs text-gray-400 leading-normal whitespace-pre-line">{t.effect}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Regiment Ability */}
+                <div className="space-y-1.5">
+                  <label className="text-xxs font-black text-amber-500 uppercase flex items-center gap-1">
+                    <ShieldAlert className="h-3 w-3" /> Select Regiment Ability
+                  </label>
+                  <select
+                    value={regimentId}
+                    onChange={(e) => setRegimentId(e.target.value)}
+                    className="w-full h-9 bg-[#151923] border border-[#2c3548] rounded px-2.5 text-xs text-white"
+                  >
+                    {faction.regimentAbilities.map(r => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                  {faction.regimentAbilities.find(r => r.id === regimentId) && (
+                    <p className="text-xxs text-gray-400 italic">
+                      {faction.regimentAbilities.find(r => r.id === regimentId)?.effect}
+                    </p>
+                  )}
+                </div>
+
+                {/* Enhancement */}
+                <div className="space-y-1.5">
+                  <label className="text-xxs font-black text-amber-500 uppercase flex items-center gap-1">
+                    <Sword className="h-3 w-3" /> Select General Enhancement
+                  </label>
+                  <select
+                    value={enhancementId}
+                    onChange={(e) => setEnhancementId(e.target.value)}
+                    className="w-full h-9 bg-[#151923] border border-[#2c3548] rounded px-2.5 text-xs text-white"
+                  >
+                    {faction.enhancements.map(enh => (
+                      <option key={enh.id} value={enh.id}>{enh.name}</option>
+                    ))}
+                  </select>
+                  {faction.enhancements.find(e => e.id === enhancementId) && (
+                    <p className="text-xxs text-gray-400 italic">
+                      {faction.enhancements.find(e => e.id === enhancementId)?.effect}
+                    </p>
+                  )}
+                </div>
+
+                {/* Starting Army Units Configurator */}
+                <div className="space-y-3 pt-4 border-t border-[#2c3548]/40">
+                  <label className="text-xxs font-black text-amber-500 uppercase flex items-center gap-1">
+                    <Swords className="h-3 w-3" /> Starting Army Units (Adjust duplicates if needed)
+                  </label>
+                  <div className="space-y-2">
+                    {faction.units.map(unit => {
+                      const count = unitCounts[unit.id] || 0;
+                      return (
+                        <div key={unit.id} className="flex justify-between items-center p-3 bg-[#151923] rounded-lg border border-[#2c3548]/40 hover:border-[#2c3548] transition-all">
+                          <div>
+                            <p className="text-xs font-black text-white">{unit.name}</p>
+                            <p className="text-[10px] text-gray-400">
+                              Move: {unit.move}" • Save: {unit.save}+ • HP: {unit.health} {unit.ward > 0 ? `• Ward: ${unit.ward}+` : ''} • Models: {unit.models ?? 1}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUnitCounts({
+                                  ...unitCounts,
+                                  [unit.id]: Math.max(0, count - 1)
+                                });
+                              }}
+                              className="h-7 w-7 bg-[#1c2230] hover:bg-[#2c3548] border border-[#2c3548] rounded text-gray-400 hover:text-white font-extrabold flex items-center justify-center text-sm transition-all"
+                            >
+                              -
+                            </button>
+                            <span className="text-xs font-black text-white min-w-[1.25rem] text-center">{count}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUnitCounts({
+                                  ...unitCounts,
+                                  [unit.id]: count + 1
+                                });
+                              }}
+                              className="h-7 w-7 bg-[#1c2230] hover:bg-[#2c3548] border border-[#2c3548] rounded text-gray-400 hover:text-white font-extrabold flex items-center justify-center text-sm transition-all"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* Who Goes First Selector */}
+            {faction && (
+              <div className="border-t border-[#222834] pt-6 flex flex-col items-center space-y-4">
+                <label className="text-sm font-bold text-gray-400 uppercase tracking-wider">Choose First Turn Active Player (Round 1)</label>
+                <div className="flex gap-4">
+                  <Button
+                    type="button"
+                    variant={firstPlayer === 'me' ? 'default' : 'outline'}
+                    onClick={() => setFirstPlayer('me')}
+                    className={`h-11 px-6 font-bold text-xs rounded-xl
+                      ${firstPlayer === 'me' 
+                        ? 'bg-amber-500 text-white hover:bg-amber-600' 
+                        : 'border-[#2c3548] text-gray-300 hover:bg-[#1c2230]'}`}
+                  >
+                    <User className="h-4 w-4 mr-2" /> Me First
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={firstPlayer === 'opponent' ? 'default' : 'outline'}
+                    onClick={() => setFirstPlayer('opponent')}
+                    className={`h-11 px-6 font-bold text-xs rounded-xl
+                      ${firstPlayer === 'opponent' 
+                        ? 'bg-red-500 text-white hover:bg-red-600' 
+                        : 'border-[#2c3548] text-gray-300 hover:bg-[#1c2230]'}`}
+                  >
+                    <Users className="h-4 w-4 mr-2" /> Opponent First
+                  </Button>
+                </div>
+              </div>
+            )}
+
+          </CardContent>
+          
+          <CardFooter className="bg-[#0f121a] py-6 border-t border-[#222834] p-8 flex justify-center">
+            <Button
+              onClick={handleStartGame}
+              disabled={!faction}
+              className={`w-full max-w-md h-12 rounded-xl text-base font-black uppercase tracking-wider shadow-lg transition-all duration-300
+                ${faction 
+                  ? 'bg-gradient-to-r from-[#ca8a04] to-amber-500 hover:scale-103 hover:shadow-amber-500/10 text-white' 
+                  : 'bg-gray-700 text-gray-400 cursor-not-allowed border-transparent'}`}
             >
-              <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                {item.title}{" "}
-                <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-                  →
-                </span>
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-300">{item.description}</p>
-            </Link>
-          ))}
-        </div>
+              <Swords className="h-5 w-5 mr-2 animate-bounce" />
+              Begin Spearhead Match
+            </Button>
+          </CardFooter>
+        </Card>
+
       </main>
 
-      <footer className="bg-white dark:bg-gray-800 shadow-inner mt-auto">
-        <div className="container mx-auto px-4 py-6 text-center text-sm text-gray-600 dark:text-gray-400">
-          © {new Date().getFullYear()} Spearhead Helper. All rights reserved.
-        </div>
+      {/* Footer */}
+      <footer className="border-t border-[#222834] bg-[#0d1017] py-6 text-center text-xs text-gray-500 mt-auto">
+        © {new Date().getFullYear()} Spearhead Rules Tracker • Solo Tabletop Companion
       </footer>
+
     </div>
-  )
+  );
 }
