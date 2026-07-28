@@ -20,14 +20,12 @@ const getAbilityBgClass = (ability: Partial<Ability>) => {
   const phase = ability.phase;
   const appliedPhase = ability.passiveAppliedPhase;
 
-  let targetPhase = phase;
-  if (phase === 'passive') {
-    if (!appliedPhase) {
-      targetPhase = 'end'; // falls back to purple
-    } else {
-      targetPhase = appliedPhase;
-    }
+  if (phase === 'passive' && !appliedPhase) {
+    // Unscheduled passive: distinct Indigo/violet color to differentiate from End Phase (purple)
+    return "bg-[#161a35] border-indigo-500/35 shadow-sm"; 
   }
+
+  const targetPhase = phase === 'passive' ? appliedPhase : phase;
 
   switch (targetPhase) {
     case 'start':
