@@ -47,6 +47,13 @@ const getAbilityBgClass = (ability: Partial<Ability>) => {
   }
 };
 
+const mergeFactions = (defaults: Faction[], custom: Faction[]): Faction[] => {
+  const map = new Map<string, Faction>();
+  defaults.forEach(f => map.set(f.id, f));
+  custom.forEach(f => map.set(f.id, f));
+  return Array.from(map.values());
+};
+
 export default function AdminPage() {
   const router = useRouter();
 
@@ -85,6 +92,43 @@ export default function AdminPage() {
   const [selectedUnitIndex, setSelectedUnitIndex] = useState<number>(0);
 
   // Load configuration and existing custom factions on mount
+  const saveFactionsToDisk = async (factions: Faction[]) => {
+    try {
+      await fetch('/api/save-factions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ factions }),
+      });
+    } catch (err) {
+      console.error('Error syncing custom factions to disk:', err);
+    }
+  };
+
+  const handleManualSyncToDisk = async () => {
+    try {
+      const response = await fetch('/api/save-factions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ factions: customFactions }),
+      });
+      const data = await response.json();
+      if (data.warning === 'ReadOnlyEnvironment') {
+        showToast('Local disk write bypassed on deployed production server.', 'error');
+      } else if (!response.ok) {
+        showToast('Failed to save to disk: ' + (data.error || 'Unknown error'), 'error');
+      } else {
+        showToast('Successfully synced custom factions to static default-factions.json codebase!', 'success');
+      }
+    } catch (err: any) {
+      showToast('Error saving to disk: ' + err.message, 'error');
+    }
+  };
+
+  // Load configuration and existing custom factions on mount
   useEffect(() => {
     const savedKey = localStorage.getItem('user_gemini_api_key') || '';
     setApiKey(savedKey);
@@ -92,12 +136,18 @@ export default function AdminPage() {
       setShowKeyInput(true);
     }
 
-    const savedFactionsStr = localStorage.getItem('custom_factions') || '[]';
-    try {
-      const parsed = JSON.parse(savedFactionsStr);
-      setCustomFactions(parsed);
-    } catch (err) {
-      console.error('Failed to load custom factions:', err);
+    const savedFactionsStr = localStorage.getItem('custom_factions');
+    if (savedFactionsStr) {
+      try {
+        const parsed = JSON.parse(savedFactionsStr);
+        const merged = mergeFactions(DEFAULT_FACTIONS, parsed);
+        setCustomFactions(merged);
+      } catch (err) {
+        console.error('Failed to load custom factions:', err);
+        setCustomFactions(DEFAULT_FACTIONS);
+      }
+    } else {
+      setCustomFactions(DEFAULT_FACTIONS);
     }
   }, []);
 
@@ -146,6 +196,7 @@ export default function AdminPage() {
           onConfirm: () => {
             localStorage.setItem('custom_factions', JSON.stringify(parsed));
             setCustomFactions(parsed);
+            saveFactionsToDisk(parsed);
             showToast('Backup restored successfully!');
           }
         });
@@ -291,6 +342,7 @@ export default function AdminPage() {
 
         localStorage.setItem('custom_factions', JSON.stringify(updatedFactions));
         setCustomFactions(updatedFactions);
+        saveFactionsToDisk(updatedFactions);
         setStatus('idle');
         setFile(null);
 
@@ -362,6 +414,7 @@ export default function AdminPage() {
         const updated = customFactions.filter(f => f.id !== id);
         setCustomFactions(updated);
         localStorage.setItem('custom_factions', JSON.stringify(updated));
+        saveFactionsToDisk(updated);
         showToast('Faction deleted successfully!');
       }
     });
@@ -388,6 +441,7 @@ export default function AdminPage() {
 
     localStorage.setItem('custom_factions', JSON.stringify(updatedFactions));
     setCustomFactions(updatedFactions);
+    saveFactionsToDisk(updatedFactions);
     setIsEditing(false);
     setEditorFaction(null);
     showToast(`Faction "${finalFaction.name}" saved successfully to your roster!`, 'success');
@@ -1384,6 +1438,15 @@ export default function AdminPage() {
                       <Upload className="h-4 w-4" /> Restore Database Backup
                     </Button>
                   </div>
+                </div>
+
+                <div className="border-t border-[#222834]/50 pt-3.5">
+                  <Button 
+                    onClick={handleManualSyncToDisk} 
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs gap-1.5 h-10 shadow-md"
+                  >
+                    <Save className="h-4 w-4" /> 💾 Save to Static Codebase (Local Disk)
+                  </Button>
                 </div>
               </CardContent>
             </Card>

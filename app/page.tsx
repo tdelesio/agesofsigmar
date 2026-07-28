@@ -23,6 +23,13 @@ const getPhaseLabel = (phase: string, appliedPhase?: string) => {
   return phase;
 };
 
+const mergeFactions = (defaults: Faction[], custom: Faction[]): Faction[] => {
+  const map = new Map<string, Faction>();
+  defaults.forEach(f => map.set(f.id, f));
+  custom.forEach(f => map.set(f.id, f));
+  return Array.from(map.values());
+};
+
 export default function HomePage() {
   const router = useRouter();
 
@@ -57,10 +64,13 @@ export default function HomePage() {
     if (savedFactionsStr) {
       try {
         const customFactions: Faction[] = JSON.parse(savedFactionsStr);
-        setFactions([...DEFAULT_FACTIONS, ...customFactions]);
+        setFactions(mergeFactions(DEFAULT_FACTIONS, customFactions));
       } catch (err) {
         console.error('Failed to parse custom factions from storage:', err);
+        setFactions(DEFAULT_FACTIONS);
       }
+    } else {
+      setFactions(DEFAULT_FACTIONS);
     }
 
     const activeGame = localStorage.getItem('active_spearhead_game');
