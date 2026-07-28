@@ -409,41 +409,45 @@ export default function TrackerPage() {
     return unit.abilities.filter(a => a.phase === phase);
   };
 
-  // Get passive abilities (faction-wide) that are applied to the active phase
+  // Get passive abilities (faction-wide) that are applied to the active phase (or always active if none is assigned)
   const getPassiveAbilitiesForPhase = (phase: string): Ability[] => {
     if (!gameState) return [];
     const list: Ability[] = [];
     
+    const isMatched = (a: Ability) => {
+      return a.phase === 'passive' && (!a.passiveAppliedPhase || a.passiveAppliedPhase === (phase as GamePhase));
+    };
+
     // Faction-wide passives
     if (gameState.selectedBattleTraitId === 'all') {
       faction.battleTraits.forEach(t => {
-        if (t.phase === 'passive' && t.passiveAppliedPhase === phase) {
+        if (isMatched(t)) {
           list.push(t);
         }
       });
     } else {
       const trait = faction.battleTraits.find(t => t.id === gameState.selectedBattleTraitId);
-      if (trait && trait.phase === 'passive' && trait.passiveAppliedPhase === phase) {
+      if (trait && isMatched(trait)) {
         list.push(trait);
       }
     }
 
     const regiment = faction.regimentAbilities.find(r => r.id === gameState.selectedRegimentAbilityId);
-    if (regiment && regiment.phase === 'passive' && regiment.passiveAppliedPhase === phase) {
+    if (regiment && isMatched(regiment)) {
       list.push(regiment);
     }
 
     const enhancement = faction.enhancements.find(e => e.id === gameState.selectedEnhancementId);
-    if (enhancement && enhancement.phase === 'passive' && enhancement.passiveAppliedPhase === phase) {
+    if (enhancement && isMatched(enhancement)) {
       list.push(enhancement);
     }
 
     return list;
   };
 
-  // Get passive abilities on a specific unit that apply to the current active phase
+  // Get passive abilities on a specific unit that apply to the current active phase (or always active if none is assigned)
   const getUnitPassiveAbilitiesForPhase = (unit: Unit, phase: string): Ability[] => {
-    return unit.abilities.filter(a => a.phase === 'passive' && a.passiveAppliedPhase === phase);
+    return unit.abilities.filter(a => a.phase === 'passive' && (!a.passiveAppliedPhase || a.passiveAppliedPhase === (phase as GamePhase)));
   };
 
   return (

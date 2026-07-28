@@ -13,6 +13,16 @@ import { Badge } from '@/components/ui/badge';
 import { DEFAULT_FACTIONS } from './data/default-factions';
 import { Faction, GameState, UnitState } from './types';
 
+const getPhaseLabel = (phase: string, appliedPhase?: string) => {
+  if (phase === 'passive') {
+    if (appliedPhase) {
+      return `Passive (In: ${appliedPhase})`;
+    }
+    return 'Passive (Always Active)';
+  }
+  return phase;
+};
+
 export default function HomePage() {
   const router = useRouter();
 
@@ -268,11 +278,38 @@ export default function HomePage() {
                       <option key={r.id} value={r.id}>{r.name}</option>
                     ))}
                   </select>
-                  {faction.regimentAbilities.find(r => r.id === regimentId) && (
-                    <p className="text-xxs text-gray-400 italic">
-                      {faction.regimentAbilities.find(r => r.id === regimentId)?.effect}
-                    </p>
-                  )}
+                  {(() => {
+                    const r = faction.regimentAbilities.find(r => r.id === regimentId);
+                    if (!r) return null;
+                    return (
+                      <div className="bg-[#121622] border border-[#2c3548]/45 rounded-lg p-3 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-[#2c3548]/30 pb-1.5">
+                          <span className="text-xs font-black text-white">{r.name}</span>
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="outline" className="text-[8px] leading-none font-bold text-amber-400 border-amber-500/20 bg-amber-500/5 px-1.5 py-0.5">
+                              {r.timing || 'Passive'}
+                            </Badge>
+                            {r.phase && (
+                              <Badge variant="outline" className="text-[8px] leading-none font-bold text-cyan-400 border-cyan-500/20 bg-cyan-500/5 px-1.5 py-0.5 uppercase">
+                                {getPhaseLabel(r.phase, r.passiveAppliedPhase)}
+                              </Badge>
+                            )}
+                            {r.isDefense && (
+                              <Badge variant="outline" className="text-[8px] leading-none font-bold text-rose-400 border-rose-500/20 bg-rose-500/5 px-1.5 py-0.5 uppercase">
+                                Defense
+                              </Badge>
+                            )}
+                            {r.once && r.once !== 'none' && (
+                              <Badge variant="outline" className="text-[8px] leading-none font-bold text-purple-400 border-purple-500/20 bg-purple-500/5 px-1.5 py-0.5 uppercase">
+                                {r.once.replace('-', ' ')}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-xxs text-gray-400 leading-normal whitespace-pre-line">{r.effect}</p>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Enhancement */}
@@ -289,11 +326,38 @@ export default function HomePage() {
                       <option key={enh.id} value={enh.id}>{enh.name}</option>
                     ))}
                   </select>
-                  {faction.enhancements.find(e => e.id === enhancementId) && (
-                    <p className="text-xxs text-gray-400 italic">
-                      {faction.enhancements.find(e => e.id === enhancementId)?.effect}
-                    </p>
-                  )}
+                  {(() => {
+                    const e = faction.enhancements.find(e => e.id === enhancementId);
+                    if (!e) return null;
+                    return (
+                      <div className="bg-[#121622] border border-[#2c3548]/45 rounded-lg p-3 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-[#2c3548]/30 pb-1.5">
+                          <span className="text-xs font-black text-white">{e.name}</span>
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="outline" className="text-[8px] leading-none font-bold text-amber-400 border-amber-500/20 bg-amber-500/5 px-1.5 py-0.5">
+                              {e.timing || 'Passive'}
+                            </Badge>
+                            {e.phase && (
+                              <Badge variant="outline" className="text-[8px] leading-none font-bold text-cyan-400 border-cyan-500/20 bg-cyan-500/5 px-1.5 py-0.5 uppercase">
+                                {getPhaseLabel(e.phase, e.passiveAppliedPhase)}
+                              </Badge>
+                            )}
+                            {e.isDefense && (
+                              <Badge variant="outline" className="text-[8px] leading-none font-bold text-rose-400 border-rose-500/20 bg-rose-500/5 px-1.5 py-0.5 uppercase">
+                                Defense
+                              </Badge>
+                            )}
+                            {e.once && e.once !== 'none' && (
+                              <Badge variant="outline" className="text-[8px] leading-none font-bold text-purple-400 border-purple-500/20 bg-purple-500/5 px-1.5 py-0.5 uppercase">
+                                {e.once.replace('-', ' ')}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-xxs text-gray-400 leading-normal whitespace-pre-line">{e.effect}</p>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Starting Army Units Configurator */}
