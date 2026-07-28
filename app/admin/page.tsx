@@ -372,7 +372,7 @@ export default function AdminPage() {
     type: 'battleTraits' | 'regimentAbilities' | 'enhancements',
     index: number,
     field: keyof Ability,
-    value: string
+    value: any
   ) => {
     if (!editorFaction) return;
     const updatedList = [...editorFaction[type]];
@@ -681,6 +681,41 @@ export default function AdminPage() {
                           <label className="text-[10px] text-gray-500 font-bold uppercase">Rule Effect Text</label>
                           <textarea value={trait.effect} onChange={(e) => updateAbility('battleTraits', index, 'effect', e.target.value)} className="w-full rounded-md border border-[#2c3547] bg-[#151923] p-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 min-h-16" />
                         </div>
+
+                        {/* Custom Passive Applied Phase & Defensive Fields */}
+                        <div className="flex flex-col sm:flex-row gap-4 pt-1 border-t border-[#222834]/40 mt-2">
+                          {trait.phase === 'passive' && (
+                            <div className="flex-1 space-y-1">
+                              <label className="text-[10px] text-amber-500 font-extrabold uppercase tracking-wide">Applied Active Phase</label>
+                              <select 
+                                value={trait.passiveAppliedPhase || ''} 
+                                onChange={(e) => updateAbility('battleTraits', index, 'passiveAppliedPhase', e.target.value || undefined)}
+                                className="w-full bg-[#151923] border border-[#2c3547] text-xs h-8 rounded px-2 text-white"
+                              >
+                                <option value="">None (Always Active)</option>
+                                <option value="start">Start of Turn</option>
+                                <option value="hero">Hero Phase</option>
+                                <option value="movement">Movement Phase</option>
+                                <option value="shooting">Shooting Phase</option>
+                                <option value="charge">Charge Phase</option>
+                                <option value="combat">Combat Phase</option>
+                                <option value="end">End of Turn</option>
+                              </select>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 pt-3">
+                            <input 
+                              type="checkbox" 
+                              id={`isDefense-trait-${trait.id}`}
+                              checked={trait.isDefense || false} 
+                              onChange={(e) => updateAbility('battleTraits', index, 'isDefense', e.target.checked)}
+                              className="rounded bg-[#151923] border-[#2c3547] text-amber-500 focus:ring-amber-500/20" 
+                            />
+                            <label htmlFor={`isDefense-trait-${trait.id}`} className="text-xs text-gray-300 font-bold cursor-pointer select-none">
+                              🛡️ Defensive Ability (Show on Opponent's Turn)
+                            </label>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </CardContent>
@@ -734,6 +769,41 @@ export default function AdminPage() {
                           <label className="text-[10px] text-gray-500 font-bold uppercase">Rule Effect Text</label>
                           <textarea value={reg.effect} onChange={(e) => updateAbility('regimentAbilities', index, 'effect', e.target.value)} className="w-full rounded-md border border-[#2c3547] bg-[#151923] p-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 min-h-16" />
                         </div>
+
+                        {/* Custom Passive Applied Phase & Defensive Fields */}
+                        <div className="flex flex-col sm:flex-row gap-4 pt-1 border-t border-[#222834]/40 mt-2">
+                          {reg.phase === 'passive' && (
+                            <div className="flex-1 space-y-1">
+                              <label className="text-[10px] text-amber-500 font-extrabold uppercase tracking-wide">Applied Active Phase</label>
+                              <select 
+                                value={reg.passiveAppliedPhase || ''} 
+                                onChange={(e) => updateAbility('regimentAbilities', index, 'passiveAppliedPhase', e.target.value || undefined)}
+                                className="w-full bg-[#151923] border border-[#2c3547] text-xs h-8 rounded px-2 text-white"
+                              >
+                                <option value="">None (Always Active)</option>
+                                <option value="start">Start of Turn</option>
+                                <option value="hero">Hero Phase</option>
+                                <option value="movement">Movement Phase</option>
+                                <option value="shooting">Shooting Phase</option>
+                                <option value="charge">Charge Phase</option>
+                                <option value="combat">Combat Phase</option>
+                                <option value="end">End of Turn</option>
+                              </select>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 pt-3">
+                            <input 
+                              type="checkbox" 
+                              id={`isDefense-reg-${reg.id}`}
+                              checked={reg.isDefense || false} 
+                              onChange={(e) => updateAbility('regimentAbilities', index, 'isDefense', e.target.checked)}
+                              className="rounded bg-[#151923] border-[#2c3547] text-amber-500 focus:ring-amber-500/20" 
+                            />
+                            <label htmlFor={`isDefense-reg-${reg.id}`} className="text-xs text-gray-300 font-bold cursor-pointer select-none">
+                              🛡️ Defensive Ability (Show on Opponent's Turn)
+                            </label>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </CardContent>
@@ -786,6 +856,41 @@ export default function AdminPage() {
                         <div className="space-y-1">
                           <label className="text-[10px] text-gray-500 font-bold uppercase">Rule Effect Text</label>
                           <textarea value={enh.effect} onChange={(e) => updateAbility('enhancements', index, 'effect', e.target.value)} className="w-full rounded-md border border-[#2c3547] bg-[#151923] p-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 min-h-16" />
+                        </div>
+
+                        {/* Custom Passive Applied Phase & Defensive Fields */}
+                        <div className="flex flex-col sm:flex-row gap-4 pt-1 border-t border-[#222834]/40 mt-2">
+                          {enh.phase === 'passive' && (
+                            <div className="flex-1 space-y-1">
+                              <label className="text-[10px] text-amber-500 font-extrabold uppercase tracking-wide">Applied Active Phase</label>
+                              <select 
+                                value={enh.passiveAppliedPhase || ''} 
+                                onChange={(e) => updateAbility('enhancements', index, 'passiveAppliedPhase', e.target.value || undefined)}
+                                className="w-full bg-[#151923] border border-[#2c3547] text-xs h-8 rounded px-2 text-white"
+                              >
+                                <option value="">None (Always Active)</option>
+                                <option value="start">Start of Turn</option>
+                                <option value="hero">Hero Phase</option>
+                                <option value="movement">Movement Phase</option>
+                                <option value="shooting">Shooting Phase</option>
+                                <option value="charge">Charge Phase</option>
+                                <option value="combat">Combat Phase</option>
+                                <option value="end">End of Turn</option>
+                              </select>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 pt-3">
+                            <input 
+                              type="checkbox" 
+                              id={`isDefense-enh-${enh.id}`}
+                              checked={enh.isDefense || false} 
+                              onChange={(e) => updateAbility('enhancements', index, 'isDefense', e.target.checked)}
+                              className="rounded bg-[#151923] border-[#2c3547] text-amber-500 focus:ring-amber-500/20" 
+                            />
+                            <label htmlFor={`isDefense-enh-${enh.id}`} className="text-xs text-gray-300 font-bold cursor-pointer select-none">
+                              🛡️ Defensive Ability (Show on Opponent's Turn)
+                            </label>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1028,6 +1133,41 @@ export default function AdminPage() {
                               <div className="space-y-1">
                                 <label className="text-[9px] text-gray-500 font-bold uppercase">Rule Effect Text</label>
                                 <textarea value={ability.effect} onChange={(e) => updateUnitAbility(selectedUnitIndex, abilityIdx, 'effect', e.target.value)} className="w-full rounded-md border border-[#2c3547] bg-[#151923] p-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 min-h-12" />
+                              </div>
+
+                              {/* Custom Passive Applied Phase & Defensive Fields */}
+                              <div className="flex flex-col sm:flex-row gap-4 pt-1 border-t border-[#222834]/40 mt-2">
+                                {ability.phase === 'passive' && (
+                                  <div className="flex-1 space-y-1">
+                                    <label className="text-[10px] text-amber-500 font-extrabold uppercase tracking-wide">Applied Active Phase</label>
+                                    <select 
+                                      value={ability.passiveAppliedPhase || ''} 
+                                      onChange={(e) => updateUnitAbility(selectedUnitIndex, abilityIdx, 'passiveAppliedPhase', e.target.value || undefined)}
+                                      className="w-full bg-[#151923] border border-[#2c3547] text-xs h-8 rounded px-2 text-white"
+                                    >
+                                      <option value="">None (Always Active)</option>
+                                      <option value="start">Start of Turn</option>
+                                      <option value="hero">Hero Phase</option>
+                                      <option value="movement">Movement Phase</option>
+                                      <option value="shooting">Shooting Phase</option>
+                                      <option value="charge">Charge Phase</option>
+                                      <option value="combat">Combat Phase</option>
+                                      <option value="end">End of Turn</option>
+                                    </select>
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-2 pt-3">
+                                  <input 
+                                    type="checkbox" 
+                                    id={`isDefense-unit-${ability.id}`}
+                                    checked={ability.isDefense || false} 
+                                    onChange={(e) => updateUnitAbility(selectedUnitIndex, abilityIdx, 'isDefense', e.target.checked)}
+                                    className="rounded bg-[#151923] border-[#2c3547] text-amber-500 focus:ring-amber-500/20" 
+                                  />
+                                  <label htmlFor={`isDefense-unit-${ability.id}`} className="text-xs text-gray-300 font-bold cursor-pointer select-none">
+                                    🛡️ Defensive Ability (Show on Opponent's Turn)
+                                  </label>
+                                </div>
                               </div>
                             </div>
                           ))}

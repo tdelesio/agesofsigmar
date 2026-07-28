@@ -21,6 +21,7 @@ export default function TrackerPage() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [factions, setFactions] = useState<Faction[]>(DEFAULT_FACTIONS);
   const [activeTab, setActiveTab] = useState<'tracker' | 'roster' | 'traits' | 'logs'>('tracker');
+  const [turnScoredVPs, setTurnScoredVPs] = useState(0);
 
   // Custom non-blocking modal states
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
@@ -284,6 +285,7 @@ export default function TrackerPage() {
   };
 
   const handleNextPhase = () => {
+    if (!gameState) return;
     const updated = { ...gameState };
     
     if (currentPhaseIndex < phases.length - 1) {
@@ -292,13 +294,19 @@ export default function TrackerPage() {
       saveGame(updated);
     } else {
       // End of "End" phase -> transition turn
-      handleEndTurn();
+      updated.victoryPoints = Math.max(0, updated.victoryPoints + turnScoredVPs);
+      updated.logs.unshift(`[Round ${gameState.round}] Scored +${turnScoredVPs} Victory Points. Total score is now ${updated.victoryPoints} VPs.`);
+      
+      // Pass the updated game state containing the new VPs to handleEndTurn
+      handleEndTurn(updated);
+      setTurnScoredVPs(0); // reset the turn counter
     }
   };
 
   // Transition turn and round
-  const handleEndTurn = () => {
-    const updated = { ...gameState };
+  const handleEndTurn = (stateToUse?: GameState) => {
+    if (!gameState) return;
+    const updated = stateToUse || { ...gameState };
     const lastTurn = updated.activeTurn;
     
     // Toggle active turn
@@ -308,9 +316,6 @@ export default function TrackerPage() {
     updated.logs.unshift(`⚔️ Finished turn for ${lastTurn === 'me' ? 'Me' : 'Opponent'}.`);
 
     // Increment round if switching back to the player who had priority
-    // To make it simple, we increment the round each time we return to Player "Me" (if they started),
-    // or when we finish both. To be perfectly accurate and simple:
-    // If the next turn is 'me' and the last turn was 'opponent', it means a full round of two turns has completed!
     if (lastTurn === 'opponent') {
       if (updated.round < 4) {
         updated.round += 1;
@@ -329,7 +334,6 @@ export default function TrackerPage() {
 
     // Reset once-per-turn abilities
     Object.keys(updated.usedAbilities).forEach(key => {
-      // Find matching ability inside faction or units
       let isOncePerTurn = true;
       const traitAb = faction.battleTraits.find(a => a.id === key);
       const regAb = faction.regimentAbilities.find(a => a.id === key);
@@ -386,6 +390,43 @@ export default function TrackerPage() {
   // Get active phase abilities on our Units
   const getUnitAbilitiesForPhase = (unit: Unit, phase: string): Ability[] => {
     return unit.abilities.filter(a => a.phase === phase);
+  };
+
+  // Get passive abilities (faction-wide) that are applied to the active phase
+  const getPassiveAbilitiesForPhase = (phase: string): Ability[] => {
+    if (!gameState) return [];
+    const list: Ability[] = [];
+    
+    // Faction-wide passives
+    if (gameState.selectedBattleTraitId === 'all') {
+      faction.battleTraits.forEach(t => {
+        if (t.phase === 'passive' && t.passiveAppliedPhase === phase) {
+          list.push(t);
+        }
+      });
+    } else {
+      const trait = faction.battleTraits.find(t => t.id === gameState.selectedBattleTraitId);
+      if (trait && trait.phase === 'passive' && trait.passiveAppliedPhase === phase) {
+        list.push(trait);
+      }
+    }
+
+    const regiment = faction.regimentAbilities.find(r => r.id === gameState.selectedRegimentAbilityId);
+    if (regiment && regiment.phase === 'passive' && regiment.passiveAppliedPhase === phase) {
+      list.push(regiment);
+    }
+
+    const enhancement = faction.enhancements.find(e => e.id === gameState.selectedEnhancementId);
+    if (enhancement && enhancement.phase === 'passive' && enhancement.passiveAppliedPhase === phase) {
+      list.push(enhancement);
+    }
+
+    return list;
+  };
+
+  // Get passive abilities on a specific unit that apply to the current active phase
+  const getUnitPassiveAbilitiesForPhase = (unit: Unit, phase: string): Ability[] => {
+    return unit.abilities.filter(a => a.phase === 'passive' && a.passiveAppliedPhase === phase);
   };
 
   return (
@@ -531,7 +572,202 @@ export default function TrackerPage() {
           <div className="space-y-6">
             
             {/* Specialized Tactically Interactive Phase Widgets */}
-            
+
+            {/* 🛡️ OPPONENT ATTACK & DEFENSIVE ROSTER DASHBOARD */}
+            {gameState.activeTurn === 'opponent' && (
+              <Card className="border-[#222834] bg-[#11141c] text-white">
+                <CardHeader className="border-b border-[#222834] py-4">
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-1.5 text-rose-400">
+                      <Shield className="h-4 w-4" /> My Defensive Roster & Responses
+                    </CardTitle>
+                    <Badge className="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-xxs px-2 py-0.5 font-bold uppercase animate-pulse">
+                      🛡️ Defending
+                    </Badge>
+                  </div>
+                  <CardDescription className="text-xxs text-gray-400">
+                    The opponent is attacking! Monitor unit **Save** and **Ward** profiles, toggle defensive abilities, and log model casualties or wounds instantly.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 space-y-6">
+                  
+                  {/* Defensive abilities for current phase */}
+                  {(() => {
+                    // Gather all defensive abilities that are active
+                    const defAbilities: { source: string; name: string; timing?: string; effect: string; id: string; key: string }[] = [];
+                    
+                    // Faction defensive abilities
+                    if (gameState.selectedBattleTraitId === 'all') {
+                      faction.battleTraits.forEach(a => {
+                        if (a.isDefense) defAbilities.push({ source: 'Faction Trait', name: a.name, timing: a.timing, effect: a.effect, id: a.id, key: a.id });
+                      });
+                    } else {
+                      const trait = faction.battleTraits.find(a => a.id === gameState.selectedBattleTraitId);
+                      if (trait && trait.isDefense) {
+                        defAbilities.push({ source: 'Faction Trait', name: trait.name, timing: trait.timing, effect: trait.effect, id: trait.id, key: trait.id });
+                      }
+                    }
+
+                    const regiment = faction.regimentAbilities.find(a => a.id === gameState.selectedRegimentAbilityId);
+                    if (regiment && regiment.isDefense) {
+                      defAbilities.push({ source: 'Regiment', name: regiment.name, timing: regiment.timing, effect: regiment.effect, id: regiment.id, key: regiment.id });
+                    }
+
+                    const enhancement = faction.enhancements.find(a => a.id === gameState.selectedEnhancementId);
+                    if (enhancement && enhancement.isDefense) {
+                      defAbilities.push({ source: 'Enhancement', name: enhancement.name, timing: enhancement.timing, effect: enhancement.effect, id: enhancement.id, key: enhancement.id });
+                    }
+
+                    // Unit specific defensive abilities
+                    gameState.units.filter(u => !u.isSlain).forEach(u => {
+                      const uRules = faction.units.find(r => r.id === u.unitId);
+                      if (uRules) {
+                        uRules.abilities.forEach(a => {
+                          if (a.isDefense) {
+                            defAbilities.push({ 
+                              source: uRules.name, 
+                              name: a.name, 
+                              timing: a.timing, 
+                              effect: a.effect, 
+                              id: a.id,
+                              key: `${u.id}-${a.id}`
+                            });
+                          }
+                        });
+                      }
+                    });
+
+                    if (defAbilities.length === 0) return null;
+
+                    return (
+                      <div className="space-y-3">
+                        <h4 className="text-xxs font-black text-rose-400 uppercase tracking-widest pb-1.5 border-b border-[#222834]/60">
+                          🛡️ Available Defensive Responses:
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {defAbilities.map(ab => {
+                            const isUsed = !!gameState.usedAbilities[ab.key];
+                            return (
+                              <Card 
+                                key={ab.key} 
+                                onClick={() => toggleAbilityUsed(ab.key, `${ab.source}: ${ab.name}`)}
+                                className={`cursor-pointer transition-all duration-300 relative overflow-hidden text-white border p-3.5 space-y-1.5
+                                  ${isUsed 
+                                    ? 'bg-zinc-800/30 border-transparent saturate-0 opacity-40' 
+                                    : 'bg-[#151a24] border-rose-500/25 hover:border-rose-500/50 shadow-md shadow-rose-950/5'}`}
+                              >
+                                <div className="flex justify-between items-start gap-1">
+                                  <div>
+                                    <span className="text-[9px] font-black text-rose-400 uppercase tracking-wider block">{ab.source}</span>
+                                    <h5 className="text-xs font-bold text-white mt-0.5">{ab.name}</h5>
+                                  </div>
+                                  <Badge className="bg-rose-500/20 text-rose-400 text-[8px] uppercase shrink-0 font-bold">DEFENSE</Badge>
+                                </div>
+                                {ab.timing && <p className="text-[10px] text-amber-500/80 font-medium">{ab.timing}</p>}
+                                <p className="text-xxs text-gray-300 leading-normal">{ab.effect}</p>
+                                {isUsed && (
+                                  <div className="absolute inset-0 bg-[#0d1015]/15 flex items-center justify-center">
+                                    <span className="text-sm font-black text-rose-500 uppercase rotate-[-8deg] tracking-widest bg-zinc-950/80 px-2 py-0.5 rounded border border-rose-600/40">TRIGGERED</span>
+                                  </div>
+                                )}
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Defensive Survival profiles grid */}
+                  <div className="space-y-3">
+                    <h4 className="text-xxs font-black text-gray-400 uppercase tracking-widest pb-1.5 border-b border-[#222834]/60">
+                      📋 Active Defender Roster profiles:
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {gameState.units.filter(u => !u.isSlain).map(u => {
+                        const uRules = faction.units.find(r => r.id === u.unitId);
+                        if (!uRules) return null;
+                        
+                        return (
+                          <div key={u.id} className="bg-[#1c2230] border border-[#2c3548] p-4 rounded-xl space-y-3 shadow-sm hover:border-[#384358] transition-all">
+                            <div className="flex justify-between items-start border-b border-[#2c3548]/40 pb-2">
+                              <div>
+                                <h5 className="text-xs font-black text-white">{uRules.name}</h5>
+                                <div className="flex gap-2 items-center mt-1">
+                                  <Badge className="bg-blue-600/15 text-blue-400 border border-blue-500/20 text-[9px] font-black uppercase">
+                                    SAVE: {uRules.save}+
+                                  </Badge>
+                                  {uRules.ward > 0 ? (
+                                    <Badge className="bg-emerald-600/15 text-emerald-400 border border-emerald-500/20 text-[9px] font-black uppercase">
+                                      WARD: {uRules.ward}+
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-gray-500 border-gray-800 text-[9px] font-black uppercase">
+                                      NO WARD
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="text-purple-400 border-purple-500/10 bg-purple-500/5 text-[9px] font-bold">
+                                    HP/Model: {uRules.health}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Direct HP and Models Casuality Adjusters */}
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-[#151923]/60 p-2 rounded-xl border border-[#222834]">
+                              <div className="flex justify-between items-center gap-2 flex-grow">
+                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Models</span>
+                                <div className="flex items-center bg-[#1c2230] rounded border border-[#2c3548] overflow-hidden">
+                                  <button
+                                    onClick={() => adjustModelsById(u.id, -1)}
+                                    className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-red-400 font-extrabold text-xs transition-all"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="px-3 font-black text-white text-xs min-w-[2.5rem] text-center">
+                                    {u.modelsCount ?? uRules.models ?? 1} / {u.maxModels ?? uRules.models ?? 1}
+                                  </span>
+                                  <button
+                                    onClick={() => adjustModelsById(u.id, 1)}
+                                    className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-emerald-400 font-extrabold text-xs transition-all"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="hidden sm:block h-6 w-px bg-[#2c3548]/40" />
+
+                              <div className="flex justify-between items-center gap-2 flex-grow">
+                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Model HP</span>
+                                <div className="flex items-center bg-[#1c2230] rounded border border-[#2c3548] overflow-hidden">
+                                  <button
+                                    onClick={() => adjustWoundsById(u.id, -1)}
+                                    className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-red-400 font-extrabold text-xs transition-all"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="px-3 font-black text-white text-xs min-w-[3.5rem] text-center">
+                                    {uRules.health - (u.currentWounds || 0)} / {uRules.health} HP
+                                  </span>
+                                  <button
+                                    onClick={() => adjustWoundsById(u.id, 1)}
+                                    className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-emerald-400 font-extrabold text-xs transition-all"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* MOVEMENT PHASE WIDGET */}
             {gameState.currentPhase === 'movement' && gameState.activeTurn === 'me' && (
               <Card className="border-[#222834] bg-[#151923] text-white">
@@ -924,24 +1160,84 @@ export default function TrackerPage() {
             {gameState.currentPhase === 'end' && (
               <Card className="border-[#222834] bg-[#151923] text-white">
                 <CardHeader className="border-b border-[#222834] py-4">
-                  <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
-                    <Trophy className="h-4 w-4" /> Turn Scoring Entry
-                  </CardTitle>
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-1.5 text-purple-400">
+                      <Trophy className="h-4 w-4" /> Turn Scoring & Reference
+                    </CardTitle>
+                    <Badge className="bg-purple-600/20 text-purple-400 border border-purple-500/20 text-[10px] px-2 py-0.5 font-bold uppercase">
+                      End of Turn Scoring
+                    </Badge>
+                  </div>
                   <CardDescription className="text-xxs text-gray-400">
-                    Add up Battle Tactics and control cards for this turn, then click **End Turn** to alternate priority.
+                    Consult the official Spearhead scoring rules, select exactly how many victory points you earned, and end your turn.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="p-6 flex flex-col items-center space-y-4">
-                  <h4 className="text-xs font-bold text-gray-300">Quick Score Victory Points:</h4>
-                  <div className="flex gap-3">
-                    <Button onClick={() => updateVP(1)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs">
-                      +1 VP
-                    </Button>
-                    <Button onClick={() => updateVP(2)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs">
-                      +2 VPs
-                    </Button>
-                    <Button onClick={() => updateVP(3)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs">
-                      +3 VPs
+                <CardContent className="p-5 space-y-5">
+                  {/* Official Spearhead Scoring Reference */}
+                  <div className="p-4 bg-[#0d1017]/80 rounded-xl border border-[#222834] space-y-2.5">
+                    <h5 className="text-xs font-black text-purple-400 uppercase tracking-wider flex items-center gap-1">
+                      📋 Official Spearhead Scoring Guide:
+                    </h5>
+                    <ul className="space-y-1.5 text-xxs text-gray-300">
+                      <li className="flex justify-between items-center border-b border-[#222834]/40 pb-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-purple-500" /> Control at least one objective
+                        </span>
+                        <Badge variant="outline" className="text-purple-400 border-purple-500/20 bg-purple-500/5 text-[9px] font-black">+1 VP</Badge>
+                      </li>
+                      <li className="flex justify-between items-center border-b border-[#222834]/40 pb-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-purple-500" /> Control two or more objectives
+                        </span>
+                        <Badge variant="outline" className="text-purple-400 border-purple-500/20 bg-purple-500/5 text-[9px] font-black">+1 VP</Badge>
+                      </li>
+                      <li className="flex justify-between items-center border-b border-[#222834]/40 pb-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-purple-500" /> Control more objectives than opponent
+                        </span>
+                        <Badge variant="outline" className="text-purple-400 border-purple-500/20 bg-purple-500/5 text-[9px] font-black">+1 VP</Badge>
+                      </li>
+                      <li className="flex justify-between items-center pb-0.5">
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-purple-500" /> Score for each Battle Tactic completed this turn
+                        </span>
+                        <Badge variant="outline" className="text-purple-400 border-purple-500/20 bg-purple-500/5 text-[9px] font-black">+1 VP each</Badge>
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Active VP Scoring Selector */}
+                  <div className="flex flex-col items-center justify-center space-y-3 bg-[#1c2230] p-4 rounded-xl border border-[#2c3548]">
+                    <div className="text-center">
+                      <span className="text-xxs font-black text-gray-400 uppercase tracking-wider block">VICTORY POINTS EARNED THIS TURN</span>
+                      <p className="text-[10px] text-purple-400/80 mt-0.5 font-medium">Includes tactics, objectives, or special card rules</p>
+                    </div>
+
+                    <div className="flex items-center bg-[#151923] rounded-2xl border border-[#2c3548] overflow-hidden p-1">
+                      <Button 
+                        type="button"
+                        onClick={() => setTurnScoredVPs(prev => Math.max(0, prev - 1))}
+                        className="bg-transparent hover:bg-[#2c3548] text-gray-400 hover:text-red-400 font-extrabold text-lg h-10 w-10 p-0 transition-all rounded-xl"
+                      >
+                        -
+                      </Button>
+                      <span className="px-6 font-black text-white text-xl min-w-[5rem] text-center">
+                        {turnScoredVPs} VP
+                      </span>
+                      <Button 
+                        type="button"
+                        onClick={() => setTurnScoredVPs(prev => prev + 1)}
+                        className="bg-transparent hover:bg-[#2c3548] text-gray-400 hover:text-emerald-400 font-extrabold text-lg h-10 w-10 p-0 transition-all rounded-xl"
+                      >
+                        +
+                      </Button>
+                    </div>
+
+                    <Button 
+                      onClick={handleNextPhase} 
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white font-black text-xs h-10 shadow-md uppercase tracking-wider rounded-xl mt-2"
+                    >
+                      Commit {turnScoredVPs} VP & End Turn
                     </Button>
                   </div>
                 </CardContent>
@@ -1050,6 +1346,70 @@ export default function TrackerPage() {
                 </p>
               )}
             </div>
+
+            {/* 🧬 PHASE-APPLIED PASSIVE ABILITIES */}
+            {(getPassiveAbilitiesForPhase(gameState.currentPhase).length > 0 || 
+              gameState.units.filter(u => !u.isSlain).flatMap(u => {
+                const uRules = faction.units.find(rules => rules.id === u.unitId);
+                return uRules ? getUnitPassiveAbilitiesForPhase(uRules, gameState.currentPhase) : [];
+              }).length > 0) && (
+              <div className="space-y-4 pt-4 border-t border-[#222834]/40">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="h-4.5 w-4.5 text-cyan-400 animate-pulse" /> 
+                    🧬 Phase-Applied Passive Rules ({phases[currentPhaseIndex].name})
+                  </h3>
+                  <Badge variant="outline" className="uppercase text-xxs border-cyan-500/30 bg-cyan-500/10 text-cyan-400">
+                    PASSIVE ALWAYS ACTIVE
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Faction-Level Passives */}
+                  {getPassiveAbilitiesForPhase(gameState.currentPhase).map(ability => (
+                    <Card key={ability.id} className="bg-[#14222a] border-cyan-500/20 text-white shadow-lg shadow-cyan-950/10">
+                      <CardHeader className="p-4 pb-1">
+                        <div className="flex justify-between items-start gap-2">
+                          <CardTitle className="text-xs font-bold text-white">{ability.name}</CardTitle>
+                          <Badge variant="outline" className="border-cyan-500/40 text-cyan-300 text-[9px] uppercase">
+                            FACTION PASSIVE
+                          </Badge>
+                        </div>
+                        {ability.timing && <CardDescription className="text-xxs text-cyan-400/80 mt-0.5">{ability.timing}</CardDescription>}
+                      </CardHeader>
+                      <CardContent className="p-4 pt-1">
+                        <p className="text-xxs text-gray-300 leading-normal whitespace-pre-line">{ability.effect}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                  {/* Unit-Specific Passives */}
+                  {gameState.units.filter(u => !u.isSlain).flatMap((u) => {
+                    const uRules = faction.units.find(rules => rules.id === u.unitId);
+                    if (!uRules) return [];
+                    return getUnitPassiveAbilitiesForPhase(uRules, gameState.currentPhase).map(ability => (
+                      <Card key={`${u.id}-${ability.id}`} className="bg-[#14222a] border-cyan-500/20 text-white shadow-lg shadow-cyan-950/10">
+                        <CardHeader className="p-4 pb-1">
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <CardDescription className="text-xxs font-black text-cyan-400 uppercase tracking-wider">{uRules.name}</CardDescription>
+                              <CardTitle className="text-xs font-bold text-white mt-0.5">{ability.name}</CardTitle>
+                            </div>
+                            <Badge variant="outline" className="border-cyan-500/40 text-cyan-300 text-[9px] uppercase shrink-0">
+                              UNIT PASSIVE
+                            </Badge>
+                          </div>
+                          {ability.timing && <CardDescription className="text-xxs text-cyan-400/80 mt-0.5">{ability.timing}</CardDescription>}
+                        </CardHeader>
+                        <CardContent className="p-4 pt-1">
+                          <p className="text-xxs text-gray-300 leading-normal whitespace-pre-line">{ability.effect}</p>
+                        </CardContent>
+                      </Card>
+                    ));
+                  })}
+                </div>
+              </div>
+            )}
 
           </div>
         )}

@@ -20,6 +20,8 @@ export interface Ability {
   phase: GamePhase | 'passive';
   timing?: string; // e.g. "Your Movement Phase", "Enemy Hero Phase", "Any Combat Phase"
   once: AbilityLimit;
+  passiveAppliedPhase?: GamePhase; // phase this passive is applied to
+  isDefense?: boolean; // is this a defensive ability
 }
 
 export interface Unit {
