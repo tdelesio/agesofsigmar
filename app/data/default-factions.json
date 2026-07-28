@@ -1,1 +1,3186 @@
-[]
+[
+  {
+    "id": "sylvaneth",
+    "name": "Sylvaneth",
+    "spearheadName": "Bitterbark Copse",
+    "battleTraits": [
+      {
+        "id": "leyLines",
+        "name": "Ley Lines",
+        "effect": "Effect: Heal (1) each friendly unit that is within 3\" of any terrain features.",
+        "phase": "end",
+        "timing": "Once Per Turn, End of Any Turn",
+        "once": "once-per-turn"
+      },
+      {
+        "id": "strikeAndFade",
+        "name": "Strike and Fade",
+        "effect": "Declare: Pick a friendly unit that used a Fight ability this turn and is within 3\" of any terrain features, then roll a dice.\nEffect: On a 2+, remove that unit from the battlefield and set it up again so that each model in the unit is within 3\" of any terrain features and more than 6\" from all enemy units.",
+        "phase": "end",
+        "timing": "Once Per Turn, End of Any Turn",
+        "once": "once-per-turn"
+      }
+    ],
+    "regimentAbilities": [
+      {
+        "id": "vengefulSpiritsOfTheLand",
+        "name": "Vengeful Spirits of the Land",
+        "effect": "Declare: Pick an enemy unit that is contesting an objective and roll a dice.\nEffect: On a 4+, inflict D3 mortal damage on that enemy unit.",
+        "phase": "end",
+        "timing": "Once Per Turn, End of Any Turn",
+        "once": "once-per-turn"
+      },
+      {
+        "id": "walkersOfTheHiddenPaths",
+        "name": "Walkers of the Hidden Paths",
+        "effect": "Declare: Pick a friendly unit that is within 3\" of any terrain features and not in combat.\nEffect: Remove that unit from the battlefield and set it up again more than 6\" from all enemy units. That unit cannot use Move abilities for the rest of the phase.",
+        "phase": "movement",
+        "timing": "Once Per Turn, Your Movement Phase",
+        "once": "once-per-turn"
+      }
+    ],
+    "enhancements": [
+      {
+        "id": "regrowth",
+        "name": "Regrowth",
+        "effect": "Declare: Pick a visible friendly unit wholly within 18\" of your general to be the target, then make a casting roll of 2D6.\nEffect: On a 5+, Heal (D6) the target.",
+        "phase": "hero",
+        "timing": "Your Hero Phase",
+        "once": "none"
+      },
+      {
+        "id": "gnarledWarrior",
+        "name": "Gnarled Warrior",
+        "effect": "Effect: Ignore negative modifiers to save rolls for your general.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none",
+        "isDefense": true
+      },
+      {
+        "id": "treesong",
+        "name": "Treesong",
+        "effect": "Declare: Pick a visible friendly unit wholly within 12\" of your general to be the target, then make a casting roll of 2D6.\nEffect: On a 7+, add 1 to the Rend characteristic of the target unit’s melee weapons until the start of your next turn.",
+        "phase": "hero",
+        "timing": "Your Hero Phase",
+        "once": "none"
+      },
+      {
+        "id": "seedOfRebirth",
+        "name": "Seed of Rebirth",
+        "effect": "Effect: If your general would be destroyed, before removing them from play, roll a dice. On a 3+, your general is not destroyed and any remaining damage points inflicted on them have no effect. Then, Heal (1) your general. This unit cannot use this ability again for the rest of the battle.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "once-per-battle",
+        "isDefense": true
+      }
+    ],
+    "units": [
+      {
+        "id": "branchwych",
+        "name": "Branchwych",
+        "move": 6,
+        "control": 2,
+        "health": 5,
+        "save": 5,
+        "ward": 0,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Greenwood Scythe and Bittergrub",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 4,
+            "rend": 1,
+            "damage": "D3"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "verdurousHarmony",
+            "name": "Verdurous Harmony",
+            "effect": "Declare: Pick a visible friendly unit wholly within 18\" of this unit to be the target, then make a casting roll of 2D6.\nEffect: On a 7+, you can return 1 slain model to the target unit. If you picked a Tree-Revenants unit, you can return D3 slain models instead of 1.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "treelord",
+        "name": "Treelord",
+        "move": 5,
+        "control": 5,
+        "health": 14,
+        "save": 3,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Strangleroots",
+            "range": "10\"",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 2,
+            "rend": 1,
+            "damage": "2",
+            "abilities": "Shoot in Combat"
+          },
+          {
+            "name": "Sweeping Blows",
+            "range": "Melee",
+            "attacks": "5",
+            "hit": 4,
+            "wound": 2,
+            "rend": 1,
+            "damage": "2"
+          },
+          {
+            "name": "Massive Impaling Talons",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 4,
+            "wound": 2,
+            "rend": 2,
+            "damage": "3"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "groundshaker",
+            "name": "Groundshaker",
+            "effect": "Declare: Pick an enemy unit in combat with this unit to be the target, then roll a dice.\nEffect: On a 4+, the target has Strike-last this phase.",
+            "phase": "combat",
+            "timing": "Any Combat Phase",
+            "once": "none"
+          },
+          {
+            "id": "battleDamaged",
+            "name": "Battle Damaged",
+            "effect": "Effect: While this unit has 10 or more damage points, the Attacks characteristic of its Massive Impaling Talons is 1.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "kurnothHunters",
+        "name": "Kurnoth Hunters",
+        "move": 5,
+        "control": 2,
+        "health": 5,
+        "save": 4,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Kurnoth Greatbow",
+            "range": "18\"",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "2"
+          },
+          {
+            "name": "Vicious Claws",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 3,
+            "rend": 0,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "envoysOfTheEverqueen",
+            "name": "Envoys of the Everqueen",
+            "effect": "Effect: While this unit is contesting an objective, friendly units contesting that objective have Ward (6+).",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none",
+            "isDefense": true
+          }
+        ],
+        "models": 3
+      },
+      {
+        "id": "treeRevenants",
+        "name": "Tree-Revenants",
+        "move": 6,
+        "control": 1,
+        "health": 2,
+        "save": 5,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Enchanted Blade",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 4,
+            "rend": 1,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "martialMemories",
+            "name": "Martial Memories",
+            "effect": "Effect: Pick 1 of the following effects to apply to this unit this phase:\nMemories of War: Add 1 to hit rolls for attacks made by this unit.\nMemories of Peace: Add 1 to save rolls for this unit.",
+            "phase": "combat",
+            "timing": "Any Combat Phase",
+            "once": "none"
+          }
+        ],
+        "models": 5
+      }
+    ]
+  },
+  {
+    "id": "ossiarch-bonereapers",
+    "name": "Ossiarch Bonereapers",
+    "spearheadName": "Mortisan Elite",
+    "battleTraits": [
+      {
+        "id": "dreadDescent",
+        "name": "Dread Descent",
+        "effect": "Set up this unit anywhere on the battlefield more than 6\" from all enemy units.",
+        "phase": "movement",
+        "timing": "Once Per Turn (Army), Your Movement Phase",
+        "once": "once-per-turn"
+      },
+      {
+        "id": "relentlessDiscipline",
+        "name": "Relentless Discipline",
+        "effect": "Declare: Pick a friendly unit to be the target.\nEffect: Make a discipline roll of D6. Add 1 to the roll if the target is wholly within 12\" of your general. On a 4+, pick 1 of the effects below:\n• Your Movement Phase: Add 2\" to the target’s Move characteristic for the rest of the phase.\n• Your Charge Phase: Add 1 to charge rolls for the target for the rest of the phase.\n• Any Combat Phase: Add 1 to wound rolls for combat attacks made by the target for the rest of the phase.\n• Any Combat Phase: The target has Ward (5+) for the rest of the phase.",
+        "phase": "start",
+        "timing": "Once Per Phase (Army)",
+        "once": "none"
+      }
+    ],
+    "regimentAbilities": [
+      {
+        "id": "peerlessCohesion",
+        "name": "Peerless Cohesion",
+        "effect": "Effect: You can use the ‘Relentless Discipline’ ability for a second time this phase but you must pick a different target to the one you picked the first time.",
+        "phase": "passive",
+        "timing": "Once Per Turn (Army), Reaction: You declared the ‘Relentless Discipline’ ability",
+        "once": "once-per-turn"
+      },
+      {
+        "id": "immaculateGeneralship",
+        "name": "Immaculate Generalship",
+        "effect": "Add 1 to discipline rolls you make.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      }
+    ],
+    "enhancements": [
+      {
+        "id": "shardStorm",
+        "name": "Shard Storm",
+        "effect": "Declare: Pick a visible enemy unit within 12\" of your general to be the target, then make a casting roll of 2D6.\nEffect: On a 7+, roll a number of dice equal to the number of models in the target unit. For each 5+, inflict 1 mortal damage on the target.",
+        "phase": "hero",
+        "timing": "Your Hero Phase",
+        "once": "none"
+      },
+      {
+        "id": "mendConstructs",
+        "name": "Mend Constructs",
+        "effect": "Declare: Pick a visible friendly unit wholly within 12\" of your general to be the target, then make a casting roll of 2D6.\nEffect: On a 6+, Heal (D3) the target.",
+        "phase": "hero",
+        "timing": "Your Hero Phase",
+        "once": "none"
+      },
+      {
+        "id": "lodeOfSaturation",
+        "name": "Lode of Saturation",
+        "effect": "Subtract 1 from the Rend characteristic of melee weapons used for combat attacks that target this general.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "helmOfTyranny",
+        "name": "Helm of Tyranny",
+        "effect": "Declare: Pick an enemy unit within 12\" of your general to be the target and roll a dice.\nEffect: On a 3+, subtract 3 from the control score of the target for the rest of the turn.",
+        "phase": "end",
+        "timing": "Once Per Battle, End of Your Turn",
+        "once": "once-per-battle"
+      }
+    ],
+    "units": [
+      {
+        "id": "mortisanOssifector",
+        "name": "Mortisan Ossifector",
+        "move": 5,
+        "control": 2,
+        "health": 5,
+        "save": 4,
+        "ward": 6,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Ossified Talons",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 4,
+            "wound": 4,
+            "rend": 0,
+            "damage": "2"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "refinedCreations",
+            "name": "Refined Creations",
+            "effect": "Declare: Pick a visible friendly unit wholly within 12\" of this unit to be the target, then make a casting roll of 2D6.\nEffect: On a 5+, the target’s melee weapons have Crit (2 Hits) until the start of your next turn.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "immortisGuard",
+        "name": "Immortis Guard",
+        "move": 5,
+        "control": 1,
+        "health": 4,
+        "save": 3,
+        "ward": 6,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Dread Halberd",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "2"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "soulboundProtectors",
+            "name": "Soulbound Protectors",
+            "effect": "Your general has Ward (5+) while they are within this unit’s combat range.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "necropolisStalkers",
+        "name": "Necropolis Stalkers",
+        "move": 6,
+        "control": 1,
+        "health": 4,
+        "save": 4,
+        "ward": 6,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Stalker Blades",
+            "range": "Melee",
+            "attacks": "4",
+            "hit": 3,
+            "wound": 3,
+            "rend": 2,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "switchAspects",
+            "name": "Switch Aspects",
+            "effect": "Pick 1 of the following effects to apply for the rest of the turn:\nBlade-parry Aspect: Subtract 1 from hit rolls for combat attacks that target this unit.\nDestroyer Aspect: Ward rolls cannot be made for damage points inflicted by this unit’s combat attacks.",
+            "phase": "combat",
+            "timing": "Any Combat Phase",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "morghastArchai",
+        "name": "Morghast Archai",
+        "move": 10,
+        "control": 2,
+        "health": 6,
+        "save": 3,
+        "ward": 6,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Spirit Weapons",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 2,
+            "rend": 2,
+            "damage": "3"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "heraldsOfNagashUnit",
+            "name": "Heralds of Nagash",
+            "effect": "Add 1 to discipline rolls for this unit while it is not wholly within 12\" of your general.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "stormcast-eternals-yndrastas-spearhead",
+    "name": "Stormcast Eternals",
+    "spearheadName": "Yndrasta's Spearhead",
+    "battleTraits": [
+      {
+        "id": "lightningStrikeArrival",
+        "name": "Lightning-Strike Arrival",
+        "effect": "Yndrasta and your Annihilators unit are not set up during the deployment phase. Instead, from the third battle round onwards, they can use the following ability:\nEffect: Set up this unit anywhere on the battlefield more than 6\" from all enemy units.",
+        "phase": "movement",
+        "timing": "Your Movement Phase",
+        "once": "none"
+      }
+    ],
+    "regimentAbilities": [
+      {
+        "id": "driveThemBack",
+        "name": "Drive Them Back",
+        "effect": "Declare: Pick any number of friendly units that are both contesting an objective and in combat.\nEffect: Each of those units can make a pile-in move (Core Rules, 15.3). For each unit that did so, pick an enemy unit within 1\" of it and roll a dice. On a 4+, inflict 1 mortal damage on that enemy unit.",
+        "phase": "end",
+        "timing": "End of Any Turn",
+        "once": "none"
+      },
+      {
+        "id": "defendToTheLast",
+        "name": "Defend to the Last",
+        "effect": "Effect: Friendly units have Ward (6+) while they are contesting an objective you control.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      }
+    ],
+    "enhancements": [
+      {
+        "id": "thePrimeHuntress",
+        "name": "The Prime Huntress",
+        "effect": "Effect: The Damage characteristic of Thengavar (Yndrasta's spear) is 2D6 for attacks that target a Monster.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "strikeWithTheTempestsRage",
+        "name": "Strike with the Tempest's Rage",
+        "effect": "Effect: Your general has Strike-first if they charged in the same turn.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "dazzlingRadiance",
+        "name": "Dazzling Radiance",
+        "effect": "Declare: Pick your general to use this ability if they were set up this phase.\nEffect: You can return 1 slain model to each friendly unit wholly within 12\" of your general.",
+        "phase": "movement",
+        "timing": "Once Per Battle, Your Movement Phase",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "hawkOfTheCelestialSkies",
+        "name": "Hawk of the Celestial Skies",
+        "effect": "Effect: Until the end of the phase, add 1 to hit rolls for attacks made by friendly units while they are wholly within 12\" of your general.",
+        "phase": "combat",
+        "timing": "Once Per Battle, Any Combat Phase",
+        "once": "once-per-battle"
+      }
+    ],
+    "units": [
+      {
+        "id": "yndrastaTheCelestialSpear",
+        "name": "Yndrasta, the Celestial Spear",
+        "move": 12,
+        "control": 2,
+        "health": 8,
+        "save": 3,
+        "ward": 6,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Thengavar",
+            "range": "12\"",
+            "attacks": "1",
+            "hit": 3,
+            "wound": 2,
+            "rend": 2,
+            "damage": "4",
+            "abilities": "Shoot in Combat"
+          },
+          {
+            "name": "Blade of the High Heavens",
+            "range": "Melee",
+            "attacks": "5",
+            "hit": 3,
+            "wound": 3,
+            "rend": 2,
+            "damage": "3"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "championOfSigmar",
+            "name": "Champion of Sigmar",
+            "effect": "Effect: This unit has Ward (5+) this phase.",
+            "phase": "combat",
+            "timing": "Once Per Battle, Any Combat Phase",
+            "once": "once-per-battle"
+          }
+        ]
+      },
+      {
+        "id": "knightVexillor",
+        "name": "Knight-Vexillor",
+        "move": 5,
+        "control": 5,
+        "health": 6,
+        "save": 3,
+        "ward": 0,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Sigmarite Warblade",
+            "range": "Melee",
+            "attacks": "4",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "2"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "bannerOfTheReforged",
+            "name": "Banner of the Reforged",
+            "effect": "Declare: Pick a friendly unit wholly within 12\" of this unit to be the target.\nEffect: Heal (D3) the target. In addition, add 3 to that unit's control score until the start of your next turn.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "annihilators",
+        "name": "Annihilators",
+        "move": 4,
+        "control": 1,
+        "health": 3,
+        "save": 2,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Meteoric Hammer",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "2"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "forceOfAFallingStar",
+            "name": "Force of a Falling Star",
+            "effect": "Declare: If this unit charged this phase and the unmodified charge roll was 8+, pick an enemy unit within 1\" of it to be the target.\nEffect: The target has Strike-last this turn.",
+            "phase": "charge",
+            "timing": "Any Charge Phase",
+            "once": "none"
+          }
+        ],
+        "models": 3
+      },
+      {
+        "id": "vanquishers",
+        "name": "Vanquishers",
+        "move": 5,
+        "control": 1,
+        "health": 2,
+        "save": 3,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Celestial Greatsword",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "lightningStrikes",
+            "name": "Lightning Strikes",
+            "effect": "Effect: Add 1 to the Damage characteristic of this unit's Celestial Greatswords for attacks that target an enemy unit that has 5 or more models.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ],
+        "models": 5
+      },
+      {
+        "id": "stormstrikeChariot",
+        "name": "Stormstrike Chariot",
+        "move": 10,
+        "control": 2,
+        "health": 10,
+        "save": 3,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Great Stormbow",
+            "range": "18\"",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "1"
+          },
+          {
+            "name": "Stormstrike Axe",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "1"
+          },
+          {
+            "name": "Gryph-chargers' Beaks and Claws",
+            "range": "Melee",
+            "attacks": "6",
+            "hit": 4,
+            "wound": 3,
+            "rend": 1,
+            "damage": "1",
+            "abilities": "Companion"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "azyrUnleashed",
+            "name": "Azyr Unleashed",
+            "effect": "Declare: If this unit charged this phase, pick an enemy unit within 1\" of it to be the target and roll a dice.\nEffect: On a 2+, inflict D3 mortal damage on the target.",
+            "phase": "charge",
+            "timing": "Any Charge Phase",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "unit-1785201210036",
+        "name": "Vanquishers (Copy)",
+        "move": 5,
+        "control": 1,
+        "health": 2,
+        "save": 3,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Celestial Greatsword",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "lightningStrikes",
+            "name": "Lightning Strikes",
+            "effect": "Effect: Add 1 to the Damage characteristic of this unit's Celestial Greatswords for attacks that target an enemy unit that has 5 or more models.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ],
+        "models": 5
+      }
+    ]
+  },
+  {
+    "id": "stormcast-eternals-vigilant-brotherhood",
+    "name": "Stormcast Eternals",
+    "spearheadName": "Vigilant Brotherhood",
+    "battleTraits": [
+      {
+        "id": "shieldOfAzyr",
+        "name": "Shield of Azyr",
+        "effect": "Declare: Pick a friendly unit.\nEffect: Until the start of your next turn, that unit has Ward (5+).",
+        "phase": "hero",
+        "timing": "Once Per Turn, Your Hero Phase",
+        "once": "once-per-turn"
+      },
+      {
+        "id": "stormCharge",
+        "name": "Storm Charge",
+        "effect": "Declare: Pick a friendly unit that is not in combat.\nEffect: That unit can use Charge abilities this turn even if it used a Run ability in the same turn.",
+        "phase": "charge",
+        "timing": "Once Per Battle, Your Charge Phase",
+        "once": "once-per-battle"
+      }
+    ],
+    "regimentAbilities": [
+      {
+        "id": "strikeWhereNeeded",
+        "name": "Strike Where Needed",
+        "effect": "Used By: The unit using that Retreat ability.\nEffect: No mortal damage is inflicted on that unit by that Retreat ability. In addition, that unit can still use Charge abilities this turn even though it used a Retreat ability.",
+        "phase": "movement",
+        "timing": "Once Per Battle, Reaction: You declared a Retreat ability",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "blazeOfGlory",
+        "name": "Blaze of Glory",
+        "effect": "Declare: Pick a friendly unit that is in combat.\nEffect: Until the end of the phase, each time a model in that unit is slain, make a vengeance roll of D6. On a 4+, inflict 1 mortal damage on an enemy unit in combat with that unit.",
+        "phase": "combat",
+        "timing": "Once Per Battle, Any Combat Phase",
+        "once": "once-per-battle"
+      }
+    ],
+    "enhancements": [
+      {
+        "id": "hallowedScrolls",
+        "name": "Hallowed Scrolls",
+        "effect": "Effect: Your general has Ward (5+).",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "morrdasTalon",
+        "name": "Morrda's Talon",
+        "effect": "Effect: Your general's Hallowed Greataxe has Crit (Mortal).",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "quicksilverDraught",
+        "name": "Quicksilver Draught",
+        "effect": "Effect: Your general has Strike-first this phase.",
+        "phase": "combat",
+        "timing": "Once Per Battle, Any Combat Phase",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "nullPendant",
+        "name": "Null Pendant",
+        "effect": "Declare: Roll a dice for each enemy unit contesting the same objective as your general.\nEffect: On a 2+, subtract the roll from the control score of that enemy unit this turn.",
+        "phase": "end",
+        "timing": "Once Per Battle, End of Any Turn",
+        "once": "once-per-battle"
+      }
+    ],
+    "units": [
+      {
+        "id": "lordVigilantOnGryphStalker",
+        "name": "Lord-Vigilant on Gryph-stalker",
+        "move": 12,
+        "control": 2,
+        "health": 8,
+        "save": 3,
+        "ward": 0,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Hallowed Greataxe",
+            "range": "Melee",
+            "attacks": "5",
+            "hit": 3,
+            "wound": 3,
+            "rend": 2,
+            "damage": "2"
+          },
+          {
+            "name": "Gryph-stalker's Beak and Talons",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 4,
+            "wound": 3,
+            "rend": 1,
+            "damage": "2",
+            "abilities": "Companion"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "deliverJudgement",
+            "name": "Deliver Judgement",
+            "effect": "Declare: Pick a friendly non-Hero unit wholly within 12\" of this unit to be the target.\nEffect: The target can use 2 Fight abilities this phase. After the first is used, however, the target has Strike-last for the rest of the phase.",
+            "phase": "combat",
+            "timing": "Once Per Battle, Any Combat Phase",
+            "once": "once-per-battle"
+          },
+          {
+            "id": "planTheAttack",
+            "name": "Plan the Attack",
+            "effect": "Declare: Pick an objective you do not control.\nEffect: For the rest of the turn, add 1 to hit rolls for combat attacks made by friendly units that target enemy units contesting that objective.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "lordVeritant",
+        "name": "Lord-Veritant",
+        "move": 5,
+        "control": 2,
+        "health": 6,
+        "save": 3,
+        "ward": 0,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Staff of Abjuration",
+            "range": "Melee",
+            "attacks": "1",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "3"
+          },
+          {
+            "name": "Judgement Blade",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "D3",
+            "abilities": "Anti-Wizard (+1 Rend), Anti-Priest (+1 Rend)"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "senseUnholySorcery",
+            "name": "Sense Unholy Sorcery",
+            "effect": "Effect: This unit's Gryph-crow is a token. This unit has Ward (5+) while its Gryph-crow is on the battlefield. If you make an unmodified ward roll of 1 for this unit, remove its Gryph-crow from the battlefield.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          },
+          {
+            "id": "cleansingFires",
+            "name": "Cleansing Fires",
+            "effect": "Declare: Pick a visible enemy unit within 12\" of this unit to be the target, then make a chanting roll of D6.\nEffect: On a 3+, roll a dice for each model in the target unit. For each 5+, inflict 1 mortal damage on the target unit.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "prosecutors",
+        "name": "Prosecutors",
+        "move": 12,
+        "control": 1,
+        "health": 2,
+        "save": 3,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Stormcall Javelin",
+            "range": "10\"",
+            "attacks": "1",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "D3"
+          },
+          {
+            "name": "Stormcall Javelin",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "skirmishers",
+            "name": "Skirmishers",
+            "effect": "Effect: This unit has a coherency range of 2\".",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          },
+          {
+            "id": "heraldsOfRighteousness",
+            "name": "Heralds of Righteousness",
+            "effect": "Effect: When you make a charge roll for this unit, roll 1 additional dice.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ],
+        "models": 3
+      },
+      {
+        "id": "liberators",
+        "name": "Liberators",
+        "move": 5,
+        "control": 1,
+        "health": 2,
+        "save": 3,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Warhammer",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "1",
+            "abilities": "Crit (Mortal)"
+          },
+          {
+            "name": "Grandhammer",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "2",
+            "abilities": "Crit (Mortal)"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "stalwartDefenders",
+            "name": "Stalwart Defenders",
+            "effect": "Effect: Add 3 to this unit's control score while it contests an objective wholly within friendly territory.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ],
+        "models": 5
+      }
+    ]
+  },
+  {
+    "id": "soulblight-gravelords-bloodcrave-hunt",
+    "name": "Soulblight Gravelords",
+    "spearheadName": "Bloodcrave Hunt",
+    "battleTraits": [
+      {
+        "id": "deathsDescentSwoopDown",
+        "name": "Death's Descent - Swoop Down",
+        "effect": "Set up this unit anywhere on the battlefield more than 6\" from all enemy units. (Your Vargheists unit is not set up during the deployment phase. Instead, from the third battle round onwards, it can use this ability).",
+        "phase": "movement",
+        "timing": "Your Movement Phase",
+        "once": "none"
+      },
+      {
+        "id": "theHunger",
+        "name": "The Hunger",
+        "effect": "Each time a friendly VAMPIRE unit uses a Fight ability, after all of its attacks have been resolved, Heal (X) that VAMPIRE unit where X is the number of damage points allocated by those attacks.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      }
+    ],
+    "regimentAbilities": [
+      {
+        "id": "endlessLegions",
+        "name": "Endless Legions",
+        "effect": "Declare: Pick a friendly Deathrattle Skeletons unit that has been destroyed.\nEffect: You can set up a replacement unit with D6 models in friendly territory more than 6\" from enemy units.",
+        "phase": "movement",
+        "timing": "Once Per Battle, Your Movement Phase",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "ruinousChargers",
+        "name": "Ruinous Chargers",
+        "effect": "Declare: Pick your Blood Knights unit to use this ability if it charged this turn.\nEffect: Inflict D3 mortal damage on each enemy unit it passed across during that Charge ability.",
+        "phase": "charge",
+        "timing": "Any Charge Phase",
+        "once": "none"
+      }
+    ],
+    "enhancements": [
+      {
+        "id": "graveSandShard",
+        "name": "Grave-Sand Shard",
+        "effect": "Add 1 to each legion roll made for that unit.",
+        "phase": "combat",
+        "timing": "Once Per Battle, Reaction: You declared the 'Skeleton Legion' ability for a unit within 9\" of your general",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "cloudOfBats",
+        "name": "Cloud of Bats",
+        "effect": "Remove your general from the battlefield and set them up again anywhere on the battlefield more than 6\" from all enemy units.",
+        "phase": "movement",
+        "timing": "Once Per Battle, Your Movement Phase",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "auraOfNight",
+        "name": "Aura of Night",
+        "effect": "Ignore negative modifiers to save rolls for shooting attacks that target your general.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "spiritGale",
+        "name": "Spirit Gale",
+        "effect": "Declare: Make a casting roll of 2D6.\nEffect: On a 7+, inflict 1 mortal damage on each enemy unit on the battlefield.",
+        "phase": "hero",
+        "timing": "Your Hero Phase",
+        "once": "none"
+      }
+    ],
+    "units": [
+      {
+        "id": "vampireLord",
+        "name": "Vampire Lord",
+        "move": 6,
+        "control": 2,
+        "health": 5,
+        "save": 3,
+        "ward": 6,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Dynastic War-relic",
+            "range": "Melee",
+            "attacks": "5",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "2",
+            "abilities": "-"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "vileTransference",
+            "name": "Vile Transference",
+            "effect": "Declare: Pick a visible enemy unit within 6\" of this unit to be the target, then make a casting roll of 2D6.\nEffect: On a 6+, roll a number of dice equal to the target's Health characteristic. For each 5+, inflict 1 mortal damage on the target and Heal (1) this unit.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "bloodKnights",
+        "name": "Blood Knights",
+        "move": 10,
+        "control": 1,
+        "health": 3,
+        "save": 3,
+        "ward": 6,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Templar Lance or Templar Blade",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "1",
+            "abilities": "Charge (+1 Damage)"
+          },
+          {
+            "name": "Nightmare's Hooves and Teeth",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 5,
+            "wound": 3,
+            "rend": 0,
+            "damage": "1",
+            "abilities": "Companion"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "ridersOfRuin",
+            "name": "Riders of Ruin",
+            "effect": "Models in this unit can pass across enemy Infantry models as if this unit had Fly.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ],
+        "models": 5
+      },
+      {
+        "id": "vargheists",
+        "name": "Vargheists",
+        "move": 12,
+        "control": 1,
+        "health": 4,
+        "save": 5,
+        "ward": 6,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Murderous Fangs and Talons",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 4,
+            "wound": 3,
+            "rend": 1,
+            "damage": "2",
+            "abilities": "Crit (2 Hits)"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "theScentOfGore",
+            "name": "The Scent of Gore",
+            "effect": "Add 1 to wound rolls for attacks made by this unit that target a damaged unit.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ],
+        "models": 3
+      },
+      {
+        "id": "deathrattleSkeletons",
+        "name": "Deathrattle Skeletons",
+        "move": 4,
+        "control": 1,
+        "health": 1,
+        "save": 5,
+        "ward": 6,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Ancient Weapon",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 4,
+            "wound": 4,
+            "rend": 0,
+            "damage": "1",
+            "abilities": "-"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "skeletonLegion",
+            "name": "Skeleton Legion",
+            "effect": "For each slain model from this unit, make a legion roll of D6. For each 6, return 1 slain model to this unit.",
+            "phase": "combat",
+            "timing": "Your Combat Phase",
+            "once": "none"
+          }
+        ],
+        "models": 10
+      },
+      {
+        "id": "unit-1785200122406",
+        "name": "Deathrattle Skeletons (Copy)",
+        "move": 4,
+        "control": 1,
+        "health": 1,
+        "save": 5,
+        "ward": 6,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Ancient Weapon",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 4,
+            "wound": 4,
+            "rend": 0,
+            "damage": "1",
+            "abilities": "-"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "skeletonLegion",
+            "name": "Skeleton Legion",
+            "effect": "For each slain model from this unit, make a legion roll of D6. For each 6, return 1 slain model to this unit.",
+            "phase": "combat",
+            "timing": "Your Combat Phase",
+            "once": "none"
+          }
+        ],
+        "models": 10
+      }
+    ]
+  },
+  {
+    "id": "daughters-of-khaine-heartflayer-troupe",
+    "name": "Daughters of Khaine",
+    "spearheadName": "Heartflayer Troupe",
+    "battleTraits": [
+      {
+        "id": "bloodRites",
+        "name": "Blood Rites",
+        "effect": "At the start of each battle round, all friendly units gain the Blood Rites passive ability that corresponds to the current battle round number (units keep all Blood Rites abilities gained in previous battle rounds):\nRound 1 - Quickening Bloodlust: Add 1 to run rolls for this unit.\nRound 2 - Headlong Fury: Add 1 to charge rolls for this unit.\nRound 3 - Zealot's Rage: Add 1 to hit rolls for combat attacks made by this unit.\nRound 4 - Slaughterer's Strength: Add 1 to wound rolls for combat attacks made by this unit.",
+        "phase": "start",
+        "timing": "Start of Battle Round",
+        "once": "none"
+      }
+    ],
+    "regimentAbilities": [
+      {
+        "id": "murderousEpiphany",
+        "name": "Murderous Epiphany",
+        "effect": "All friendly units gain the Blood Rites passive ability they would have gained at the start of the next battle round (they keep this ability for the rest of the battle, but they do not gain it for a second time at the start of the next battle round).",
+        "phase": "hero",
+        "timing": "Once Per Battle, Your Hero Phase",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "blessingOfKhaine",
+        "name": "Blessing of Khaine",
+        "effect": "Declare: Pick a friendly unit wholly within 12\" of your general. You cannot pick your general.\nEffect: Add 1 to ward rolls for that unit this phase.",
+        "phase": "combat",
+        "timing": "Any Combat Phase",
+        "once": "none"
+      }
+    ],
+    "enhancements": [
+      {
+        "id": "bathedInBlood",
+        "name": "Bathed in Blood",
+        "effect": "Each time a model is slain by your general, Heal (1) your general.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "fuelledByRevenge",
+        "name": "Fuelled by Revenge",
+        "effect": "Add 1 to the Rend characteristic of melee weapons used by friendly Blood Stalkers units while they are wholly within 12\" of your general.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "flaskOfShademist",
+        "name": "Flask of Shademist",
+        "effect": "Until the end of the phase, subtract 1 from hit rolls for attacks that target friendly units while they are wholly within 12\" of your general.",
+        "phase": "combat",
+        "timing": "Once Per Battle, Any Combat Phase",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "zealousOrator",
+        "name": "Zealous Orator",
+        "effect": "Declare: Pick a friendly unit wholly within 9\" of your general that is not in combat. Roll a dice for each slain model from that unit.\nEffect: For each 5+, you can return 1 slain model to that unit.",
+        "phase": "hero",
+        "timing": "Your Hero Phase",
+        "once": "none"
+      }
+    ],
+    "units": [
+      {
+        "id": "melusaiIronscale",
+        "name": "Melusai Ironscale",
+        "move": 8,
+        "control": 2,
+        "health": 6,
+        "save": 5,
+        "ward": 6,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Keldrisaíth",
+            "range": "12\"",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "D3"
+          },
+          {
+            "name": "Keldrisaíth",
+            "range": "Melee",
+            "attacks": "6",
+            "hit": 3,
+            "wound": 4,
+            "rend": 1,
+            "damage": "2"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "allOutSlaughter",
+            "name": "All-Out Slaughter",
+            "effect": "Declare: Pick a friendly unit wholly within 12\" of this unit to be the target. You cannot pick this unit.\nEffect: Add 1 to the Attacks characteristic of the target's melee weapons for the rest of the turn.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "none"
+          },
+          {
+            "id": "turnedToCrystal",
+            "name": "Turned to Crystal",
+            "effect": "Declare: Pick an enemy unit within 1\" of this unit to be the target and roll a dice.\nEffect: On a 2+, inflict 1 mortal damage on the target.",
+            "phase": "end",
+            "timing": "End of Any Turn",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "bloodStalkers",
+        "name": "Blood Stalkers",
+        "move": 8,
+        "control": 1,
+        "health": 2,
+        "save": 5,
+        "ward": 6,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Heartseeker Bow",
+            "range": "18\"",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 4,
+            "rend": 1,
+            "damage": "1",
+            "abilities": "Crit (Auto-wound)"
+          },
+          {
+            "name": "Scianlar",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 4,
+            "rend": 0,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "heartseekers",
+            "name": "Heartseekers",
+            "effect": "Shooting attacks made by this unit score critical hits on unmodified hit rolls of 5+ if this unit did not use a Move ability in the same turn.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ],
+        "models": 5
+      },
+      {
+        "id": "doomfireWarlocks",
+        "name": "Doomfire Warlocks",
+        "move": 14,
+        "control": 1,
+        "health": 3,
+        "save": 5,
+        "ward": 6,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Doomfire Crossbow",
+            "range": "10\"",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 4,
+            "rend": 0,
+            "damage": "1"
+          },
+          {
+            "name": "Cursed Scimitar",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 4,
+            "rend": 1,
+            "damage": "1"
+          },
+          {
+            "name": "Dark Steed's Vicious Bite",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 5,
+            "wound": 3,
+            "rend": 0,
+            "damage": "1",
+            "abilities": "Companion"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "doomfire",
+            "name": "Doomfire",
+            "effect": "Declare: Pick a visible enemy unit within 12\" of this unit to be the target, then make a casting roll of 2D6.\nEffect: On a 6+, inflict D3 mortal damage on the target.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "none"
+          }
+        ],
+        "models": 5
+      },
+      {
+        "id": "witchAelves",
+        "name": "Witch Aelves",
+        "move": 6,
+        "control": 1,
+        "health": 1,
+        "save": 6,
+        "ward": 6,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Paired Sciansá",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 4,
+            "rend": 0,
+            "damage": "1",
+            "abilities": "Crit (Auto-wound)"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "frenziedFervour",
+            "name": "Frenzied Fervour",
+            "effect": "Add 1 to the Rend characteristic of this unit's melee weapons if it charged in the same turn.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ],
+        "models": 5
+      },
+      {
+        "id": "unit-1785201284959",
+        "name": "Witch Aelves (Copy)",
+        "move": 6,
+        "control": 1,
+        "health": 1,
+        "save": 6,
+        "ward": 6,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Paired Sciansá",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 4,
+            "rend": 0,
+            "damage": "1",
+            "abilities": "Crit (Auto-wound)"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "frenziedFervour",
+            "name": "Frenzied Fervour",
+            "effect": "Add 1 to the Rend characteristic of this unit's melee weapons if it charged in the same turn.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ],
+        "models": 5
+      }
+    ]
+  },
+  {
+    "id": "slaves-to-darkness-bloodwind-legion",
+    "name": "Slaves to Darkness",
+    "spearheadName": "Bloodwind Legion",
+    "battleTraits": [
+      {
+        "id": "eyeOfTheGods",
+        "name": "Eye of the Gods",
+        "effect": "Declare: Pick one of the following friendly units to use this ability:\n• A unit that is contesting an objective not controlled by your opponent and is not in combat.\n• A unit that destroyed an enemy unit this turn.\n\nEffect: Roll once on the Eye of the Gods table for that unit. That unit gains the Eye of the Gods passive ability that corresponds to the roll (the unit keeps all Eye of the Gods abilities gained in previous turns). If the same unit gains the same ability more than once in the battle, the effects are not cumulative.\n\nEye of the Gods Table:\n1: Snubbed by the Gods: No effect.\n2: Ward of Tzeentch: This unit has Ward (6+).\n3: Grace of Slaanesh: Add 1 to run rolls for this unit.\n4: Blessing of Nurgle: Subtract 1 from wound rolls for attacks that target this unit.\n5: Fury of Khorne: Add 1 to the Rend characteristic of this unit's melee weapons.\n6: Champion of Chaos: Pick any ability from the table.",
+        "phase": "end",
+        "timing": "End of Any Turn",
+        "once": "once-per-turn"
+      }
+    ],
+    "regimentAbilities": [
+      {
+        "id": "theDreadBanner",
+        "name": "The Dread Banner",
+        "effect": "Declare: Pick a friendly Chaos Warriors or Chaos Knights unit.\n\nEffect: You can immediately roll on the Eye of the Gods table for that unit.",
+        "phase": "start",
+        "timing": "Start of the First Battle Round",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "fierceConquerors",
+        "name": "Fierce Conquerors",
+        "effect": "Add 3 to the control scores of friendly Chaos Warriors units.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      }
+    ],
+    "enhancements": [
+      {
+        "id": "markOfKhorne",
+        "name": "Mark of Khorne",
+        "effect": "Add 1 to the Rend characteristic of your general's melee weapons if they charged in the same turn.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "markOfTzeentch",
+        "name": "Mark of Tzeentch",
+        "effect": "Declare: Pick a friendly unit on the battlefield. You cannot pick your general.\n\nEffect: Remove that unit from the battlefield and set it up again wholly within 6\" of your general and more than 6\" from all enemy units. It cannot use Move abilities for the rest of the phase.",
+        "phase": "movement",
+        "timing": "Your Movement Phase",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "markOfNurgle",
+        "name": "Mark of Nurgle",
+        "effect": "Subtract 1 from wound rolls for combat attacks that target your general.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "markOfSlaanesh",
+        "name": "Mark of Slaanesh",
+        "effect": "Your general has Strike-first.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      }
+    ],
+    "units": [
+      {
+        "id": "chaosLord",
+        "name": "Chaos Lord",
+        "move": 5,
+        "control": 2,
+        "health": 6,
+        "models": 1,
+        "save": 3,
+        "ward": 0,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Reaperblade",
+            "range": "Melee",
+            "attacks": "5",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "2",
+            "abilities": "Crit (Mortal)"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "favouredOfThePantheon",
+            "name": "Favoured of the Pantheon",
+            "effect": "Roll a dice. On a 4+, you can roll on the Eye of the Gods table for this unit.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "none"
+          },
+          {
+            "id": "ironWilledChampion",
+            "name": "Iron-Willed Champion",
+            "effect": "Declare: Pick a friendly unit wholly within 12\" of this unit to be the target and roll a dice. You cannot pick this unit.\n\nEffect: On a 2+, add 1 to hit rolls for attacks made by the target unit this phase.",
+            "phase": "combat",
+            "timing": "Any Combat Phase",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "chaosChariot",
+        "name": "Chaos Chariot",
+        "move": 10,
+        "control": 2,
+        "health": 7,
+        "models": 1,
+        "save": 4,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Chaos War-flail",
+            "range": "Melee",
+            "attacks": "6",
+            "hit": 3,
+            "wound": 3,
+            "rend": 0,
+            "damage": "1"
+          },
+          {
+            "name": "Driver's Lashing Whip",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 4,
+            "wound": 4,
+            "rend": 0,
+            "damage": "1"
+          },
+          {
+            "name": "Warhorses' Trampling Hooves",
+            "range": "Melee",
+            "attacks": "4",
+            "hit": 5,
+            "wound": 3,
+            "rend": 0,
+            "damage": "1",
+            "abilities": "Companion"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "swiftDeath",
+            "name": "Swift Death",
+            "effect": "Declare: If this unit charged this phase, pick an enemy unit within 1\" of it to be the target and roll a dice.\n\nEffect: On a 2+, inflict D3 mortal damage on the target.",
+            "phase": "charge",
+            "timing": "Your Charge Phase",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "chaosWarriors1",
+        "name": "Chaos Warriors",
+        "move": 5,
+        "control": 1,
+        "health": 2,
+        "models": 5,
+        "save": 3,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Rune-etched Halberd",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "bringersOfDesolation",
+            "name": "Bringers of Desolation",
+            "effect": "Add 1 to wound rolls for combat attacks made by this unit that target an enemy unit that is contesting an objective you do not control.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "chaosWarriors2",
+        "name": "Chaos Warriors",
+        "move": 5,
+        "control": 1,
+        "health": 2,
+        "models": 5,
+        "save": 3,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Rune-etched Halberd",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "bringersOfDesolation",
+            "name": "Bringers of Desolation",
+            "effect": "Add 1 to wound rolls for combat attacks made by this unit that target an enemy unit that is contesting an objective you do not control.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "chaosKnights",
+        "name": "Chaos Knights",
+        "move": 10,
+        "control": 1,
+        "health": 4,
+        "models": 5,
+        "save": 3,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Cursed Lance",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "1",
+            "abilities": "Charge (+1 Damage)"
+          },
+          {
+            "name": "Chaos Steed's Trampling Hooves",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 5,
+            "wound": 3,
+            "rend": 0,
+            "damage": "1",
+            "abilities": "Companion"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "impalingCharge",
+            "name": "Impaling Charge",
+            "effect": "Add 1 to the Rend characteristic of this unit's Cursed Lances if it charged in the same turn.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "lumineth-realm-lords-hurakan-vanguard",
+    "name": "Lumineth Realm-Lords",
+    "spearheadName": "Hurakan Vanguard",
+    "battleTraits": [
+      {
+        "id": "stormBrewing",
+        "name": "STORM BREWING",
+        "effect": "Pick a battlefield edge to be the target. That battlefield edge is leeward. For the rest of the battle, each time a friendly Ride the Hurricane ability is used, after that ability has been resolved, change the leeward battlefield edge to the next edge clockwise.",
+        "phase": "start",
+        "timing": "Deployment Phase",
+        "once": "none"
+      },
+      {
+        "id": "pulledByTheWinds",
+        "name": "PULLED BY THE WINDS",
+        "effect": "Pick a friendly unit that is not in combat to be the target. The target can move D6\" but must end that move closer to the leeward battlefield edge. It can pass through the combat ranges of enemy units but cannot end that move in combat.",
+        "phase": "movement",
+        "timing": "Once Per Turn (Army), Any Movement Phase",
+        "once": "once-per-turn"
+      },
+      {
+        "id": "galeForce",
+        "name": "GALE FORCE",
+        "effect": "Add 1 to hit rolls for attacks made as part of that Attack ability if the target of that ability is closer to the leeward battlefield edge than the unit using this ability.",
+        "phase": "combat",
+        "timing": "Once Per Turn (Army), Reaction: You declared an Attack ability",
+        "once": "once-per-turn"
+      }
+    ],
+    "regimentAbilities": [
+      {
+        "id": "liftedDebris",
+        "name": "LIFTED DEBRIS",
+        "effect": "Pick an enemy unit that is closer to the leeward battlefield edge than the large terrain feature within friendly territory to be the target. Roll a number of dice equal to the current battle round number. For each 3+, inflict 1 mortal damage on the target.",
+        "phase": "hero",
+        "timing": "Your Hero Phase",
+        "once": "none"
+      },
+      {
+        "id": "roaringHeadwind",
+        "name": "ROARING HEADWIND",
+        "effect": "Pick an enemy unit to be the target. For the rest of the turn, each time the target uses a Move ability, it must end that move closer to the leeward battlefield edge.",
+        "phase": "hero",
+        "timing": "Once Per Battle (Army), Enemy Hero Phase",
+        "once": "once-per-battle"
+      }
+    ],
+    "enhancements": [
+      {
+        "id": "scatteredToTheWinds",
+        "name": "SCATTERED TO THE WINDS",
+        "effect": "Subtract 1 from the control scores of enemy units within 6\" of your general for each friendly Ride the Hurricane ability used this battle round.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "windWhisperer",
+        "name": "WIND WHISPERER",
+        "effect": "Pick a battlefield edge to be the target. Change the leeward battlefield edge to the target battlefield edge.",
+        "phase": "hero",
+        "timing": "Once Per Battle (Army), Any Hero Phase",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "templeGuardians",
+        "name": "TEMPLE GUARDIANS",
+        "effect": "While any friendly Infantry units are within your general’s combat range, both your general and those Infantry units have Ward (5+).",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "curvedShots",
+        "name": "CURVED SHOTS",
+        "effect": "You can measure the range and visibility of your general’s shooting attacks from any point on the leeward battlefield edge.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      }
+    ],
+    "units": [
+      {
+        "id": "hurakanWindmage",
+        "name": "Hurakan Windmage",
+        "move": 12,
+        "control": 2,
+        "health": 5,
+        "models": 1,
+        "save": 5,
+        "ward": 0,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Windblast Vortex",
+            "range": "12\"",
+            "attacks": "1",
+            "hit": 2,
+            "wound": 3,
+            "rend": 2,
+            "damage": "D3"
+          },
+          {
+            "name": "Aspiragillum",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 4,
+            "rend": 1,
+            "damage": "D3"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "guideTheGusts",
+            "name": "GUIDE THE GUSTS",
+            "effect": "Pick a visible friendly unit wholly within 12\" of this unit to be the target, then make a casting roll of 2D6. On a 6+, for the rest of the turn:\n• The target can use Retreat abilities and still use Shoot and/or Charge abilities later in the turn.\n• No mortal damage is inflicted on the target by Retreat abilities.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "hurakanSpiritOfTheWind",
+        "name": "Hurakan Spirit of the Wind",
+        "move": 18,
+        "control": 5,
+        "health": 8,
+        "models": 1,
+        "save": 4,
+        "ward": 5,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Bow of the Wind’s Vengeance",
+            "range": "15\"",
+            "attacks": "4",
+            "hit": 2,
+            "wound": 3,
+            "rend": 2,
+            "damage": "2"
+          },
+          {
+            "name": "Swirling Shards",
+            "range": "Melee",
+            "attacks": "6",
+            "hit": 2,
+            "wound": 4,
+            "rend": 0,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "eyeOfTheStorm",
+            "name": "EYE OF THE STORM",
+            "effect": "Subtract 1 from hit rolls for attacks that target friendly units while they are wholly within 6\" of this unit.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          },
+          {
+            "id": "hurricaneWinds",
+            "name": "HURRICANE WINDS",
+            "effect": "Pick an enemy unit that had any damage points allocated to it this turn by this unit’s shooting attacks to be the target. Roll a dice. On a 3+, the target has Strike-last for the rest of the turn.",
+            "phase": "shooting",
+            "timing": "Any Shooting Phase",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "hurakanWindchargers",
+        "name": "Hurakan Windchargers",
+        "move": 14,
+        "control": 1,
+        "health": 3,
+        "models": 5,
+        "save": 4,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Windcharger Bow",
+            "range": "12\"",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 4,
+            "rend": 1,
+            "damage": "1"
+          },
+          {
+            "name": "Windcharger Blade",
+            "range": "Melee",
+            "attacks": "1",
+            "hit": 4,
+            "wound": 4,
+            "rend": 0,
+            "damage": "1"
+          },
+          {
+            "name": "Treerunner’s Claws",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 5,
+            "wound": 3,
+            "rend": 0,
+            "damage": "1",
+            "abilities": "Companion"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "leapIntoTheStorm",
+            "name": "LEAP INTO THE STORM",
+            "effect": "If this unit is not in combat, remove it from the battlefield and set it up again wholly within 3\" of the leeward battlefield edge and more than 6\" from all enemy units.",
+            "phase": "end",
+            "timing": "End of Your Turn",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "vanariAuralanWardens",
+        "name": "Vanari Auralan Wardens",
+        "move": 6,
+        "control": 1,
+        "health": 1,
+        "models": 10,
+        "save": 4,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Warden Pike and Blade",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 4,
+            "rend": 0,
+            "damage": "1",
+            "abilities": "Anti-charge (+1 Rend), Crit (Mortal)"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "wallOfBlades",
+            "name": "WALL OF BLADES",
+            "effect": "If this unit did not charge this turn and is in combat with an enemy unit that charged this turn, roll a dice. Add 1 to the roll if that enemy unit is Cavalry. On a 3+, this unit has Strike-first for the rest of the turn.",
+            "phase": "combat",
+            "timing": "Any Combat Phase",
+            "once": "none"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "soulblight-gravelords-deathrattle-tomb-host",
+    "name": "Soulblight Gravelords",
+    "spearheadName": "Deathrattle Tomb Host",
+    "battleTraits": [
+      {
+        "id": "theRisingDead",
+        "name": "The Rising Dead",
+        "effect": "One of your Deathrattle Skeletons units is not set up during the deployment phase. Instead, from the third battle round onwards, it can use the following ability:\n\nEffect: Set up this unit anywhere on the battlefield wholly within 3\" of a battlefield edge and more than 6\" from all enemy units.",
+        "phase": "movement",
+        "timing": "Once Per Battle (Army), Your Movement Phase",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "auraOfAntiquity",
+        "name": "Aura of Antiquity",
+        "effect": "Declare: Pick an enemy unit in combat with any friendly units to be the target.\n\nEffect: Roll a dice. On a 3+, subtract 1 from the Rend characteristic of the target's melee weapons until the start of your next turn.",
+        "phase": "combat",
+        "timing": "Once Per Turn (Army), Your Combat Phase",
+        "once": "once-per-turn"
+      }
+    ],
+    "regimentAbilities": [
+      {
+        "id": "overwhelmingHordes",
+        "name": "Overwhelming Hordes",
+        "effect": "Add 1 to wound rolls for combat attacks made by friendly non-Hero units that target a unit that has fewer models than the attacking unit.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "deathmarch",
+        "name": "Deathmarch",
+        "effect": "Declare: Pick a friendly non-Hero unit that is not in combat to be the target.\n\nEffect: For the rest of the turn, add 1\" to the target's Move characteristic and add 3 to its control score.",
+        "phase": "hero",
+        "timing": "Once Per Turn (Army), Your Hero Phase",
+        "once": "once-per-turn"
+      }
+    ],
+    "enhancements": [
+      {
+        "id": "shyishanBlade",
+        "name": "Shyishan Blade",
+        "effect": "The Rend characteristic of your general's Baleful Tomb Blade is 2.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "stolenAnimus",
+        "name": "Stolen Animus",
+        "effect": "Each time your general scores a critical hit, Heal (2) your general after the Attack ability has been resolved.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "propelledByHate",
+        "name": "Propelled by Hate",
+        "effect": "Declare: Pick another friendly unit wholly within 12\" of your general to be the target.\n\nEffect: You can re-roll charge rolls for the target for the rest of the turn.",
+        "phase": "charge",
+        "timing": "Your Charge Phase",
+        "once": "none"
+      },
+      {
+        "id": "soulDrainPendant",
+        "name": "Soul-Drain Pendant",
+        "effect": "Declare: Pick an enemy unit in combat with your general to be the target.\n\nEffect: Roll a dice. On a 2+, the target has Strike-last for the rest of the turn.",
+        "phase": "combat",
+        "timing": "Once Per Battle, Any Combat Phase",
+        "once": "once-per-battle"
+      }
+    ],
+    "units": [
+      {
+        "id": "wightKing",
+        "name": "Wight King",
+        "move": 4,
+        "control": 2,
+        "health": 5,
+        "models": 1,
+        "save": 3,
+        "ward": 6,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Baleful Tomb Blade",
+            "range": "Melee",
+            "attacks": "5",
+            "hit": 4,
+            "wound": 3,
+            "rend": 1,
+            "damage": "2",
+            "abilities": "Crit (Mortal)"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "kingOfShamblingBones",
+            "name": "King of Shambling Bones",
+            "effect": "Declare: Pick a friendly Deathrattle unit wholly within 12\" of this unit to be the target.\n\nEffect: Roll a dice. On a 2+, add 1 to hit rolls for combat attacks made by the target for the rest of the turn.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "barrowGuard",
+        "name": "Barrow Guard",
+        "move": 4,
+        "control": 1,
+        "health": 1,
+        "models": 10,
+        "save": 4,
+        "ward": 6,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Wight Blade",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 4,
+            "wound": 3,
+            "rend": 1,
+            "damage": "1",
+            "abilities": "Crit (Mortal)"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "guardiansOfTheKing",
+            "name": "Guardians of the King",
+            "effect": "While your general is within this unit's combat range, both this unit and your general have Ward (5+).",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "barrowKnights",
+        "name": "Barrow Knights",
+        "move": 10,
+        "control": 1,
+        "health": 3,
+        "models": 5,
+        "save": 4,
+        "ward": 6,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Barrow Lance",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 4,
+            "wound": 3,
+            "rend": 1,
+            "damage": "1",
+            "abilities": "Crit (Mortal), Charge (+1 Damage)"
+          },
+          {
+            "name": "Skeletal Steed's Hooves and Teeth",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 5,
+            "wound": 3,
+            "rend": 0,
+            "damage": "1",
+            "abilities": "Companion"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "cursedToRiseOnceMore",
+            "name": "Cursed to Rise Once More",
+            "effect": "You can return 1 slain model to this unit.",
+            "phase": "end",
+            "timing": "End of Your Turn",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "deathrattleSkeletons1",
+        "name": "Deathrattle Skeletons",
+        "move": 4,
+        "control": 1,
+        "health": 1,
+        "models": 10,
+        "save": 5,
+        "ward": 6,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Ancient Weapon",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 4,
+            "wound": 4,
+            "rend": 0,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "skeletonLegion",
+            "name": "Skeleton Legion",
+            "effect": "You can return D3 slain models to this unit.",
+            "phase": "end",
+            "timing": "End of Any Turn",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "deathrattleSkeletons2",
+        "name": "Deathrattle Skeletons",
+        "move": 4,
+        "control": 1,
+        "health": 1,
+        "models": 10,
+        "save": 5,
+        "ward": 6,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Ancient Weapon",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 4,
+            "wound": 4,
+            "rend": 0,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "skeletonLegion",
+            "name": "Skeleton Legion",
+            "effect": "You can return D3 slain models to this unit.",
+            "phase": "end",
+            "timing": "End of Any Turn",
+            "once": "none"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "lumineth-realm-lords-glittering-phalanx",
+    "name": "Lumineth Realm-Lords",
+    "spearheadName": "Glittering Phalanx",
+    "battleTraits": [
+      {
+        "id": "facetsOfWar",
+        "name": "FACETS OF WAR",
+        "effect": "You must use this ability at the start of the battle round. Pick 1 FACET OF WAR ability. That FACET OF WAR ability can be used this battle round but the other cannot.",
+        "phase": "start",
+        "timing": "Once Per Battle Round, Start of Battle Round",
+        "once": "once-per-turn"
+      },
+      {
+        "id": "shiningCompany",
+        "name": "SHINING COMPANY",
+        "effect": "Subtract 1 from hit rolls for attacks that target friendly units.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "powerOfHysh",
+        "name": "POWER OF HYSH",
+        "effect": "Declare: Pick a friendly unit.\n\nEffect: Roll a dice. On a 2+, until the start of your next turn, attacks made by that unit score critical hits on unmodified hit rolls of 5+.",
+        "phase": "hero",
+        "timing": "Once Per Turn (Army), Your Hero Phase",
+        "once": "once-per-turn"
+      },
+      {
+        "id": "lightningReactions",
+        "name": "LIGHTNING REACTIONS",
+        "effect": "When players are alternating picking units to use a Fight ability, when it is your turn to pick a unit, you can pick 2 units instead of 1. Resolve the second Fight ability immediately after the first.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      }
+    ],
+    "regimentAbilities": [
+      {
+        "id": "arcaneProwess",
+        "name": "ARCANE PROWESS",
+        "effect": "Add 1 to casting rolls for your general.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "heightenedReflexes",
+        "name": "HEIGHTENED REFLEXES",
+        "effect": "Add 1 to save rolls for friendly units that use a Fight ability immediately after another friendly unit because of the ‘Lightning Reactions’ ability, until the end of the phase.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      }
+    ],
+    "enhancements": [
+      {
+        "id": "overwhelmingHeat",
+        "name": "OVERWHELMING HEAT",
+        "effect": "Declare: Pick a visible enemy unit within 24\" of your general, then make a casting roll of 2D6.\n\nEffect: On a 7+, halve the Move characteristic of that unit until the start of your next turn and roll a dice. If the roll equals or exceeds that unit’s Save characteristic, inflict D3 mortal damage on it.",
+        "phase": "hero",
+        "timing": "Your Hero Phase",
+        "once": "once-per-turn"
+      },
+      {
+        "id": "protectionOfHysh",
+        "name": "PROTECTION OF HYSH",
+        "effect": "Declare: Pick a visible friendly unit wholly within 12\" of your general to be the target, then make a casting roll of 2D6.\n\nEffect: On a 7+, the target has Ward (5+) until the start of your next turn.",
+        "phase": "hero",
+        "timing": "Your Hero Phase",
+        "once": "once-per-turn"
+      },
+      {
+        "id": "waystone",
+        "name": "WAYSTONE",
+        "effect": "Remove your general from the battlefield and set them up again anywhere on the battlefield more than 6\" from all enemy units.",
+        "phase": "movement",
+        "timing": "Your Movement Phase",
+        "once": "once-per-turn"
+      },
+      {
+        "id": "speedOfHysh",
+        "name": "SPEED OF HYSH",
+        "effect": "Declare: Pick a visible friendly unit wholly within 18\" of your general, then make a casting roll of 2D6.\n\nEffect: On a 5+, double the Move characteristic of that unit until the start of your next turn.",
+        "phase": "hero",
+        "timing": "Your Hero Phase",
+        "once": "once-per-turn"
+      }
+    ],
+    "units": [
+      {
+        "id": "scinariCathallar",
+        "name": "Scinari Cathallar",
+        "move": 6,
+        "control": 2,
+        "health": 5,
+        "models": 1,
+        "save": 6,
+        "ward": 0,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Despairing Touch",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 4,
+            "rend": 0,
+            "damage": "D3"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "darknessOfTheSoul",
+            "name": "DARKNESS OF THE SOUL",
+            "effect": "Declare: Pick an enemy unit within 12\" of this unit to be the target, then roll a dice.\n\nEffect: On a 3+, subtract D6 from the control score of the target unit this turn.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "once-per-turn"
+          }
+        ]
+      },
+      {
+        "id": "vanariBladelords",
+        "name": "Vanari Bladelords",
+        "move": 6,
+        "control": 1,
+        "health": 2,
+        "models": 5,
+        "save": 4,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Sunmetal Greatblade: Perfect Strike",
+            "range": "Melee",
+            "attacks": "1",
+            "hit": 0,
+            "wound": 0,
+            "rend": 0,
+            "damage": "See below"
+          },
+          {
+            "name": "Sunmetal Greatblade: Flurry of Blows",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 3,
+            "wound": 4,
+            "rend": 1,
+            "damage": "1",
+            "abilities": "Crit (Mortal), Anti-Infantry (+1 Rend)"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "swordmasters",
+            "name": "SWORDMASTERS",
+            "effect": "Each time this unit uses a Fight ability, you must pick either the Perfect Strike or Flurry of Blows weapon characteristics for all the attacks it makes with its Sunmetal Greatblade. In addition: Do not use the attack sequence for an attack made with Perfect Strike. Instead, roll a dice. On a 2+, inflict 1 mortal damage on the target unit.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          },
+          {
+            "id": "guardians",
+            "name": "GUARDIANS",
+            "effect": "While your general is wholly within this unit’s combat range, both this unit and your general have Ward (5+).",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "vanariAuralanSentinels1",
+        "name": "Vanari Auralan Sentinels",
+        "move": 6,
+        "control": 1,
+        "health": 1,
+        "models": 5,
+        "save": 5,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Auralan Bow",
+            "range": "18\"",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 4,
+            "rend": 1,
+            "damage": "1",
+            "abilities": "Crit (Auto-wound)"
+          },
+          {
+            "name": "Vanari Dagger",
+            "range": "Melee",
+            "attacks": "1",
+            "hit": 3,
+            "wound": 4,
+            "rend": 0,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "loftedShots",
+            "name": "LOFTED SHOTS",
+            "effect": "Until the end of the phase, add 6\" to the Range characteristic of this unit’s Auralan Bows but subtract 1 from hit rolls for this unit’s shooting attacks.",
+            "phase": "shooting",
+            "timing": "Your Shooting Phase",
+            "once": "once-per-turn"
+          }
+        ]
+      },
+      {
+        "id": "vanariAuralanSentinels2",
+        "name": "Vanari Auralan Sentinels",
+        "move": 6,
+        "control": 1,
+        "health": 1,
+        "models": 5,
+        "save": 5,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Auralan Bow",
+            "range": "18\"",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 4,
+            "rend": 1,
+            "damage": "1",
+            "abilities": "Crit (Auto-wound)"
+          },
+          {
+            "name": "Vanari Dagger",
+            "range": "Melee",
+            "attacks": "1",
+            "hit": 3,
+            "wound": 4,
+            "rend": 0,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "loftedShots",
+            "name": "LOFTED SHOTS",
+            "effect": "Until the end of the phase, add 6\" to the Range characteristic of this unit’s Auralan Bows but subtract 1 from hit rolls for this unit’s shooting attacks.",
+            "phase": "shooting",
+            "timing": "Your Shooting Phase",
+            "once": "once-per-turn"
+          }
+        ]
+      },
+      {
+        "id": "vanariAuralanWardens",
+        "name": "Vanari Auralan Wardens",
+        "move": 6,
+        "control": 1,
+        "health": 1,
+        "models": 10,
+        "save": 4,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Warden’s Pike",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 4,
+            "rend": 0,
+            "damage": "1",
+            "abilities": "Crit (Mortal), Anti-charge (+1 Rend)"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "moonfireFlask",
+            "name": "MOONFIRE FLASK",
+            "effect": "Declare: Pick an enemy unit in combat with this unit and that charged this turn to be the target, then roll a dice.\n\nEffect: On a 2+, inflict D3 mortal damage on the target.",
+            "phase": "combat",
+            "timing": "Once Per Battle, Any Combat Phase",
+            "once": "once-per-battle"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "skaven-gnawfeast-clawpack",
+    "name": "Skaven",
+    "spearheadName": "Gnawfeast Clawpack",
+    "battleTraits": [
+      {
+        "id": "theLurkingVermintide",
+        "name": "The Lurking Vermintide",
+        "effect": "Declare: Pick a friendly unit that has not been deployed to be the target.\n\nEffect: The target unit is set up in reserve in the tunnels below. Units in the tunnels below that have not used the 'Gnawhole Ambush' ability by the end of the third battle round are destroyed.",
+        "phase": "start",
+        "timing": "Once Per Battle, Deployment Phase",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "gnawholeAmbush",
+        "name": "Gnawhole Ambush",
+        "effect": "Declare: Pick a friendly unit that is in the tunnels below to use this ability.\n\nEffect: Set up that unit wholly within 6\" of a corner of the battlefield and more than 9\" from all enemy units.",
+        "phase": "movement",
+        "timing": "Your Movement Phase",
+        "once": "none"
+      }
+    ],
+    "regimentAbilities": [
+      {
+        "id": "warpstoneLacedBullets",
+        "name": "Warpstone-Laced Bullets",
+        "effect": "Declare: Pick a ranged weapon a friendly unit is armed with.\n\nEffect: That weapon has Crit (Mortal) this phase.",
+        "phase": "shooting",
+        "timing": "Once Per Battle, Your Shooting Phase",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "tooQuickToHitHit",
+        "name": "Too Quick to Hit-Hit",
+        "effect": "No mortal damage is inflicted on friendly units when they use Retreat abilities.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      }
+    ],
+    "enhancements": [
+      {
+        "id": "leadTheSeethingHorde",
+        "name": "Lead the Seething Horde",
+        "effect": "Instead of using the set-up instructions in the 'Call for Reinforcements' ability, the replacement unit can be set up wholly within 13\" of this unit and not in combat.",
+        "phase": "end",
+        "timing": "Reaction: You declared the 'Call for Reinforcements' ability",
+        "once": "none"
+      },
+      {
+        "id": "skryreConnections",
+        "name": "Skryre Connections",
+        "effect": "Your general's Ratling Pistol has an Attacks characteristic of 2D6 instead of D6.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "warpstoneCharm",
+        "name": "Warpstone Charm",
+        "effect": "Subtract 1 from save rolls for enemy units in combat with your general.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "cloakOfStitchedVictories",
+        "name": "Cloak of Stitched Victories",
+        "effect": "Your general has Ward (5+).",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      }
+    ],
+    "units": [
+      {
+        "id": "clawlordOnGnawBeast",
+        "name": "Clawlord on Gnaw-beast",
+        "move": 9,
+        "control": 2,
+        "health": 7,
+        "models": 1,
+        "save": 4,
+        "ward": 6,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Ratling Pistol",
+            "range": "10\"",
+            "attacks": "D6",
+            "hit": 3,
+            "wound": 3,
+            "rend": 1,
+            "damage": "1",
+            "abilities": "Crit (Auto-wound), Shoot in Combat"
+          },
+          {
+            "name": "Warpforged Halberd",
+            "range": "Melee",
+            "attacks": "5",
+            "hit": 3,
+            "wound": 4,
+            "rend": 1,
+            "damage": "2"
+          },
+          {
+            "name": "Gnaw-beast's Chisel Fangs",
+            "range": "Melee",
+            "attacks": "4",
+            "hit": 4,
+            "wound": 3,
+            "rend": 1,
+            "damage": "D3",
+            "abilities": "Companion"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "corneredRat",
+            "name": "Cornered Rat",
+            "effect": "While this unit is damaged, add 3 to the Attacks characteristic of its Warpforged Halberd.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "greySeer",
+        "name": "Grey Seer",
+        "move": 6,
+        "control": 2,
+        "health": 5,
+        "models": 1,
+        "save": 6,
+        "ward": 0,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Warpstone Staff",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 4,
+            "wound": 4,
+            "rend": 1,
+            "damage": "D3"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "willOfTheHornedRat",
+            "name": "Will of the Horned Rat",
+            "effect": "Declare: Pick a friendly unit wholly within 13\" of this unit to be the target, then roll a dice.\n\nEffect: On a 3+, add the roll to the target's control score until the start of your next turn.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "none"
+          },
+          {
+            "id": "wither",
+            "name": "Wither",
+            "effect": "Declare: Pick a visible enemy unit within 13\" of this unit to be the target, then make a casting roll of 2D6.\n\nEffect: On a 6+, inflict D3 mortal damage on the target.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "warlockEngineer",
+        "name": "Warlock Engineer",
+        "move": 6,
+        "control": 2,
+        "health": 5,
+        "models": 1,
+        "save": 5,
+        "ward": 0,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Warplock Musket",
+            "range": "24\"",
+            "attacks": "2",
+            "hit": 3,
+            "wound": 3,
+            "rend": 2,
+            "damage": "D3",
+            "abilities": "Crit (Auto-wound)"
+          },
+          {
+            "name": "Warpforged Dagger",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 4,
+            "wound": 4,
+            "rend": 0,
+            "damage": "2"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "moreMoreWarpEnergy",
+            "name": "More-More Warp Energy!",
+            "effect": "Roll a dice. On a 2+, set the Damage characteristic of its Warplock Musket to 3 this phase. On a 1, inflict D3 mortal damage on this unit.",
+            "phase": "shooting",
+            "timing": "Reaction: You declared a Shoot ability for this unit and it has not used a Move ability this turn",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "clanrats1",
+        "name": "Clanrats",
+        "move": 6,
+        "control": 1,
+        "health": 1,
+        "models": 10,
+        "save": 5,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Rusty Blade",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 4,
+            "wound": 5,
+            "rend": 0,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "seethingSwarm1",
+            "name": "Seething Swarm",
+            "effect": "You can return D3 slain models to this unit.",
+            "phase": "end",
+            "timing": "End of Any Turn",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "clanrats2",
+        "name": "Clanrats",
+        "move": 6,
+        "control": 1,
+        "health": 1,
+        "models": 10,
+        "save": 5,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Rusty Blade",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 4,
+            "wound": 5,
+            "rend": 0,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "seethingSwarm2",
+            "name": "Seething Swarm",
+            "effect": "You can return D3 slain models to this unit.",
+            "phase": "end",
+            "timing": "End of Any Turn",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "ratOgors",
+        "name": "Rat Ogors",
+        "move": 6,
+        "control": 1,
+        "health": 4,
+        "models": 3,
+        "save": 5,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Warpfire Gun",
+            "range": "10\"",
+            "attacks": "2D6",
+            "hit": 2,
+            "wound": 4,
+            "rend": 2,
+            "damage": "1",
+            "abilities": "Shoot in Combat"
+          },
+          {
+            "name": "Claws, Blades and Fangs",
+            "range": "Melee",
+            "attacks": "5",
+            "hit": 4,
+            "wound": 3,
+            "rend": 1,
+            "damage": "2"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "unleashedWarpFury",
+            "name": "Unleashed Warp-Fury",
+            "effect": "Inflict D3 mortal damage on this unit. Then, add 1 to the Attacks characteristic of its melee weapons this phase.",
+            "phase": "combat",
+            "timing": "Any Combat Phase, Once Per Battle",
+            "once": "once-per-battle"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "skaven-warpspark-clawpack",
+    "name": "Skaven",
+    "spearheadName": "Warpspark Clawpack",
+    "battleTraits": [
+      {
+        "id": "alwaysThreeClawstepsAhead",
+        "name": "Always Three Clawsteps Ahead",
+        "effect": "Declare: Pick a friendly unit that is not in combat.\n\nEffect: That unit can use the 'Normal Move' ability as if it were your movement phase.",
+        "phase": "movement",
+        "timing": "Once Per Phase, Enemy Movement Phase",
+        "once": "once-per-turn"
+      }
+    ],
+    "regimentAbilities": [
+      {
+        "id": "warpstoneLacedArmour",
+        "name": "Warpstone-Laced Armour",
+        "effect": "Used By: Your Stormfiends unit.\n\nEffect: Your Stormfiends unit has Ward (5+) for the rest of the turn.",
+        "phase": "combat",
+        "timing": "Once Per Battle, Reaction: Opponent declared an Attack ability and targeted your Stormfiends unit",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "endlessSwarmOfRats",
+        "name": "Endless Swarm of Rats",
+        "effect": "When a friendly Clanrats unit uses its 'Seething Swarm' ability, you can return D6 slain models to that unit instead of D3.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      }
+    ],
+    "enhancements": [
+      {
+        "id": "skilledManipulator",
+        "name": "Skilled Manipulator",
+        "effect": "Your general has Ward (4+) while they are within 1\" of any friendly Clanrats units.",
+        "phase": "passive",
+        "timing": "Passive",
+        "once": "none"
+      },
+      {
+        "id": "skitterleap",
+        "name": "Skitterleap",
+        "effect": "Declare: Make a casting roll of 2D6.\n\nEffect: On a 6+, remove your general from the battlefield and set them up again on the battlefield more than 6\" from all enemy units. They cannot use Move abilities in the following movement phase.",
+        "phase": "hero",
+        "timing": "Your Hero Phase",
+        "once": "none"
+      },
+      {
+        "id": "cageOfWarpLightning",
+        "name": "Cage of Warp Lightning",
+        "effect": "Declare: Pick a visible enemy unit within 6\" of your general and roll a dice.\n\nEffect: On a 2+, the enemy unit has Strike-last this phase. On a 1, inflict 1 mortal damage on your general.",
+        "phase": "combat",
+        "timing": "Once Per Battle, Any Combat Phase",
+        "once": "once-per-battle"
+      },
+      {
+        "id": "scurryAway",
+        "name": "Scurry Away",
+        "effect": "Roll a dice. On a 3+, this unit can immediately use the 'Retreat' ability as if it were your movement phase. If it does so, no mortal damage is inflicted on it.",
+        "phase": "combat",
+        "timing": "Any Combat Phase",
+        "once": "none"
+      }
+    ],
+    "units": [
+      {
+        "id": "greySeerWarpspark",
+        "name": "Grey Seer",
+        "move": 6,
+        "control": 2,
+        "health": 5,
+        "models": 1,
+        "save": 6,
+        "ward": 0,
+        "isHero": true,
+        "weapons": [
+          {
+            "name": "Warpstone Staff",
+            "range": "Melee",
+            "attacks": "3",
+            "hit": 4,
+            "wound": 4,
+            "rend": 1,
+            "damage": "D3"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "willOfTheHornedRatWarpspark",
+            "name": "Will of the Horned Rat",
+            "effect": "Declare: Pick a friendly unit wholly within 13\" of this unit to be the target, then roll a dice.\n\nEffect: On a 3+, add the roll to the target's control score until the start of your next turn.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "none"
+          },
+          {
+            "id": "witherWarpspark",
+            "name": "Wither",
+            "effect": "Declare: Pick a visible enemy unit within 13\" of this unit to be the target, then make a casting roll of 2D6.\n\nEffect: On a 6+, inflict D3 mortal damage on the target.",
+            "phase": "hero",
+            "timing": "Your Hero Phase",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "stormfiends",
+        "name": "Stormfiends",
+        "move": 6,
+        "control": 2,
+        "health": 6,
+        "models": 3,
+        "save": 4,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Ratling Cannons",
+            "range": "15\"",
+            "attacks": "3D6",
+            "hit": 4,
+            "wound": 3,
+            "rend": 1,
+            "damage": "1"
+          },
+          {
+            "name": "Windlaunchers",
+            "range": "15\"",
+            "attacks": "3",
+            "hit": 4,
+            "wound": 3,
+            "rend": 2,
+            "damage": "D3"
+          },
+          {
+            "name": "Shock Gauntlets",
+            "range": "Melee",
+            "attacks": "4",
+            "hit": 4,
+            "wound": 2,
+            "rend": 1,
+            "damage": "2"
+          },
+          {
+            "name": "Clubbing Blows",
+            "range": "Melee",
+            "attacks": "4",
+            "hit": 4,
+            "wound": 2,
+            "rend": 0,
+            "damage": "2"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "shockGauntlets",
+            "name": "Shock Gauntlets",
+            "effect": "Each time an attack made with this unit's Shock Gauntlets scores a critical hit, that attack scores D6 hits instead of 1 (make a wound roll for each hit).",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "warpLightningCannon",
+        "name": "Warp Lightning Cannon",
+        "move": 3,
+        "control": 2,
+        "health": 8,
+        "models": 1,
+        "save": 4,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Warp Lightning Blast",
+            "range": "20\"",
+            "attacks": "2D6",
+            "hit": 4,
+            "wound": 0,
+            "rend": 0,
+            "damage": "See below",
+            "abilities": "See below"
+          },
+          {
+            "name": "Crew's Teeth and Knives",
+            "range": "Melee",
+            "attacks": "D6",
+            "hit": 4,
+            "wound": 5,
+            "rend": 0,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "warpLightningBlastAbility",
+            "name": "Warp Lightning Blast",
+            "effect": "Each attack made with this weapon in a single phase must target the same enemy unit. Each hit inflicts 1 mortal damage on the target and the attack sequence ends.",
+            "phase": "passive",
+            "timing": "Passive",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "clanratsWarpspark1",
+        "name": "Clanrats",
+        "move": 6,
+        "control": 1,
+        "health": 1,
+        "models": 10,
+        "save": 5,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Rusty Blade",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 4,
+            "wound": 5,
+            "rend": 0,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "seethingSwarmWarpspark1",
+            "name": "Seething Swarm",
+            "effect": "You can return D3 slain models to this unit.",
+            "phase": "end",
+            "timing": "End of Any Turn",
+            "once": "none"
+          }
+        ]
+      },
+      {
+        "id": "clanratsWarpspark2",
+        "name": "Clanrats",
+        "move": 6,
+        "control": 1,
+        "health": 1,
+        "models": 10,
+        "save": 5,
+        "ward": 0,
+        "isHero": false,
+        "weapons": [
+          {
+            "name": "Rusty Blade",
+            "range": "Melee",
+            "attacks": "2",
+            "hit": 4,
+            "wound": 5,
+            "rend": 0,
+            "damage": "1"
+          }
+        ],
+        "abilities": [
+          {
+            "id": "seethingSwarmWarpspark2",
+            "name": "Seething Swarm",
+            "effect": "You can return D3 slain models to this unit.",
+            "phase": "end",
+            "timing": "End of Any Turn",
+            "once": "none"
+          }
+        ]
+      }
+    ]
+  }
+]
