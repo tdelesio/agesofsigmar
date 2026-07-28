@@ -334,17 +334,34 @@ export default function TrackerPage() {
 
     // Reset once-per-turn abilities
     Object.keys(updated.usedAbilities).forEach(key => {
-      let isOncePerTurn = true;
-      const traitAb = faction.battleTraits.find(a => a.id === key);
-      const regAb = faction.regimentAbilities.find(a => a.id === key);
-      const enhAb = faction.enhancements.find(a => a.id === key);
+      let isOncePerBattleAbility = false;
       
-      const foundAb = traitAb || regAb || enhAb;
-      if (foundAb && foundAb.once === 'once-per-battle') {
-        isOncePerTurn = false;
+      // 1. Try to find in faction battle traits, regiment abilities, or enhancements
+      let foundAb = faction.battleTraits.find(a => a.id === key) ||
+                    faction.regimentAbilities.find(a => a.id === key) ||
+                    faction.enhancements.find(a => a.id === key);
+      
+      // 2. Try to find in unit abilities (matching by raw ID or end of hyphenated key)
+      if (!foundAb) {
+        for (const u of faction.units) {
+          const matched = u.abilities.find(a => key === a.id || key.endsWith(`-${a.id}`));
+          if (matched) {
+            foundAb = matched;
+            break;
+          }
+        }
       }
-      
-      if (isOncePerTurn) {
+
+      if (foundAb) {
+        const isOncePerBattleType = foundAb.once === 'once-per-battle';
+        const isTimingOncePerBattle = foundAb.timing && foundAb.timing.toLowerCase().startsWith('once per battle');
+        if (isOncePerBattleType || isTimingOncePerBattle) {
+          isOncePerBattleAbility = true;
+        }
+      }
+
+      // If it is NOT a once-per-battle ability, delete it so it resets for the new turn/round!
+      if (!isOncePerBattleAbility) {
         delete updated.usedAbilities[key];
       }
     });

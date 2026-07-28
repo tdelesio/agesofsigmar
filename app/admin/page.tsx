@@ -16,6 +16,39 @@ import { Badge } from '@/components/ui/badge';
 import { DEFAULT_FACTIONS } from '../data/default-factions';
 import { Faction, Unit, Weapon, Ability } from '../types';
 
+const getAbilityBgClass = (ability: Partial<Ability>) => {
+  const phase = ability.phase;
+  const appliedPhase = ability.passiveAppliedPhase;
+
+  let targetPhase = phase;
+  if (phase === 'passive') {
+    if (!appliedPhase) {
+      targetPhase = 'end'; // falls back to purple
+    } else {
+      targetPhase = appliedPhase;
+    }
+  }
+
+  switch (targetPhase) {
+    case 'start':
+      return "bg-[#181c25] border-zinc-700/60 shadow-sm"; // Charcoal/slate
+    case 'hero':
+      return "bg-[#272417] border-yellow-500/30 shadow-sm"; // Premium dark gold/yellow
+    case 'movement':
+      return "bg-[#131f2c] border-blue-500/30 shadow-sm"; // Premium dark blue
+    case 'shooting':
+      return "bg-[#11241a] border-emerald-500/30 shadow-sm"; // Premium dark green
+    case 'charge':
+      return "bg-[#291e14] border-orange-500/30 shadow-sm"; // Premium dark orange
+    case 'combat':
+      return "bg-[#29161a] border-rose-500/30 shadow-sm"; // Premium dark rose/red
+    case 'end':
+      return "bg-[#21152a] border-purple-500/30 shadow-sm"; // Premium dark purple
+    default:
+      return "bg-[#0f121a] border-[#222834]";
+  }
+};
+
 export default function AdminPage() {
   const router = useRouter();
 
@@ -646,7 +679,7 @@ export default function AdminPage() {
                   </CardHeader>
                   <CardContent className="p-4 space-y-4">
                     {editorFaction.battleTraits.map((trait, index) => (
-                      <div key={trait.id} className="bg-[#0f121a] p-4 rounded-lg border border-[#222834] space-y-3 relative">
+                      <div key={trait.id} className={`p-4 rounded-lg border transition-all space-y-3 relative ${getAbilityBgClass(trait)}`}>
                         <Button size="sm" variant="ghost" onClick={() => removeAbility('battleTraits', index)} className="absolute top-2 right-2 text-red-400 hover:text-red-500 hover:bg-red-500/10 h-8 w-8 p-0">
                           <Trash className="h-3.5 w-3.5" />
                         </Button>
@@ -734,7 +767,7 @@ export default function AdminPage() {
                   </CardHeader>
                   <CardContent className="p-4 space-y-4">
                     {editorFaction.regimentAbilities.map((reg, index) => (
-                      <div key={reg.id} className="bg-[#0f121a] p-4 rounded-lg border border-[#222834] space-y-3 relative">
+                      <div key={reg.id} className={`p-4 rounded-lg border transition-all space-y-3 relative ${getAbilityBgClass(reg)}`}>
                         <Button size="sm" variant="ghost" onClick={() => removeAbility('regimentAbilities', index)} className="absolute top-2 right-2 text-red-400 hover:text-red-500 hover:bg-red-500/10 h-8 w-8 p-0">
                           <Trash className="h-3.5 w-3.5" />
                         </Button>
@@ -822,7 +855,7 @@ export default function AdminPage() {
                   </CardHeader>
                   <CardContent className="p-4 space-y-4">
                     {editorFaction.enhancements.map((enh, index) => (
-                      <div key={enh.id} className="bg-[#0f121a] p-4 rounded-lg border border-[#222834] space-y-3 relative">
+                      <div key={enh.id} className={`p-4 rounded-lg border transition-all space-y-3 relative ${getAbilityBgClass(enh)}`}>
                         <Button size="sm" variant="ghost" onClick={() => removeAbility('enhancements', index)} className="absolute top-2 right-2 text-red-400 hover:text-red-500 hover:bg-red-500/10 h-8 w-8 p-0">
                           <Trash className="h-3.5 w-3.5" />
                         </Button>
@@ -1099,7 +1132,7 @@ export default function AdminPage() {
                         </CardHeader>
                         <CardContent className="p-4 space-y-4">
                           {editorFaction.units[selectedUnitIndex].abilities?.map((ability, abilityIdx) => (
-                            <div key={ability.id} className="bg-[#0f121a] p-3 rounded-lg border border-[#222834] relative space-y-2">
+                            <div key={ability.id} className={`p-3 rounded-lg border transition-all relative space-y-2 ${getAbilityBgClass(ability)}`}>
                               <Button size="sm" variant="ghost" onClick={() => removeUnitAbility(selectedUnitIndex, abilityIdx)} className="absolute top-2 right-2 text-red-400 hover:text-red-500 h-6 w-6 p-0 hover:bg-transparent">
                                 <Trash className="h-3.5 w-3.5" />
                               </Button>
