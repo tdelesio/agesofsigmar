@@ -22,6 +22,17 @@ export default function AdminPage() {
   // State
   const [apiKey, setApiKey] = useState('');
   const [showKeyInput, setShowKeyInput] = useState(false);
+  
+  // Custom non-blocking modal states
+  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
+
+  const showToast = (message: string, type: 'error' | 'success' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(prev => prev?.message === message ? null : prev);
+    }, 4500);
+  };
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
 
@@ -71,8 +82,9 @@ export default function AdminPage() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      showToast('Backup file exported successfully!');
     } catch (err) {
-      alert('Failed to export backup: ' + err);
+      showToast('Failed to export backup: ' + err, 'error');
     }
   };
 
@@ -85,7 +97,7 @@ export default function AdminPage() {
         const text = event.target?.result as string;
         const parsed = JSON.parse(text);
         if (!Array.isArray(parsed)) {
-          alert('Invalid backup file format. Expected a JSON array of Factions.');
+          showToast('Invalid backup file format. Expected a JSON array of Factions.', 'error');
           return;
         }
         
@@ -93,18 +105,21 @@ export default function AdminPage() {
         if (parsed.length > 0) {
           const first = parsed[0];
           if (!first.id || !first.name || !Array.isArray(first.units)) {
-            alert('Invalid backup file content. Faction schemas do not match.');
+            showToast('Invalid backup file content. Faction schemas do not match.', 'error');
             return;
           }
         }
 
-        if (confirm(`Are you sure you want to restore ${parsed.length} factions? This will replace your current loaded factions database.`)) {
-          localStorage.setItem('custom_factions', JSON.stringify(parsed));
-          setCustomFactions(parsed);
-          alert('Backup restored successfully!');
-        }
+        setConfirmModal({
+          message: `Are you sure you want to restore ${parsed.length} factions? This will replace your current loaded factions database.`,
+          onConfirm: () => {
+            localStorage.setItem('custom_factions', JSON.stringify(parsed));
+            setCustomFactions(parsed);
+            showToast('Backup restored successfully!');
+          }
+        });
       } catch (err) {
-        alert('Failed to restore backup: ' + err);
+        showToast('Failed to restore backup: ' + err, 'error');
       }
     };
     reader.readAsText(file);
@@ -133,7 +148,7 @@ export default function AdminPage() {
       if (droppedFile.type === 'application/pdf') {
         setFile(droppedFile);
       } else {
-        alert('Please upload a PDF file.');
+        showToast('Please upload a PDF file.', 'error');
       }
     }
   };
@@ -249,7 +264,7 @@ export default function AdminPage() {
         setFile(null);
 
         const armyNames = incoming.map((f: any) => f.spearheadName || f.name).join(', ');
-        alert(`Successfully parsed and bulk-saved ${incoming.length} armies directly to your roster:\n👉 ${armyNames}\n\nYou can edit or delete them individually in the table list below.`);
+        showToast(`Successfully bulk-saved ${incoming.length} armies: ${armyNames}! Edit them in the list below.`, 'success');
       }
     } catch (err: any) {
       console.error(err);
@@ -309,11 +324,16 @@ export default function AdminPage() {
 
   // CRUD: Delete specific custom faction
   const handleDeleteFaction = (id: string) => {
-    if (confirm('Are you sure you want to delete this custom faction? This cannot be undone.')) {
-      const updated = customFactions.filter(f => f.id !== id);
-      setCustomFactions(updated);
-      localStorage.setItem('custom_factions', JSON.stringify(updated));
-    }
+    const faction = customFactions.find(f => f.id === id);
+    setConfirmModal({
+      message: `Are you sure you want to delete "${faction?.name || 'this custom faction'}"? This cannot be undone.`,
+      onConfirm: () => {
+        const updated = customFactions.filter(f => f.id !== id);
+        setCustomFactions(updated);
+        localStorage.setItem('custom_factions', JSON.stringify(updated));
+        showToast('Faction deleted successfully!');
+      }
+    });
   };
 
   // CRUD: Save visual editor state back into localStorage
@@ -339,7 +359,7 @@ export default function AdminPage() {
     setCustomFactions(updatedFactions);
     setIsEditing(false);
     setEditorFaction(null);
-    alert(`Faction "${finalFaction.name}" saved successfully to your game roster!`);
+    showToast(`Faction "${finalFaction.name}" saved successfully to your roster!`, 'success');
   };
 
   // Editor updating state sub-handlers
@@ -419,7 +439,7 @@ export default function AdminPage() {
   const removeUnit = (index: number) => {
     if (!editorFaction) return;
     if (editorFaction.units.length <= 1) {
-      alert('A faction must have at least one unit roster.');
+      showToast('A faction must have at least one unit roster.', 'error');
       return;
     }
     const updatedUnits = editorFaction.units.filter((_, i) => i !== index);
@@ -799,7 +819,7 @@ export default function AdminPage() {
                       >
                         <div className="truncate pr-2">
                           <p className="text-xs font-bold truncate">{unit.name || 'Unnamed Unit'}</p>
-                          <p className="text-[10px] text-gray-500">{unit.isHero ? 'Hero general' : 'Regular infantry'}</p>
+                          <p className="text-[10px] text-gray-500">{unit.isHero ? 'Hero general' : 'Regular infantry'} • {unit.models ?? 1} model{unit.models !== 1 ? 's' : ''}</p>
                         </div>
                         <div className="flex gap-1 shrink-0">
                           <Button size="sm" variant="ghost" title="Duplicate Unit" onClick={(e) => { e.stopPropagation(); duplicateUnit(index); }} className="text-gray-500 hover:text-amber-400 h-6 w-6 p-0 hover:bg-transparent">
@@ -825,13 +845,23 @@ export default function AdminPage() {
                           <CardTitle className="text-md font-bold">Roster Stats</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-1">
                               <label className="text-xs text-gray-400 font-bold uppercase">Roster Name</label>
                               <Input 
                                 value={editorFaction.units[selectedUnitIndex].name} 
                                 onChange={(e) => updateUnitField(selectedUnitIndex, 'name', e.target.value)} 
                                 className="bg-[#0f121a] border-[#222834] text-xs h-9" 
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-xs text-gray-400 font-bold uppercase">Models Per Unit (Squad Size)</label>
+                              <Input 
+                                type="number" 
+                                min={1}
+                                value={editorFaction.units[selectedUnitIndex].models ?? 1} 
+                                onChange={(e) => updateUnitField(selectedUnitIndex, 'models', parseInt(e.target.value) || 1)} 
+                                className="bg-[#0f121a] border-[#222834] text-xs h-9 text-amber-500 font-black focus-visible:ring-1 focus-visible:ring-amber-500/30" 
                               />
                             </div>
                             <div className="flex items-center gap-2 pt-6">
@@ -849,7 +879,7 @@ export default function AdminPage() {
                           </div>
 
                           {/* Stat Grid */}
-                          <div className="grid grid-cols-6 gap-2 pt-2">
+                          <div className="grid grid-cols-5 gap-2 pt-2">
                             <div className="text-center bg-[#0f121a] p-2 rounded border border-[#222834]">
                               <p className="text-[10px] text-gray-500 font-bold uppercase">Move</p>
                               <Input 
@@ -869,7 +899,7 @@ export default function AdminPage() {
                               />
                             </div>
                             <div className="text-center bg-[#0f121a] p-2 rounded border border-[#222834]">
-                              <p className="text-[10px] text-gray-500 font-bold uppercase">Health</p>
+                              <p className="text-[10px] text-gray-500 font-bold uppercase">Health (per model)</p>
                               <Input 
                                 type="number" 
                                 value={editorFaction.units[selectedUnitIndex].health} 
@@ -878,16 +908,7 @@ export default function AdminPage() {
                               />
                             </div>
                             <div className="text-center bg-[#0f121a] p-2 rounded border border-[#222834]">
-                              <p className="text-[10px] text-gray-500 font-bold uppercase">Models</p>
-                              <Input 
-                                type="number" 
-                                value={editorFaction.units[selectedUnitIndex].models ?? 1} 
-                                onChange={(e) => updateUnitField(selectedUnitIndex, 'models', parseInt(e.target.value) || 1)} 
-                                className="bg-transparent border-none text-center font-black text-amber-500 p-0 text-sm focus-visible:ring-0 h-8" 
-                              />
-                            </div>
-                            <div className="text-center bg-[#0f121a] p-2 rounded border border-[#222834]">
-                              <p className="text-[10px] text-gray-500 font-bold uppercase">Save</p>
+                              <p className="text-[10px] text-gray-500 font-bold uppercase">Save (Save+)</p>
                               <Input 
                                 type="number" 
                                 value={editorFaction.units[selectedUnitIndex].save} 
@@ -896,7 +917,7 @@ export default function AdminPage() {
                               />
                             </div>
                             <div className="text-center bg-[#0f121a] p-2 rounded border border-[#222834]">
-                              <p className="text-[10px] text-gray-500 font-bold uppercase">Ward</p>
+                              <p className="text-[10px] text-gray-500 font-bold uppercase">Ward (Ward+)</p>
                               <Input 
                                 type="number" 
                                 value={editorFaction.units[selectedUnitIndex].ward} 
@@ -1243,6 +1264,51 @@ export default function AdminPage() {
       <footer className="border-t border-[#222834] py-6 text-center text-xs text-gray-500 mt-auto bg-[#0a0c12]">
         <p>© 2026 Spearhead Rules Tracker • Solo Tabletop Companion Admin CMS</p>
       </footer>
+
+      {toast && (
+        <div className="fixed bottom-4 right-4 left-4 md:left-auto md:max-w-sm z-50 animate-bounce-in">
+          <div className={`p-4 rounded-xl shadow-2xl border flex items-center justify-between gap-3 ${
+            toast.type === 'error' ? 'bg-red-950/90 border-red-500/30 text-red-200' : 'bg-zinc-900/95 border-amber-500/30 text-amber-200'
+          }`}>
+            <span className="text-xs font-bold leading-normal">{toast.message}</span>
+            <button onClick={() => setToast(null)} className="text-xs font-black hover:text-white shrink-0">✕</button>
+          </div>
+        </div>
+      )}
+
+      {confirmModal && (
+        <div className="fixed inset-0 bg-[#0d1017]/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-[#151923] border border-[#222834] rounded-xl max-w-sm w-full p-6 space-y-6 shadow-2xl">
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
+                <AlertCircle className="h-4 w-4 text-amber-500" /> Are you sure?
+              </h3>
+              <p className="text-xs text-gray-300 leading-relaxed">{confirmModal.message}</p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setConfirmModal(null)} 
+                className="border-[#2c3548] text-gray-300 text-xs"
+              >
+                Cancel
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(null);
+                }} 
+                className="bg-red-600 hover:bg-red-700 text-white text-xs border-transparent"
+              >
+                Yes, Proceed
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { 
   ArrowLeft, RefreshCw, Swords, Shield, Heart, Trophy, 
   ChevronRight, ChevronLeft, Award, Play, AlertTriangle, 
-  Activity, Sparkles, ScrollText, User, UserCheck, ShieldAlert
+  Activity, Sparkles, ScrollText, User, UserCheck, ShieldAlert, AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +21,17 @@ export default function TrackerPage() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [factions, setFactions] = useState<Faction[]>(DEFAULT_FACTIONS);
   const [activeTab, setActiveTab] = useState<'tracker' | 'roster' | 'traits' | 'logs'>('tracker');
+
+  // Custom non-blocking modal states
+  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
+
+  const showToast = (message: string, type: 'error' | 'success' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(prev => prev?.message === message ? null : prev);
+    }, 4000);
+  };
 
   // Load game from localStorage on mount
   useEffect(() => {
@@ -306,7 +317,7 @@ export default function TrackerPage() {
         updated.logs.unshift(`🌟 --- START OF BATTLE ROUND ${updated.round} --- 🌟`);
       } else {
         updated.logs.unshift(`🏆 --- GAME OVER (4 Rounds completed) --- 🏆`);
-        alert('All 4 Battle Rounds are completed! Your final score is: ' + updated.victoryPoints + ' VPs');
+        showToast('All 4 Battle Rounds are completed! Final score: ' + updated.victoryPoints + ' VPs', 'success');
       }
     }
 
@@ -339,10 +350,13 @@ export default function TrackerPage() {
   };
 
   const handleResetGame = () => {
-    if (confirm('Are you sure you want to RESET this match? All scores, wounds, and logs will be lost.')) {
-      localStorage.removeItem('active_spearhead_game');
-      router.push('/');
-    }
+    setConfirmModal({
+      message: 'Are you sure you want to RESET this match? All scores, wounds, and logs will be lost.',
+      onConfirm: () => {
+        localStorage.removeItem('active_spearhead_game');
+        router.push('/');
+      }
+    });
   };
 
   // Extract phase-specific abilities for reference
@@ -1228,6 +1242,50 @@ export default function TrackerPage() {
         <span>•</span>
         <span>Round Active: {gameState.round} / 4</span>
       </footer>
+
+      {toast && (
+        <div className="fixed bottom-4 right-4 left-4 md:left-auto md:max-w-sm z-50 animate-bounce-in">
+          <div className={`p-4 rounded-xl shadow-2xl border flex items-center justify-between gap-3 ${
+            toast.type === 'error' ? 'bg-red-950/90 border-red-500/30 text-red-200' : 'bg-zinc-900/95 border-amber-500/30 text-amber-200'
+          }`}>
+            <span className="text-xs font-bold leading-normal">{toast.message}</span>
+            <button onClick={() => setToast(null)} className="text-xs font-black hover:text-white shrink-0">✕</button>
+          </div>
+        </div>
+      )}
+
+      {confirmModal && (
+        <div className="fixed inset-0 bg-[#0d1017]/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-[#151923] border border-[#222834] rounded-xl max-w-sm w-full p-6 space-y-6 shadow-2xl">
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
+                <AlertCircle className="h-4 w-4 text-amber-500" /> Are you sure?
+              </h3>
+              <p className="text-xs text-gray-300 leading-relaxed">{confirmModal.message}</p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setConfirmModal(null)} 
+                className="border-[#2c3548] text-gray-300 text-xs"
+              >
+                Cancel
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(null);
+                }} 
+                className="bg-red-600 hover:bg-red-700 text-white text-xs border-transparent"
+              >
+                Yes, Proceed
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
