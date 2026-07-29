@@ -136,19 +136,35 @@ export default function AdminPage() {
       setShowKeyInput(true);
     }
 
-    const savedFactionsStr = localStorage.getItem('custom_factions');
-    if (savedFactionsStr) {
+    const loadData = async () => {
       try {
-        const parsed = JSON.parse(savedFactionsStr);
-        const merged = mergeFactions(DEFAULT_FACTIONS, parsed);
-        setCustomFactions(merged);
+        const res = await fetch('/api/factions');
+        const data = await res.json();
+        if (data.success && data.factions) {
+          setCustomFactions(data.factions);
+          return;
+        }
       } catch (err) {
-        console.error('Failed to load custom factions:', err);
+        console.error('Failed to load factions from database API, falling back to local storage:', err);
+      }
+
+      // Local storage fallback
+      const savedFactionsStr = localStorage.getItem('custom_factions');
+      if (savedFactionsStr) {
+        try {
+          const parsed = JSON.parse(savedFactionsStr);
+          const merged = mergeFactions(DEFAULT_FACTIONS, parsed);
+          setCustomFactions(merged);
+        } catch (err) {
+          console.error('Failed to load custom factions:', err);
+          setCustomFactions([...DEFAULT_FACTIONS].sort((a, b) => a.name.localeCompare(b.name)));
+        }
+      } else {
         setCustomFactions([...DEFAULT_FACTIONS].sort((a, b) => a.name.localeCompare(b.name)));
       }
-    } else {
-      setCustomFactions([...DEFAULT_FACTIONS].sort((a, b) => a.name.localeCompare(b.name)));
-    }
+    };
+
+    loadData();
   }, []);
 
   const handleExportBackup = () => {

@@ -62,18 +62,34 @@ export default function HomePage() {
 
   // Load factions and active game on mount
   useEffect(() => {
-    const savedFactionsStr = localStorage.getItem('custom_factions');
-    if (savedFactionsStr) {
+    const fetchFactions = async () => {
       try {
-        const customFactions: Faction[] = JSON.parse(savedFactionsStr);
-        setFactions(mergeFactions(DEFAULT_FACTIONS, customFactions));
+        const res = await fetch('/api/factions');
+        const data = await res.json();
+        if (data.success && data.factions) {
+          setFactions(data.factions);
+          return;
+        }
       } catch (err) {
-        console.error('Failed to parse custom factions from storage:', err);
+        console.error('Failed to fetch factions from database API, falling back to local storage:', err);
+      }
+
+      // Fallback to local storage / static defaults
+      const savedFactionsStr = localStorage.getItem('custom_factions');
+      if (savedFactionsStr) {
+        try {
+          const customFactions: Faction[] = JSON.parse(savedFactionsStr);
+          setFactions(mergeFactions(DEFAULT_FACTIONS, customFactions));
+        } catch (err) {
+          console.error('Failed to parse custom factions from storage:', err);
+          setFactions([...DEFAULT_FACTIONS].sort((a, b) => a.name.localeCompare(b.name)));
+        }
+      } else {
         setFactions([...DEFAULT_FACTIONS].sort((a, b) => a.name.localeCompare(b.name)));
       }
-    } else {
-      setFactions([...DEFAULT_FACTIONS].sort((a, b) => a.name.localeCompare(b.name)));
-    }
+    };
+
+    fetchFactions();
 
     const activeGame = localStorage.getItem('active_spearhead_game');
     if (activeGame) {
