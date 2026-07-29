@@ -1818,7 +1818,8 @@
         "effect": "Add 1 to hit rolls for attacks made as part of that Attack ability if the target of that ability is closer to the leeward battlefield edge than the unit using this ability.",
         "phase": "combat",
         "timing": "Once Per Turn (Army), Reaction: You declared an Attack ability",
-        "once": "once-per-turn"
+        "once": "once-per-turn",
+        "isDefense": true
       }
     ],
     "regimentAbilities": [
@@ -1846,7 +1847,8 @@
         "effect": "Subtract 1 from the control scores of enemy units within 6\" of your general for each friendly Ride the Hurricane ability used this battle round.",
         "phase": "passive",
         "timing": "Passive",
-        "once": "none"
+        "once": "none",
+        "passiveAppliedPhase": "end"
       },
       {
         "id": "windWhisperer",
@@ -1862,7 +1864,8 @@
         "effect": "While any friendly Infantry units are within your general’s combat range, both your general and those Infantry units have Ward (5+).",
         "phase": "passive",
         "timing": "Passive",
-        "once": "none"
+        "once": "none",
+        "isDefense": true
       },
       {
         "id": "curvedShots",
@@ -1870,7 +1873,8 @@
         "effect": "You can measure the range and visibility of your general’s shooting attacks from any point on the leeward battlefield edge.",
         "phase": "passive",
         "timing": "Passive",
-        "once": "none"
+        "once": "none",
+        "passiveAppliedPhase": "shooting"
       }
     ],
     "units": [
@@ -1952,7 +1956,8 @@
             "effect": "Subtract 1 from hit rolls for attacks that target friendly units while they are wholly within 6\" of this unit.",
             "phase": "passive",
             "timing": "Passive",
-            "once": "none"
+            "once": "none",
+            "isDefense": true
           },
           {
             "id": "hurricaneWinds",

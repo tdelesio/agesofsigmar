@@ -27,14 +27,16 @@ const mergeFactions = (defaults: Faction[], custom: Faction[]): Faction[] => {
   const map = new Map<string, Faction>();
   defaults.forEach(f => map.set(f.id, f));
   custom.forEach(f => map.set(f.id, f));
-  return Array.from(map.values());
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
 };
 
 export default function HomePage() {
   const router = useRouter();
 
   // Factions list (default + custom from localStorage)
-  const [factions, setFactions] = useState<Faction[]>(DEFAULT_FACTIONS);
+  const [factions, setFactions] = useState<Faction[]>(() => {
+    return [...DEFAULT_FACTIONS].sort((a, b) => a.name.localeCompare(b.name));
+  });
   const [hasActiveGame, setHasActiveGame] = useState(false);
 
   // Single Player (User) Choices
@@ -67,10 +69,10 @@ export default function HomePage() {
         setFactions(mergeFactions(DEFAULT_FACTIONS, customFactions));
       } catch (err) {
         console.error('Failed to parse custom factions from storage:', err);
-        setFactions(DEFAULT_FACTIONS);
+        setFactions([...DEFAULT_FACTIONS].sort((a, b) => a.name.localeCompare(b.name)));
       }
     } else {
-      setFactions(DEFAULT_FACTIONS);
+      setFactions([...DEFAULT_FACTIONS].sort((a, b) => a.name.localeCompare(b.name)));
     }
 
     const activeGame = localStorage.getItem('active_spearhead_game');

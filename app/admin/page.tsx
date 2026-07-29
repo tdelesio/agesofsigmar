@@ -51,7 +51,7 @@ const mergeFactions = (defaults: Faction[], custom: Faction[]): Faction[] => {
   const map = new Map<string, Faction>();
   defaults.forEach(f => map.set(f.id, f));
   custom.forEach(f => map.set(f.id, f));
-  return Array.from(map.values());
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
 };
 
 export default function AdminPage() {
@@ -144,10 +144,10 @@ export default function AdminPage() {
         setCustomFactions(merged);
       } catch (err) {
         console.error('Failed to load custom factions:', err);
-        setCustomFactions(DEFAULT_FACTIONS);
+        setCustomFactions([...DEFAULT_FACTIONS].sort((a, b) => a.name.localeCompare(b.name)));
       }
     } else {
-      setCustomFactions(DEFAULT_FACTIONS);
+      setCustomFactions([...DEFAULT_FACTIONS].sort((a, b) => a.name.localeCompare(b.name)));
     }
   }, []);
 
