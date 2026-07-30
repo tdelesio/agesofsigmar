@@ -13,7 +13,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DEFAULT_FACTIONS } from '../data/default-factions';
-import { GameState, Faction, Unit, GamePhase, Weapon, Ability, UnitState } from '../types';
+import { GameState, Faction, Unit, GamePhase, Weapon, Ability, UnitState, AppliedModifier } from '../types';
+import { getActiveModifiers as libGetActiveModifiers, getBattleDamagedOverride as libGetBattleDamagedOverride, calculateStatValue, isTargetingSingularFriendlyUnit } from '@/lib/rules-engine';
+
+const shownPromptsCache = new Set<string>();
 
 export default function TrackerPage() {
   const router = useRouter();
@@ -26,6 +29,26 @@ export default function TrackerPage() {
   // Custom non-blocking modal states
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
+  const [activePrompt, setActivePrompt] = useState<{
+    title: string;
+    description: string;
+    actions: string[];
+    onClose: () => void;
+  } | null>(null);
+
+  const [buffModal, setBuffModal] = useState<{
+    isOpen: boolean;
+    unitId: string;
+    unitName: string;
+    allowedStats?: ('attacks' | 'save' | 'ward' | 'move')[];
+    expiresPhase?: GamePhase;
+  } | null>(null);
+
+  const [selectUnitToBuffAbility, setSelectUnitToBuffAbility] = useState<{
+    name: string;
+    effect: string;
+    phase?: GamePhase;
+  } | null>(null);
 
   const showToast = (message: string, type: 'error' | 'success' = 'success') => {
     setToast({ message, type });
@@ -56,6 +79,39 @@ export default function TrackerPage() {
       }
     }
   }, []);
+
+  // Trigger round start overlay exactly once per round start or on load (declared above early returns)
+  useEffect(() => {
+    if (gameState) {
+      const factionTemplate = factions.find(f => f.id === gameState.factionId);
+      if (factionTemplate) {
+        const shownKey = `shown_round_prompt_${gameState.matchId || 'default'}_${gameState.round}`;
+        let alreadyShown = shownPromptsCache.has(shownKey);
+
+        if (!alreadyShown) {
+          try {
+            if (typeof window !== 'undefined' && window.sessionStorage) {
+              alreadyShown = !!sessionStorage.getItem(shownKey);
+            }
+          } catch (e) {
+            console.warn('sessionStorage is unavailable:', e);
+          }
+        }
+
+        if (!alreadyShown && gameState.currentPhase === 'start') {
+          shownPromptsCache.add(shownKey);
+          try {
+            if (typeof window !== 'undefined' && window.sessionStorage) {
+              sessionStorage.setItem(shownKey, 'true');
+            }
+          } catch (e) {
+            console.warn('sessionStorage is unavailable:', e);
+          }
+          checkRoundStartRules(gameState.round);
+        }
+      }
+    }
+  }, [gameState?.round, gameState?.currentPhase, gameState?.activeTurn, gameState?.matchId]);
 
   if (!gameState) {
     return (
@@ -101,6 +157,34 @@ export default function TrackerPage() {
   const saveGame = (newState: GameState) => {
     setGameState(newState);
     localStorage.setItem('active_spearhead_game', JSON.stringify(newState));
+  };
+
+  // Turn-based targeted buff helpers
+  const applyBuff = (unitId: string, stat: any, modifier: number, label: string, expiresPhase?: GamePhase) => {
+    if (!gameState) return;
+    const updated = { ...gameState };
+    const newMod: AppliedModifier = {
+      id: Math.random().toString(36).substring(2, 9),
+      unitId,
+      stat,
+      modifier,
+      label,
+      expiresRound: gameState.round,
+      expiresPhase
+    };
+    updated.appliedModifiers = [...(updated.appliedModifiers || []), newMod];
+    updated.logs.unshift(`[Round ${gameState.round}] ✨ Applied buff [${label}] to unit${expiresPhase ? ` for ${expiresPhase} phase` : ''}.`);
+    saveGame(updated);
+    showToast(`Applied ${label}!`, 'success');
+  };
+
+  const removeBuff = (modId: string) => {
+    if (!gameState || !gameState.appliedModifiers) return;
+    const updated = { ...gameState };
+    updated.appliedModifiers = (updated.appliedModifiers || []).filter(m => m.id !== modId);
+    updated.logs.unshift(`[Round ${gameState.round}] ✨ Removed active buff from unit.`);
+    saveGame(updated);
+    showToast('Buff removed.', 'success');
   };
 
   // VP tracking
@@ -257,13 +341,46 @@ export default function TrackerPage() {
   };
 
   // Ability Use Tracking
-  const toggleAbilityUsed = (abilityId: string, abilityName: string) => {
+  // Ability Use Tracking
+  const toggleAbilityUsed = (abilityId: string, abilityName: string, effect?: string, phase?: GamePhase | 'passive') => {
     const updated = { ...gameState };
+    
+    // Detect unlimited (once: "none") abilities to prevent permanent lockout
+    let foundAb = faction?.battleTraits.find(a => a.id === abilityId) ||
+                  faction?.regimentAbilities.find(a => a.id === abilityId) ||
+                  faction?.enhancements.find(a => a.id === abilityId);
+    
+    if (!foundAb && faction) {
+      for (const u of faction.units) {
+        const matched = u.abilities.find(a => abilityId === a.id || abilityId.endsWith(`-${a.id}`));
+        if (matched) {
+          foundAb = matched;
+          break;
+        }
+      }
+    }
+
+    const isUnlimited = foundAb && foundAb.once === 'none';
     const wasUsed = !!updated.usedAbilities[abilityId];
     updated.usedAbilities[abilityId] = !wasUsed;
 
     updated.logs.unshift(`⚡ Triggered ability: "${abilityName}"`);
     saveGame(updated);
+
+    const effectLower = (effect || '').toLowerCase();
+
+    // Intercept targetable abilities containing "pick/select/choose a/1 friendly unit" when using them
+    // Exclude global/passive abilities with plural "friendly units" or plural targeting rules
+    const isTargetingSingular = isTargetingSingularFriendlyUnit(effect || '');
+
+    if (!wasUsed && isTargetingSingular) {
+      const isPhaseLong = effectLower.includes('this phase') || effectLower.includes('the rest of the phase') || effectLower.includes('for the rest of this phase');
+      setSelectUnitToBuffAbility({ 
+        name: abilityName, 
+        effect: effect || '', 
+        phase: isPhaseLong && phase && phase !== 'passive' ? phase : undefined 
+      });
+    }
   };
 
   // Switch Turn Priority (Me <-> Opponent)
@@ -287,16 +404,28 @@ export default function TrackerPage() {
   const handleNextPhase = () => {
     if (!gameState) return;
     const updated = { ...gameState };
+    const leavingPhase = updated.currentPhase;
     
     if (currentPhaseIndex < phases.length - 1) {
       // Step to next phase in current turn
       updated.currentPhase = phases[currentPhaseIndex + 1].id;
+      
+      // Auto-expire modifiers that expire in the phase we are leaving
+      if (updated.appliedModifiers) {
+        updated.appliedModifiers = updated.appliedModifiers.filter(mod => !mod.expiresPhase || mod.expiresPhase !== leavingPhase);
+      }
+      
       saveGame(updated);
     } else {
       // End of "End" phase -> transition turn
       updated.victoryPoints = Math.max(0, updated.victoryPoints + turnScoredVPs);
       updated.logs.unshift(`[Round ${gameState.round}] Scored +${turnScoredVPs} Victory Points. Total score is now ${updated.victoryPoints} VPs.`);
       
+      // Auto-expire modifiers that expire in the phase we are leaving
+      if (updated.appliedModifiers) {
+        updated.appliedModifiers = updated.appliedModifiers.filter(mod => !mod.expiresPhase || mod.expiresPhase !== leavingPhase);
+      }
+
       // Pass the updated game state containing the new VPs to handleEndTurn
       handleEndTurn(updated);
       setTurnScoredVPs(0); // reset the turn counter
@@ -320,6 +449,10 @@ export default function TrackerPage() {
       if (updated.round < 4) {
         updated.round += 1;
         updated.logs.unshift(`🌟 --- START OF BATTLE ROUND ${updated.round} --- 🌟`);
+        // Automatically expire temporary round buffs
+        if (updated.appliedModifiers) {
+          updated.appliedModifiers = updated.appliedModifiers.filter(mod => mod.expiresRound >= updated.round);
+        }
       } else {
         updated.logs.unshift(`🏆 --- GAME OVER (4 Rounds completed) --- 🏆`);
         showToast('All 4 Battle Rounds are completed! Final score: ' + updated.victoryPoints + ' VPs', 'success');
@@ -386,27 +519,151 @@ export default function TrackerPage() {
     // Selected Battle Trait(s)
     if (gameState.selectedBattleTraitId === 'all') {
       faction.battleTraits.forEach(t => {
-        if (t.phase === phase) list.push(t);
+        if (t.phase === phase) list.push({ ...t, sourceType: 'trait' });
       });
     } else {
       const trait = faction.battleTraits.find(t => t.id === gameState.selectedBattleTraitId);
-      if (trait && trait.phase === phase) list.push(trait);
+      if (trait && trait.phase === phase) list.push({ ...trait, sourceType: 'trait' });
     }
 
     // Selected Regiment
     const regiment = faction.regimentAbilities.find(r => r.id === gameState.selectedRegimentAbilityId);
-    if (regiment && regiment.phase === phase) list.push(regiment);
+    if (regiment && regiment.phase === phase) list.push({ ...regiment, sourceType: 'regiment' });
 
     // Selected Enhancement
     const enhancement = faction.enhancements.find(e => e.id === gameState.selectedEnhancementId);
-    if (enhancement && enhancement.phase === phase) list.push(enhancement);
+    if (enhancement && enhancement.phase === phase) list.push({ ...enhancement, sourceType: 'enhancement' });
 
     return list;
   };
 
+  // Fetch active modifiers for a given stat based on current round/phase/selections
+  function getActiveModifiers(stat: string, unitId?: string): { modifier: number; description: string }[] {
+    return libGetActiveModifiers(gameState, faction || null, stat, unitId);
+  }
+
+  // Helper to parse "Battle Damaged" passive abilities and determine if a characteristic is currently degraded
+  function getBattleDamagedOverride(unitId: string | undefined, statKey: string, weaponName?: string): number | null {
+    return libGetBattleDamagedOverride(gameState, faction || null, unitId, statKey, weaponName);
+  }
+
+  // Helper to render original base stats alongside active modifier badges in a single layout
+  function renderStatWithModifier(baseValue: number | string, statKey: string, unitId?: string, suffix: string = '', weaponName?: string) {
+    // 1. Check for Battle Damaged override first
+    const override = getBattleDamagedOverride(unitId, statKey, weaponName);
+    if (override !== null) {
+      let baseNum = 0;
+      if (typeof baseValue === 'number') baseNum = baseValue;
+      else baseNum = parseInt(baseValue, 10) || 0;
+
+      return (
+        <span className="inline-flex items-center gap-1">
+          <span className="font-extrabold text-red-500 text-xs">{override}{suffix}</span>
+          <span className="text-[10px] text-gray-500 line-through font-medium">({baseNum}{suffix})</span>
+          <Badge className="bg-red-500/15 text-red-400 border border-red-500/20 text-[8px] px-1 py-0 font-black uppercase tracking-wider shrink-0 select-none">
+            DAMAGED
+          </Badge>
+        </span>
+      );
+    }
+
+    const mods = getActiveModifiers(statKey, unitId);
+    const totalMod = mods.reduce((acc, m) => acc + m.modifier, 0);
+
+    if (totalMod === 0) {
+      return <span>{baseValue}{suffix}</span>;
+    }
+
+    // Determine numerical base value
+    const { baseNum, modifiedNum, isNan } = calculateStatValue(baseValue, statKey, totalMod);
+
+    if (isNan) {
+      // Fallback for non-numeric stats (e.g. "D3" or "D6")
+      const sign = totalMod > 0 ? '+' : '';
+      return (
+        <span className="inline-flex items-center gap-1">
+          <span>{baseValue}{suffix}</span>
+          <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 text-[9px] px-1 py-0 font-bold uppercase tracking-wider shrink-0 select-none">
+            {sign}{totalMod}
+          </Badge>
+        </span>
+      );
+    }
+
+    const badgeColorClass = totalMod > 0 ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-red-500/15 text-red-400 border-red-500/20';
+    const sign = totalMod > 0 ? '+' : '';
+
+    return (
+      <span className="inline-flex items-center gap-1">
+        <span className="font-extrabold text-white text-xs">{modifiedNum}{suffix}</span>
+        <span className="text-[10px] text-gray-400 font-medium">({baseNum}{suffix})</span>
+        <Badge className={`text-[8px] px-1 py-0 font-black uppercase tracking-wider shrink-0 select-none border ${badgeColorClass}`}>
+          {sign}{totalMod}
+        </Badge>
+      </span>
+    );
+  }
+
+  // Check and compile round start rules for active popup modals
+  function checkRoundStartRules(round: number) {
+    if (!gameState || !faction) return;
+
+    const roundActions: string[] = [];
+    const prompts: string[] = [];
+
+    const scanAbility = (ability: Ability) => {
+      if (ability.ruleDefinition && ability.ruleDefinition.trigger === 'start_of_round') {
+        ability.ruleDefinition.actions.forEach(action => {
+          // If blood rites, it applies if condition round <= current round, but we notify about the NEW one!
+          if (action.condition?.round === round) {
+            if (action.type === 'modify_stat') {
+              roundActions.push(`🌟 Active Buff: ${action.description}`);
+            } else if (action.type === 'spawn_prompt') {
+              prompts.push(action.description);
+            }
+          }
+        });
+      }
+    };
+
+    if (gameState.selectedBattleTraitId === 'all') {
+      faction.battleTraits.forEach(scanAbility);
+    } else {
+      const trait = faction.battleTraits.find(t => t.id === gameState.selectedBattleTraitId);
+      if (trait) scanAbility(trait);
+    }
+    const regiment = faction.regimentAbilities.find(r => r.id === gameState.selectedRegimentAbilityId);
+    if (regiment) scanAbility(regiment);
+    const enhancement = faction.enhancements.find(e => e.id === gameState.selectedEnhancementId);
+    if (enhancement) scanAbility(enhancement);
+
+    if (roundActions.length > 0 || prompts.length > 0 || round === 1) {
+      setActivePrompt({
+        title: `⚔️ Battle Round ${round} Initializing`,
+        description: round === 1 
+          ? `Welcome to Battle Round 1! Review your pre-game setup maneuvers and active battle round traits.`
+          : `You have successfully advanced to Battle Round ${round}. Please apply the following round-start rules:`,
+        actions: [
+          ...roundActions,
+          ...prompts,
+          ...(round === 1 
+            ? (gameState.activeTurn === 'opponent'
+              ? ['🛡️ Vanguard Maneuvers: Since you are going second, pick up to D3 friendly units to make a free normal move of up to 6" before the first turn begins.']
+              : ['🛡️ Opponent Vanguard Maneuvers: Since your opponent is going second, they can pick up to D3 of their units to make a free normal move of up to 6" before your turn begins.'])
+            : [])
+        ],
+        onClose: () => {
+          setActivePrompt(null);
+        }
+      });
+    }
+  }
+
+
+
   // Get active phase abilities on our Units
   const getUnitAbilitiesForPhase = (unit: Unit, phase: string): Ability[] => {
-    return unit.abilities.filter(a => a.phase === phase);
+    return unit.abilities.filter(a => a.phase === phase).map(a => ({ ...a, sourceType: 'unit' }));
   };
 
   // Get passive abilities (faction-wide) that are applied to the active phase (or always active if none is assigned)
@@ -422,24 +679,24 @@ export default function TrackerPage() {
     if (gameState.selectedBattleTraitId === 'all') {
       faction.battleTraits.forEach(t => {
         if (isMatched(t)) {
-          list.push(t);
+          list.push({ ...t, sourceType: 'trait' });
         }
       });
     } else {
       const trait = faction.battleTraits.find(t => t.id === gameState.selectedBattleTraitId);
       if (trait && isMatched(trait)) {
-        list.push(trait);
+        list.push({ ...trait, sourceType: 'trait' });
       }
     }
 
     const regiment = faction.regimentAbilities.find(r => r.id === gameState.selectedRegimentAbilityId);
     if (regiment && isMatched(regiment)) {
-      list.push(regiment);
+      list.push({ ...regiment, sourceType: 'regiment' });
     }
 
     const enhancement = faction.enhancements.find(e => e.id === gameState.selectedEnhancementId);
     if (enhancement && isMatched(enhancement)) {
-      list.push(enhancement);
+      list.push({ ...enhancement, sourceType: 'enhancement' });
     }
 
     return list;
@@ -447,7 +704,43 @@ export default function TrackerPage() {
 
   // Get passive abilities on a specific unit that apply to the current active phase (or always active if none is assigned)
   const getUnitPassiveAbilitiesForPhase = (unit: Unit, phase: string): Ability[] => {
-    return unit.abilities.filter(a => a.phase === 'passive' && (!a.passiveAppliedPhase || a.passiveAppliedPhase === (phase as GamePhase)));
+    return unit.abilities
+      .filter(a => a.phase === 'passive' && (!a.passiveAppliedPhase || a.passiveAppliedPhase === (phase as GamePhase)))
+      .map(a => ({ ...a, sourceType: 'unit' }));
+  };
+
+  const getAbilityStyleClasses = (sourceType?: string) => {
+    switch (sourceType) {
+      case 'trait':
+        return {
+          border: 'border-slate-500/35 hover:border-slate-500/50',
+          bg: 'bg-[#181c25]',
+          badgeBg: 'bg-slate-500/10 text-slate-300 border-slate-500/25',
+          label: 'Battle Trait'
+        };
+      case 'regiment':
+        return {
+          border: 'border-[#a0522d]/40 hover:border-[#a0522d]/55',
+          bg: 'bg-[#201815]',
+          badgeBg: 'bg-orange-950/35 text-[#d27d53] border-[#a0522d]/25',
+          label: 'Regiment Ability'
+        };
+      case 'enhancement':
+        return {
+          border: 'border-amber-500/30 hover:border-amber-500/45',
+          bg: 'bg-[#221c12]',
+          badgeBg: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+          label: 'Enhancement'
+        };
+      case 'unit':
+      default:
+        return {
+          border: 'border-emerald-500/25 hover:border-emerald-500/40',
+          bg: 'bg-[#121c16]',
+          badgeBg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+          label: 'Unit Ability'
+        };
+    }
   };
 
   return (
@@ -595,7 +888,7 @@ export default function TrackerPage() {
             {/* Specialized Tactically Interactive Phase Widgets */}
 
             {/* 🛡️ OPPONENT ATTACK & DEFENSIVE ROSTER DASHBOARD */}
-            {gameState.activeTurn === 'opponent' && (
+            {gameState.activeTurn === 'opponent' && gameState.currentPhase !== 'combat' && (
               <Card className="border-[#222834] bg-[#11141c] text-white">
                 <CardHeader className="border-b border-[#222834] py-4">
                   <div className="flex justify-between items-center">
@@ -671,7 +964,7 @@ export default function TrackerPage() {
                             return (
                               <Card 
                                 key={ab.key} 
-                                onClick={() => toggleAbilityUsed(ab.key, `${ab.source}: ${ab.name}`)}
+                                onClick={() => toggleAbilityUsed(ab.key, `${ab.source}: ${ab.name}`, ab.effect, gameState.currentPhase)}
                                 className={`cursor-pointer transition-all duration-300 relative overflow-hidden text-white border p-3.5 space-y-1.5
                                   ${isUsed 
                                     ? 'bg-zinc-800/30 border-transparent saturate-0 opacity-40' 
@@ -714,13 +1007,15 @@ export default function TrackerPage() {
                             <div className="flex justify-between items-start border-b border-[#2c3548]/40 pb-2">
                               <div>
                                 <h5 className="text-xs font-black text-white">{uRules.name}</h5>
-                                <div className="flex gap-2 items-center mt-1">
-                                  <Badge className="bg-blue-600/15 text-blue-400 border border-blue-500/20 text-[9px] font-black uppercase">
-                                    SAVE: {uRules.save}+
+                                <div className="flex gap-2 items-center mt-1 flex-wrap">
+                                  <Badge className="bg-blue-600/15 text-blue-400 border border-blue-500/20 text-[9px] font-black uppercase flex items-center gap-1">
+                                    <span>SAVE:</span>
+                                    {renderStatWithModifier(uRules.save, 'save', u.id, '+')}
                                   </Badge>
                                   {uRules.ward > 0 ? (
-                                    <Badge className="bg-emerald-600/15 text-emerald-400 border border-emerald-500/20 text-[9px] font-black uppercase">
-                                      WARD: {uRules.ward}+
+                                    <Badge className="bg-emerald-600/15 text-emerald-400 border border-emerald-500/20 text-[9px] font-black uppercase flex items-center gap-1">
+                                      <span>WARD:</span>
+                                      {renderStatWithModifier(uRules.ward, 'ward', u.id, '+')}
                                     </Badge>
                                   ) : (
                                     <Badge variant="outline" className="text-gray-500 border-gray-800 text-[9px] font-black uppercase">
@@ -780,6 +1075,66 @@ export default function TrackerPage() {
                                 </div>
                               </div>
                             </div>
+
+                            {/* Active Buffs Section */}
+                            {!u.isSlain && (
+                              <div className="border-t border-[#222834]/30 pt-2.5">
+                                <div className="flex justify-between items-center mb-1.5">
+                                  <span className="text-[10px] text-amber-500 font-extrabold uppercase tracking-widest flex items-center gap-1">
+                                    <span>✨ Active Modifiers / Buffs:</span>
+                                  </span>
+                                  <Button
+                                    onClick={() => setBuffModal({ isOpen: true, unitId: u.id, unitName: uRules.name })}
+                                    size="sm"
+                                    className="h-6 text-[9px] font-black uppercase bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 px-2 py-0"
+                                  >
+                                    ➕ Apply Buff
+                                  </Button>
+                                </div>
+                                
+                                {gameState.appliedModifiers && gameState.appliedModifiers.filter(m => m.unitId === u.id).length > 0 ? (
+                                  <div className="flex gap-1.5 flex-wrap">
+                                    {gameState.appliedModifiers.filter(m => m.unitId === u.id).map(mod => (
+                                      <Badge
+                                        key={mod.id}
+                                        className="bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-[10px] py-0.5 px-2 flex items-center gap-1 font-semibold"
+                                      >
+                                        <span>{mod.label}</span>
+                                        <button
+                                          onClick={() => removeBuff(mod.id)}
+                                          className="text-emerald-400 hover:text-red-400 font-bold ml-1 text-xs shrink-0 select-none"
+                                        >
+                                          ×
+                                        </button>
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-[10px] text-gray-500 font-medium italic">No active buffs applied</p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Unit Passives inside defensive card */}
+                            {(() => {
+                              const unitPassives = getUnitPassiveAbilitiesForPhase(uRules, gameState.currentPhase);
+                              if (unitPassives.length === 0) return null;
+                              return (
+                                <div className="mt-2.5 p-3 bg-emerald-950/15 border border-emerald-500/20 rounded-xl space-y-2 text-left">
+                                  <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-widest flex items-center gap-1.5">
+                                    <Sparkles className="h-3 w-3 text-emerald-400 animate-pulse" /> Unit Passives (Defense)
+                                  </span>
+                                  <div className="space-y-2">
+                                    {unitPassives.map((ab) => (
+                                      <div key={ab.id} className="border-t border-emerald-500/10 pt-1.5 first:border-t-0 first:pt-0">
+                                        <h5 className="text-xxs font-black text-white">{ab.name}</h5>
+                                        <p className="text-[10px] text-gray-300 mt-0.5 whitespace-pre-line leading-normal">{ab.effect}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                         );
                       })}
@@ -808,7 +1163,23 @@ export default function TrackerPage() {
                       <div key={u.id} className="flex justify-between items-center p-3 rounded-lg bg-[#1c2230] border border-[#2c3548]">
                         <div>
                           <h4 className="text-xs font-extrabold text-white">{uRules.name}</h4>
-                          <p className="text-xxs text-gray-400">Move: {uRules.move}"</p>
+                          <div className="text-xxs text-gray-400 flex flex-col gap-0.5">
+                            <div className="flex items-center gap-1">
+                              <span>Move:</span>
+                              {renderStatWithModifier(uRules.move, 'move', u.id, '"')}
+                            </div>
+                            {(() => {
+                              const runMods = getActiveModifiers('run');
+                              if (runMods.length > 0) {
+                                return (
+                                  <div className="text-emerald-400 font-extrabold text-[10px] flex items-center gap-0.5 mt-0.5">
+                                    <Sparkles className="h-2.5 w-2.5 animate-pulse" /> +1 to Run Rolls active
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
                         </div>
                         <div className="flex gap-1.5">
                           <button
@@ -948,31 +1319,31 @@ export default function TrackerPage() {
                                 {/* Attacks stat */}
                                 <div className="col-span-2 flex justify-between items-center bg-emerald-950/30 border border-emerald-500/20 rounded px-2.5 py-1.5 text-emerald-400">
                                   <span className="text-gray-400 font-bold text-[10px] uppercase">Attacks</span>
-                                  <span className="font-black text-xs text-white">{w.attacks}</span>
+                                  <span className="font-black text-xs text-white">{renderStatWithModifier(w.attacks, 'attacks', u.id, '', w.name)}</span>
                                 </div>
 
                                 {/* Hit stat */}
                                 <div className="col-span-2 flex justify-between items-center bg-amber-950/30 border border-amber-500/20 rounded px-2.5 py-1.5 text-amber-400">
                                   <span className="text-gray-400 font-bold text-[10px] uppercase">Hit</span>
-                                  <span className="font-black text-xs text-white">{w.hit}+</span>
+                                  <span className="font-black text-xs text-white">{renderStatWithModifier(w.hit, 'hit', u.id, '+')}</span>
                                 </div>
 
                                 {/* Wound stat */}
                                 <div className="col-span-2 flex justify-between items-center bg-orange-950/30 border border-orange-500/20 rounded px-2.5 py-1.5 text-orange-400">
                                   <span className="text-gray-400 font-bold text-[10px] uppercase">Wound</span>
-                                  <span className="font-black text-xs text-white">{w.wound}+</span>
+                                  <span className="font-black text-xs text-white">{renderStatWithModifier(w.wound, 'wound', u.id, '+')}</span>
                                 </div>
 
                                 {/* Rend stat */}
                                 <div className="col-span-2 flex justify-between items-center bg-blue-950/30 border border-blue-500/20 rounded px-2.5 py-1.5 text-blue-400">
                                   <span className="text-gray-400 font-bold text-[10px] uppercase">Rend</span>
-                                  <span className="font-black text-xs text-white">-{w.rend}</span>
+                                  <span className="font-black text-xs text-white">-{renderStatWithModifier(w.rend, 'rend', u.id)}</span>
                                 </div>
 
                                 {/* Damage stat */}
                                 <div className="col-span-2 flex justify-between items-center bg-rose-950/30 border border-rose-500/20 rounded px-2.5 py-1.5 text-rose-400">
                                   <span className="text-gray-400 font-bold text-[10px] uppercase">Damage</span>
-                                  <span className="font-black text-xs text-white">{w.damage}</span>
+                                  <span className="font-black text-xs text-white">{renderStatWithModifier(w.damage, 'damage', u.id, '', w.name)}</span>
                                 </div>
 
                                 {/* Ability box */}
@@ -982,10 +1353,52 @@ export default function TrackerPage() {
                                     <span className="text-xs font-medium text-indigo-200 mt-0.5">{w.abilities}</span>
                                   </div>
                                 )}
+
+                                {/* Dynamic Dice Math calculation */}
+                                {(() => {
+                                  const currentModels = u.modelsCount !== undefined ? u.modelsCount : (uRules.models || 1);
+                                  const attacksMods = getActiveModifiers('attacks', u.id);
+                                  const totalAttacksMod = attacksMods.reduce((acc, m) => acc + m.modifier, 0);
+                                  
+                                  const overrideVal = getBattleDamagedOverride(u.id, 'attacks', w.name);
+                                  const baseAttacks = overrideVal !== null ? overrideVal : (parseInt(String(w.attacks), 10) || 0);
+                                  const effectiveAttacks = overrideVal !== null ? overrideVal : Math.max(0, baseAttacks + totalAttacksMod);
+                                  const totalDice = currentModels * effectiveAttacks;
+                                  return (
+                                    <div className="col-span-6 flex items-center justify-between text-[11px] bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-2.5 mt-1 select-none">
+                                      <span className="text-gray-400 font-extrabold uppercase tracking-widest text-[9px]">🎲 Dice Math:</span>
+                                      <span className="font-extrabold text-emerald-400 flex items-center gap-1">
+                                        <span>{totalDice} Dice</span>
+                                        <span className="text-gray-500 font-semibold">({currentModels} models × {effectiveAttacks} attacks)</span>
+                                      </span>
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </div>
                           ))}
                         </div>
+
+                        {/* Unit Passives inside the unit box */}
+                        {(() => {
+                          const unitPassives = getUnitPassiveAbilitiesForPhase(uRules, gameState.currentPhase);
+                          if (unitPassives.length === 0) return null;
+                          return (
+                            <div className="mt-2.5 p-3 bg-emerald-950/15 border border-emerald-500/20 rounded-xl space-y-2 text-left">
+                              <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-widest flex items-center gap-1.5">
+                                <Sparkles className="h-3 w-3 text-emerald-400 animate-pulse" /> Unit Passives (Shooting)
+                              </span>
+                              <div className="space-y-2">
+                                {unitPassives.map((ab) => (
+                                  <div key={ab.id} className="border-t border-emerald-500/10 pt-1.5 first:border-t-0 first:pt-0">
+                                    <h5 className="text-xxs font-black text-white">{ab.name}</h5>
+                                    <p className="text-[10px] text-gray-300 mt-0.5 whitespace-pre-line leading-normal">{ab.effect}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     );
                   })}
@@ -1012,7 +1425,20 @@ export default function TrackerPage() {
                       <div key={u.id} className="flex justify-between items-center p-3 rounded-lg bg-[#1c2230] border border-[#2c3548]">
                         <div>
                           <h4 className="text-xs font-extrabold text-white">{uRules.name}</h4>
-                          {u.ran && <Badge variant="destructive" className="text-xxs font-bold">RAN (Cannot Charge)</Badge>}
+                          <div className="flex flex-col gap-0.5 mt-0.5">
+                            {u.ran && <Badge variant="destructive" className="text-xxs font-bold self-start">RAN (Cannot Charge)</Badge>}
+                            {(() => {
+                              const chargeMods = getActiveModifiers('charge');
+                              if (chargeMods.length > 0 && !u.ran) {
+                                return (
+                                  <div className="text-emerald-400 font-extrabold text-[10px] flex items-center gap-0.5 self-start">
+                                    <Sparkles className="h-2.5 w-2.5 animate-pulse" /> +1 to Charge Rolls active
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
                         </div>
                         <div className="flex gap-1">
                           <button
@@ -1045,6 +1471,92 @@ export default function TrackerPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 space-y-4">
+                  {/* Combat Phase Defensive Responses */}
+                  {(() => {
+                    const defAbilities: { source: string; name: string; timing?: string; effect: string; id: string; key: string }[] = [];
+                    
+                    // Faction defensive abilities
+                    if (gameState.selectedBattleTraitId === 'all') {
+                      faction.battleTraits.forEach(a => {
+                        if (a.isDefense && (a.phase === 'combat' || a.phase === 'passive')) defAbilities.push({ source: 'Faction Trait', name: a.name, timing: a.timing, effect: a.effect, id: a.id, key: a.id });
+                      });
+                    } else {
+                      const trait = faction.battleTraits.find(a => a.id === gameState.selectedBattleTraitId);
+                      if (trait && trait.isDefense && (trait.phase === 'combat' || trait.phase === 'passive')) {
+                        defAbilities.push({ source: 'Faction Trait', name: trait.name, timing: trait.timing, effect: trait.effect, id: trait.id, key: trait.id });
+                      }
+                    }
+
+                    const regiment = faction.regimentAbilities.find(a => a.id === gameState.selectedRegimentAbilityId);
+                    if (regiment && regiment.isDefense && (regiment.phase === 'combat' || regiment.phase === 'passive')) {
+                      defAbilities.push({ source: 'Regiment', name: regiment.name, timing: regiment.timing, effect: regiment.effect, id: regiment.id, key: regiment.id });
+                    }
+
+                    const enhancement = faction.enhancements.find(a => a.id === gameState.selectedEnhancementId);
+                    if (enhancement && enhancement.isDefense && (enhancement.phase === 'combat' || enhancement.phase === 'passive')) {
+                      defAbilities.push({ source: 'Enhancement', name: enhancement.name, timing: enhancement.timing, effect: enhancement.effect, id: enhancement.id, key: enhancement.id });
+                    }
+
+                    // Unit specific defensive abilities
+                    gameState.units.filter(u => !u.isSlain).forEach(u => {
+                      const uRules = faction.units.find(r => r.id === u.unitId);
+                      if (uRules) {
+                        uRules.abilities.forEach(a => {
+                          if (a.isDefense && (a.phase === 'combat' || a.phase === 'passive')) {
+                            defAbilities.push({ 
+                              source: uRules.name, 
+                              name: a.name, 
+                              timing: a.timing, 
+                              effect: a.effect, 
+                              id: a.id,
+                              key: `${u.id}-${a.id}`
+                            });
+                          }
+                        });
+                      }
+                    });
+
+                    if (defAbilities.length === 0) return null;
+
+                    return (
+                      <div className="space-y-3 pb-4 border-b border-[#2c3548]/40">
+                        <h4 className="text-xxs font-black text-rose-400 uppercase tracking-widest pb-1">
+                          🛡️ Available Combat Defensive Responses:
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {defAbilities.map(ab => {
+                            const isUsed = !!gameState.usedAbilities[ab.key];
+                            return (
+                              <Card 
+                                key={ab.key} 
+                                onClick={() => toggleAbilityUsed(ab.key, `${ab.source}: ${ab.name}`, ab.effect, gameState.currentPhase)}
+                                className={`cursor-pointer transition-all duration-300 relative overflow-hidden text-white border p-3.5 space-y-1.5
+                                  ${isUsed 
+                                    ? 'bg-zinc-800/30 border-transparent saturate-0 opacity-40' 
+                                    : 'bg-[#151a24] border-rose-500/25 hover:border-rose-500/50 shadow-md'}`}
+                              >
+                                <div className="flex justify-between items-start gap-1">
+                                  <div>
+                                    <span className="text-[9px] font-black text-rose-400 uppercase tracking-wider block">{ab.source}</span>
+                                    <h5 className="text-xs font-bold text-white mt-0.5">{ab.name}</h5>
+                                  </div>
+                                  <Badge className="bg-rose-500/20 text-rose-400 text-[8px] uppercase shrink-0 font-bold">DEFENSE</Badge>
+                                </div>
+                                {ab.timing && <p className="text-[10px] text-amber-500/80 font-medium">{ab.timing}</p>}
+                                <p className="text-xxs text-gray-300 leading-normal">{ab.effect}</p>
+                                {isUsed && (
+                                  <div className="absolute inset-0 bg-[#0d1015]/15 flex items-center justify-center">
+                                    <span className="text-sm font-black text-rose-500 uppercase rotate-[-8deg] tracking-widest bg-zinc-950/80 px-2 py-0.5 rounded border border-rose-600/40">TRIGGERED</span>
+                                  </div>
+                                )}
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {gameState.units.filter(u => !u.isSlain).map((u) => {
                       const uRules = faction.units.find(rules => rules.id === u.unitId);
@@ -1058,7 +1570,12 @@ export default function TrackerPage() {
                           <div className="flex justify-between items-start gap-2 border-b border-[#2c3548]/40 pb-2">
                             <div>
                               <h5 className="text-xs font-black text-white">{uRules.name}</h5>
-                              <p className="text-xxs text-amber-500 font-semibold">Save: {uRules.save}+ {uRules.ward > 0 ? `• Ward: ${uRules.ward}+` : ''}</p>
+                              <div className="text-xxs text-amber-500 font-semibold flex items-center gap-2 flex-wrap mt-0.5">
+                                <span className="flex items-center gap-1">Save: {renderStatWithModifier(uRules.save, 'save', u.id, '+')}</span>
+                                {uRules.ward > 0 && (
+                                  <span className="flex items-center gap-1">| Ward: {renderStatWithModifier(uRules.ward, 'ward', u.id, '+')}</span>
+                                )}
+                              </div>
                             </div>
                             <button
                               onClick={() => toggleUnitStateFlag(u.id, 'fought')}
@@ -1131,31 +1648,31 @@ export default function TrackerPage() {
                                   {/* Attacks stat */}
                                   <div className="col-span-2 flex justify-between items-center bg-emerald-950/30 border border-emerald-500/20 rounded px-2 py-1 text-emerald-400">
                                     <span className="text-gray-400 font-bold text-[9px] uppercase">Attacks</span>
-                                    <span className="font-black text-xs text-white">{w.attacks}</span>
+                                    <span className="font-black text-xs text-white">{renderStatWithModifier(w.attacks, 'attacks', u.id, '', w.name)}</span>
                                   </div>
 
                                   {/* Hit stat */}
                                   <div className="col-span-2 flex justify-between items-center bg-amber-950/30 border border-amber-500/20 rounded px-2 py-1 text-amber-400">
                                     <span className="text-gray-400 font-bold text-[9px] uppercase">Hit</span>
-                                    <span className="font-black text-xs text-white">{w.hit}+</span>
+                                    <span className="font-black text-xs text-white">{renderStatWithModifier(w.hit, 'hit', u.id, '+')}</span>
                                   </div>
 
                                   {/* Wound stat */}
                                   <div className="col-span-2 flex justify-between items-center bg-orange-950/30 border border-orange-500/20 rounded px-2 py-1 text-orange-400">
                                     <span className="text-gray-400 font-bold text-[9px] uppercase">Wound</span>
-                                    <span className="font-black text-xs text-white">{w.wound}+</span>
+                                    <span className="font-black text-xs text-white">{renderStatWithModifier(w.wound, 'wound', u.id, '+')}</span>
                                   </div>
 
                                   {/* Rend stat */}
                                   <div className="col-span-3 flex justify-between items-center bg-blue-950/30 border border-blue-500/20 rounded px-2 py-1 text-blue-400">
                                     <span className="text-gray-400 font-bold text-[9px] uppercase">Rend</span>
-                                    <span className="font-black text-xs text-white">-{w.rend}</span>
+                                    <span className="font-black text-xs text-white">-{renderStatWithModifier(w.rend, 'rend', u.id)}</span>
                                   </div>
 
                                   {/* Damage stat */}
                                   <div className="col-span-3 flex justify-between items-center bg-rose-950/30 border border-rose-500/20 rounded px-2 py-1 text-rose-400">
                                     <span className="text-gray-400 font-bold text-[9px] uppercase">Damage</span>
-                                    <span className="font-black text-xs text-white">{w.damage}</span>
+                                    <span className="font-black text-xs text-white">{renderStatWithModifier(w.damage, 'damage', u.id, '', w.name)}</span>
                                   </div>
 
                                   {/* Ability box */}
@@ -1165,10 +1682,52 @@ export default function TrackerPage() {
                                       <span className="text-xxs font-medium text-indigo-200 mt-0.5">{w.abilities}</span>
                                     </div>
                                   )}
+
+                                  {/* Dynamic Dice Math calculation */}
+                                  {(() => {
+                                    const currentModels = u.modelsCount !== undefined ? u.modelsCount : (uRules.models || 1);
+                                    const attacksMods = getActiveModifiers('attacks', u.id);
+                                    const totalAttacksMod = attacksMods.reduce((acc, m) => acc + m.modifier, 0);
+                                    
+                                    const overrideVal = getBattleDamagedOverride(u.id, 'attacks', w.name);
+                                    const baseAttacks = overrideVal !== null ? overrideVal : (parseInt(String(w.attacks), 10) || 0);
+                                    const effectiveAttacks = overrideVal !== null ? overrideVal : Math.max(0, baseAttacks + totalAttacksMod);
+                                    const totalDice = currentModels * effectiveAttacks;
+                                    return (
+                                      <div className="col-span-6 flex items-center justify-between text-[11px] bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-2.5 mt-1 select-none">
+                                        <span className="text-gray-400 font-extrabold uppercase tracking-widest text-[9px]">🎲 Dice Math:</span>
+                                        <span className="font-extrabold text-emerald-400 flex items-center gap-1">
+                                          <span>{totalDice} Dice</span>
+                                          <span className="text-gray-500 font-semibold">({currentModels} models × {effectiveAttacks} attacks)</span>
+                                        </span>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             ))}
                           </div>
+
+                          {/* Unit Passives inside the unit box */}
+                          {(() => {
+                            const unitPassives = getUnitPassiveAbilitiesForPhase(uRules, gameState.currentPhase);
+                            if (unitPassives.length === 0) return null;
+                            return (
+                              <div className="mt-2.5 p-3 bg-emerald-950/15 border border-emerald-500/20 rounded-xl space-y-2 text-left">
+                                <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-widest flex items-center gap-1.5">
+                                  <Sparkles className="h-3 w-3 text-emerald-400 animate-pulse" /> Unit Passives (Combat)
+                                </span>
+                                <div className="space-y-2">
+                                  {unitPassives.map((ab) => (
+                                    <div key={ab.id} className="border-t border-emerald-500/10 pt-1.5 first:border-t-0 first:pt-0">
+                                      <h5 className="text-xxs font-black text-white">{ab.name}</h5>
+                                      <p className="text-[10px] text-gray-300 mt-0.5 whitespace-pre-line leading-normal">{ab.effect}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}
@@ -1284,18 +1843,24 @@ export default function TrackerPage() {
                 {/* Faction-Level Strategy Cards */}
                 {getAbilitiesForPhase(gameState.currentPhase).map(ability => {
                   const isUsed = !!gameState.usedAbilities[ability.id];
+                  const style = getAbilityStyleClasses(ability.sourceType);
                   return (
                     <Card 
                       key={ability.id} 
-                      onClick={() => toggleAbilityUsed(ability.id, ability.name)}
-                      className={`cursor-pointer transition-all duration-300 relative overflow-hidden text-white
+                      onClick={() => toggleAbilityUsed(ability.id, ability.name, ability.effect, ability.phase !== 'passive' ? ability.phase : gameState.currentPhase)}
+                      className={`cursor-pointer transition-all duration-300 relative overflow-hidden text-white border
                         ${isUsed 
                           ? 'bg-zinc-800/30 border-transparent saturate-0 opacity-40' 
-                          : 'bg-[#1c2230] border-[#2c3548] hover:border-amber-500/40'}`}
+                          : `${style.bg} ${style.border}`}`}
                     >
                       <CardHeader className="p-4 pb-1">
                         <div className="flex justify-between items-start gap-2">
-                          <CardTitle className="text-xs font-bold text-white">{ability.name}</CardTitle>
+                          <div>
+                            <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded mb-1 border ${style.badgeBg}`}>
+                              {style.label}
+                            </Badge>
+                            <CardTitle className="text-xs font-bold text-white">{ability.name}</CardTitle>
+                          </div>
                           {ability.once !== 'none' && (
                             <Badge variant="secondary" className="bg-[#151923] text-amber-400 text-xxs uppercase shrink-0">
                               {ability.once.replace('-', ' ')}
@@ -1323,19 +1888,25 @@ export default function TrackerPage() {
                   return getUnitAbilitiesForPhase(uRules, gameState.currentPhase).map(ability => {
                     const instanceKey = `${u.id}-${ability.id}`;
                     const isUsed = !!gameState.usedAbilities[instanceKey];
+                    const style = getAbilityStyleClasses(ability.sourceType);
                     return (
                       <Card 
                         key={instanceKey} 
-                        onClick={() => toggleAbilityUsed(instanceKey, `${uRules.name}: ${ability.name}`)}
-                        className={`cursor-pointer transition-all duration-300 relative overflow-hidden text-white
+                        onClick={() => toggleAbilityUsed(instanceKey, `${uRules.name}: ${ability.name}`, ability.effect, ability.phase !== 'passive' ? ability.phase : gameState.currentPhase)}
+                        className={`cursor-pointer transition-all duration-300 relative overflow-hidden text-white border
                           ${isUsed 
                             ? 'bg-zinc-800/30 border-transparent saturate-0 opacity-40' 
-                            : 'bg-[#1c2230] border-[#2c3548] hover:border-amber-500/40'}`}
+                            : `${style.bg} ${style.border}`}`}
                       >
                         <CardHeader className="p-4 pb-1">
                           <div className="flex justify-between items-start gap-2">
                             <div>
-                              <CardDescription className="text-xxs font-black text-amber-500 uppercase tracking-wider">{uRules.name}</CardDescription>
+                              <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded border ${style.badgeBg}`}>
+                                  {style.label}
+                                </Badge>
+                                <span className="text-[9px] font-extrabold text-amber-500 uppercase tracking-wider">{uRules.name}</span>
+                              </div>
                               <CardTitle className="text-xs font-bold text-white mt-0.5">{ability.name}</CardTitle>
                             </div>
                             {ability.once !== 'none' && (
@@ -1387,37 +1958,20 @@ export default function TrackerPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Faction-Level Passives */}
-                  {getPassiveAbilitiesForPhase(gameState.currentPhase).map(ability => (
-                    <Card key={ability.id} className="bg-[#14222a] border-cyan-500/20 text-white shadow-lg shadow-cyan-950/10">
-                      <CardHeader className="p-4 pb-1">
-                        <div className="flex justify-between items-start gap-2">
-                          <CardTitle className="text-xs font-bold text-white">{ability.name}</CardTitle>
-                          <Badge variant="outline" className="border-cyan-500/40 text-cyan-300 text-[9px] uppercase">
-                            FACTION PASSIVE
-                          </Badge>
-                        </div>
-                        {ability.timing && <CardDescription className="text-xxs text-cyan-400/80 mt-0.5">{ability.timing}</CardDescription>}
-                      </CardHeader>
-                      <CardContent className="p-4 pt-1">
-                        <p className="text-xxs text-gray-300 leading-normal whitespace-pre-line">{ability.effect}</p>
-                      </CardContent>
-                    </Card>
-                  ))}
-
-                  {/* Unit-Specific Passives */}
-                  {gameState.units.filter(u => !u.isSlain).flatMap((u) => {
-                    const uRules = faction.units.find(rules => rules.id === u.unitId);
-                    if (!uRules) return [];
-                    return getUnitPassiveAbilitiesForPhase(uRules, gameState.currentPhase).map(ability => (
-                      <Card key={`${u.id}-${ability.id}`} className="bg-[#14222a] border-cyan-500/20 text-white shadow-lg shadow-cyan-950/10">
+                  {getPassiveAbilitiesForPhase(gameState.currentPhase).map(ability => {
+                    const style = getAbilityStyleClasses(ability.sourceType);
+                    return (
+                      <Card key={ability.id} className={`${style.bg} ${style.border} text-white shadow-lg border`}>
                         <CardHeader className="p-4 pb-1">
                           <div className="flex justify-between items-start gap-2">
                             <div>
-                              <CardDescription className="text-xxs font-black text-cyan-400 uppercase tracking-wider">{uRules.name}</CardDescription>
-                              <CardTitle className="text-xs font-bold text-white mt-0.5">{ability.name}</CardTitle>
+                              <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded mb-1 border ${style.badgeBg}`}>
+                                {style.label}
+                              </Badge>
+                              <CardTitle className="text-xs font-bold text-white">{ability.name}</CardTitle>
                             </div>
                             <Badge variant="outline" className="border-cyan-500/40 text-cyan-300 text-[9px] uppercase shrink-0">
-                              UNIT PASSIVE
+                              FACTION PASSIVE
                             </Badge>
                           </div>
                           {ability.timing && <CardDescription className="text-xxs text-cyan-400/80 mt-0.5">{ability.timing}</CardDescription>}
@@ -1426,7 +1980,40 @@ export default function TrackerPage() {
                           <p className="text-xxs text-gray-300 leading-normal whitespace-pre-line">{ability.effect}</p>
                         </CardContent>
                       </Card>
-                    ));
+                    );
+                  })}
+
+                  {/* Unit-Specific Passives */}
+                  {gameState.units.filter(u => !u.isSlain).flatMap((u) => {
+                    const uRules = faction.units.find(rules => rules.id === u.unitId);
+                    if (!uRules) return [];
+                    return getUnitPassiveAbilitiesForPhase(uRules, gameState.currentPhase).map(ability => {
+                      const style = getAbilityStyleClasses(ability.sourceType);
+                      return (
+                        <Card key={`${u.id}-${ability.id}`} className={`${style.bg} ${style.border} text-white shadow-lg border`}>
+                          <CardHeader className="p-4 pb-1">
+                            <div className="flex justify-between items-start gap-2">
+                              <div>
+                                <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                  <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded border ${style.badgeBg}`}>
+                                    {style.label}
+                                  </Badge>
+                                  <span className="text-xxs font-black text-cyan-400 uppercase tracking-wider">{uRules.name}</span>
+                                </div>
+                                <CardTitle className="text-xs font-bold text-white mt-0.5">{ability.name}</CardTitle>
+                              </div>
+                              <Badge variant="outline" className="border-cyan-500/40 text-cyan-300 text-[9px] uppercase shrink-0">
+                                UNIT PASSIVE
+                              </Badge>
+                            </div>
+                            {ability.timing && <CardDescription className="text-xxs text-cyan-400/80 mt-0.5">{ability.timing}</CardDescription>}
+                          </CardHeader>
+                          <CardContent className="p-4 pt-1">
+                            <p className="text-xxs text-gray-300 leading-normal whitespace-pre-line">{ability.effect}</p>
+                          </CardContent>
+                        </Card>
+                      );
+                    });
                   })}
                 </div>
               </div>
@@ -1449,67 +2036,108 @@ export default function TrackerPage() {
                 if (!uRules) return null;
                 return (
                   <Card key={u.id} className={`border-[#222834] transition-all ${u.isSlain ? 'bg-zinc-800/10 border-transparent saturate-0 opacity-40' : 'bg-[#151923] text-white'}`}>
-                    <CardContent className="p-4 flex justify-between items-center gap-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-xs font-black text-white">{uRules.name}</h4>
-                          {uRules.isHero && <Badge className="bg-amber-500/10 border-amber-500/20 text-amber-500 text-xxs font-black uppercase">Hero</Badge>}
+                    <CardContent className="p-4 space-y-3.5">
+                      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-black text-white">{uRules.name}</h4>
+                            {uRules.isHero && <Badge className="bg-amber-500/10 border-amber-500/20 text-amber-500 text-xxs font-black uppercase">Hero</Badge>}
+                          </div>
+                          <p className="text-xxs text-gray-400 mt-1 leading-normal">
+                            Move: {uRules.move}" • Save: {uRules.save}+ • Control: {uRules.control} • Max HP: {uRules.health}
+                            {uRules.ward > 0 && ` • Ward: ${uRules.ward}+`}
+                          </p>
                         </div>
-                        <p className="text-xxs text-gray-400 mt-1 leading-normal">
-                          Move: {uRules.move}" • Save: {uRules.save}+ • Control: {uRules.control} • Max HP: {uRules.health}
-                          {uRules.ward > 0 && ` • Ward: ${uRules.ward}+`}
-                        </p>
+
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0 w-full xl:w-auto">
+                          {/* Models Counter */}
+                          <div className="flex items-center justify-between sm:justify-start bg-[#1c2230] p-1.5 rounded-lg border border-[#2c3548] flex-grow sm:flex-grow-0">
+                            <button 
+                              onClick={() => adjustModelsById(u.id, -1)}
+                              className="px-2 py-0.5 hover:bg-[#2c3548] text-gray-400 font-bold text-xs rounded"
+                            >
+                              -
+                            </button>
+                            <span className="text-xxs font-bold text-gray-400 px-2 sm:w-20 text-center">
+                              Models: <strong className="text-white font-black text-xs">{u.modelsCount ?? uRules.models ?? 1} / {u.maxModels ?? uRules.models ?? 1}</strong>
+                            </span>
+                            <button 
+                              onClick={() => adjustModelsById(u.id, 1)}
+                              className="px-2 py-0.5 hover:bg-[#2c3548] text-gray-400 font-bold text-xs rounded"
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          {/* HP Counter */}
+                          <div className="flex items-center justify-between sm:justify-start bg-[#1c2230] p-1.5 rounded-lg border border-[#2c3548] flex-grow sm:flex-grow-0">
+                            <button 
+                              onClick={() => adjustWoundsById(u.id, -1)}
+                              className="px-2 py-0.5 hover:bg-[#2c3548] text-gray-400 font-bold text-xs rounded"
+                            >
+                              -
+                            </button>
+                            <span className="text-xxs font-bold text-gray-400 px-2 sm:w-24 text-center">
+                              Model HP: <strong className="text-white font-black text-xs">{uRules.health - (u.currentWounds || 0)} / {uRules.health}</strong>
+                            </span>
+                            <button 
+                              onClick={() => adjustWoundsById(u.id, 1)}
+                              className="px-2 py-0.5 hover:bg-[#2c3548] text-gray-400 font-bold text-xs rounded"
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          {/* Slain button */}
+                          <Button 
+                            onClick={() => toggleSlainById(u.id)}
+                            size="sm"
+                            variant={u.isSlain ? 'default' : 'outline'}
+                            className={`text-xxs font-extrabold uppercase ${u.isSlain ? 'bg-red-600 hover:bg-red-700 text-white border-transparent' : 'border-[#2c3548] text-gray-400 hover:text-white'}`}
+                          >
+                            Slain
+                          </Button>
+                        </div>
                       </div>
 
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-                        {/* Models Counter */}
-                        <div className="flex items-center bg-[#1c2230] p-1.5 rounded-lg border border-[#2c3548]">
-                          <button 
-                            onClick={() => adjustModelsById(u.id, -1)}
-                            className="px-2 py-0.5 hover:bg-[#2c3548] text-gray-400 font-bold text-xs rounded"
-                          >
-                            -
-                          </button>
-                          <span className="text-xxs font-bold text-gray-400 w-20 text-center">
-                            Models: <strong className="text-white font-black text-xs">{u.modelsCount ?? uRules.models ?? 1} / {u.maxModels ?? uRules.models ?? 1}</strong>
-                          </span>
-                          <button 
-                            onClick={() => adjustModelsById(u.id, 1)}
-                            className="px-2 py-0.5 hover:bg-[#2c3548] text-gray-400 font-bold text-xs rounded"
-                          >
-                            +
-                          </button>
+                      {/* Active Buffs Section */}
+                      {!u.isSlain && (
+                        <div className="border-t border-[#222834]/60 pt-2.5">
+                          <div className="flex justify-between items-center mb-1.5">
+                            <span className="text-[10px] text-amber-500 font-extrabold uppercase tracking-widest flex items-center gap-1">
+                              <span>✨ Active Modifiers / Buffs:</span>
+                            </span>
+                            <Button
+                              onClick={() => setBuffModal({ isOpen: true, unitId: u.id, unitName: uRules.name })}
+                              size="sm"
+                              className="h-6 text-[9px] font-black uppercase bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 px-2 py-0"
+                            >
+                              ➕ Apply Buff
+                            </Button>
+                          </div>
+                          
+                          {gameState.appliedModifiers && gameState.appliedModifiers.filter(m => m.unitId === u.id).length > 0 ? (
+                            <div className="flex gap-1.5 flex-wrap">
+                              {gameState.appliedModifiers.filter(m => m.unitId === u.id).map(mod => (
+                                <Badge
+                                  key={mod.id}
+                                  className="bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-[10px] py-0.5 px-2 flex items-center gap-1 font-semibold"
+                                >
+                                  <span>{mod.label}</span>
+                                  <button
+                                    onClick={() => removeBuff(mod.id)}
+                                    className="text-emerald-400 hover:text-red-400 font-bold ml-1 text-xs shrink-0 select-none"
+                                  >
+                                    ×
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[10px] text-gray-500 font-medium italic">No active buffs applied</p>
+                          )}
                         </div>
-
-                        {/* HP Counter */}
-                        <div className="flex items-center bg-[#1c2230] p-1.5 rounded-lg border border-[#2c3548]">
-                          <button 
-                            onClick={() => adjustWoundsById(u.id, -1)}
-                            className="px-2 py-0.5 hover:bg-[#2c3548] text-gray-400 font-bold text-xs rounded"
-                          >
-                            -
-                          </button>
-                          <span className="text-xxs font-bold text-gray-400 w-24 text-center">
-                            Model HP: <strong className="text-white font-black text-xs">{uRules.health - (u.currentWounds || 0)} / {uRules.health}</strong>
-                          </span>
-                          <button 
-                            onClick={() => adjustWoundsById(u.id, 1)}
-                            className="px-2 py-0.5 hover:bg-[#2c3548] text-gray-400 font-bold text-xs rounded"
-                          >
-                            +
-                          </button>
-                        </div>
-
-                        {/* Slain button */}
-                        <Button 
-                          onClick={() => toggleSlainById(u.id)}
-                          size="sm"
-                          variant={u.isSlain ? 'default' : 'outline'}
-                          className={`text-xxs font-extrabold uppercase ${u.isSlain ? 'bg-red-600 hover:bg-red-700 text-white border-transparent' : 'border-[#2c3548] text-gray-400 hover:text-white'}`}
-                        >
-                          Slain
-                        </Button>
-                      </div>
+                      )}
                     </CardContent>
                   </Card>
                 );
@@ -1662,6 +2290,306 @@ export default function TrackerPage() {
                 className="bg-red-600 hover:bg-red-700 text-white text-xs border-transparent"
               >
                 Yes, Proceed
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activePrompt && (
+        <div className="fixed inset-0 bg-[#080a0f]/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-gradient-to-b from-[#1c2230] to-[#121620] border border-amber-500/30 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl flex flex-col max-h-[85vh] md:max-h-[75vh]">
+            {/* Header */}
+            <div className="p-4 border-b border-[#2c3548]/60 bg-amber-500/5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-amber-400 animate-pulse" />
+                <h3 className="text-xs md:text-sm font-black text-white uppercase tracking-wider">
+                  {activePrompt.title}
+                </h3>
+              </div>
+              <button 
+                onClick={activePrompt.onClose}
+                className="text-gray-400 hover:text-white text-xs font-black p-1 hover:bg-[#2c3548]/50 rounded transition-all"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="p-5 flex-grow overflow-y-auto space-y-4 text-left">
+              <p className="text-xxs md:text-xs text-gray-300 leading-relaxed font-medium bg-[#141822]/60 p-3 rounded-lg border border-[#2c3548]/30">
+                {activePrompt.description}
+              </p>
+
+              <div className="space-y-2.5">
+                <h4 className="text-[10px] font-black text-amber-400 uppercase tracking-widest">
+                  📋 Directives to Resolve:
+                </h4>
+                {activePrompt.actions.map((act, index) => (
+                  <div 
+                    key={index} 
+                    className="p-3 bg-[#131722]/80 border border-[#2c3548]/45 hover:border-amber-500/25 rounded-xl flex gap-3 items-start transition-all"
+                  >
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-full h-5 w-5 flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-[10px] font-bold text-amber-400">{index + 1}</span>
+                    </div>
+                    <p className="text-xxs md:text-xs text-gray-100 font-semibold leading-normal">
+                      {act}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer button */}
+            <div className="p-4 border-t border-[#2c3548]/50 bg-[#121620] flex justify-end">
+              <Button 
+                onClick={activePrompt.onClose}
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs tracking-wider uppercase py-2.5 rounded-xl shadow-lg border-transparent transition-all flex items-center justify-center gap-1"
+              >
+                <Play className="h-3.5 w-3.5" /> Got it, Battle on!
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {buffModal?.isOpen && (
+        <div className="fixed inset-0 bg-[#080a0f]/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-[#151923] border border-amber-500/30 rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b border-[#2c3548]/60 bg-amber-500/5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-amber-400 animate-pulse" />
+                <h3 className="text-xs font-black text-white uppercase tracking-wider">
+                  Apply Buff: {buffModal.unitName}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setBuffModal(null)}
+                className="text-gray-400 hover:text-white text-xs font-black p-1 hover:bg-[#2c3548]/50 rounded transition-all"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-5 space-y-4 text-left">
+              <p className="text-xxs text-gray-400 leading-relaxed font-medium">
+                Choose a preconfigured stat modifier to apply to <strong className="text-white">{buffModal.unitName}</strong> for the rest of this Battle Round (Round {gameState.round}). It will automatically expire at the end of the round.
+              </p>
+
+              <div className="grid grid-cols-1 gap-2.5">
+                {(!buffModal.allowedStats || buffModal.allowedStats.includes('attacks')) && (
+                  <Button
+                    onClick={() => {
+                      applyBuff(buffModal.unitId, 'attacks', 1, '+1 Attacks', buffModal.expiresPhase);
+                      setBuffModal(null);
+                    }}
+                    className="bg-[#1c2230] hover:bg-[#252c3d] border border-[#2c3548] text-white hover:text-emerald-400 text-xs font-bold py-2.5 rounded-xl transition-all flex items-center justify-between px-4"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-base">⚔️</span>
+                      <span>Modify Attacks</span>
+                    </span>
+                    <Badge className="bg-emerald-500/15 text-emerald-400 font-extrabold">+1 Attacks</Badge>
+                  </Button>
+                )}
+
+                {(!buffModal.allowedStats || buffModal.allowedStats.includes('save')) && (
+                  <Button
+                    onClick={() => {
+                      applyBuff(buffModal.unitId, 'save', 1, '+1 Save', buffModal.expiresPhase);
+                      setBuffModal(null);
+                    }}
+                    className="bg-[#1c2230] hover:bg-[#252c3d] border border-[#2c3548] text-white hover:text-blue-400 text-xs font-bold py-2.5 rounded-xl transition-all flex items-center justify-between px-4"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-base">🛡️</span>
+                      <span>Modify Save Roll</span>
+                    </span>
+                    <Badge className="bg-blue-500/15 text-blue-400 font-extrabold">+1 Save</Badge>
+                  </Button>
+                )}
+
+                {(!buffModal.allowedStats || buffModal.allowedStats.includes('ward')) && (
+                  <Button
+                    onClick={() => {
+                      applyBuff(buffModal.unitId, 'ward', 1, '+1 Ward', buffModal.expiresPhase);
+                      setBuffModal(null);
+                    }}
+                    className="bg-[#1c2230] hover:bg-[#252c3d] border border-[#2c3548] text-white hover:text-purple-400 text-xs font-bold py-2.5 rounded-xl transition-all flex items-center justify-between px-4"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-base">💖</span>
+                      <span>Modify Ward Roll</span>
+                    </span>
+                    <Badge className="bg-purple-500/15 text-purple-400 font-extrabold">+1 Ward</Badge>
+                  </Button>
+                )}
+
+                {(!buffModal.allowedStats || buffModal.allowedStats.includes('move')) && (
+                  <Button
+                    onClick={() => {
+                      applyBuff(buffModal.unitId, 'move', 1, '+1" Move', buffModal.expiresPhase);
+                      setBuffModal(null);
+                    }}
+                    className="bg-[#1c2230] hover:bg-[#252c3d] border border-[#2c3548] text-white hover:text-amber-400 text-xs font-bold py-2.5 rounded-xl transition-all flex items-center justify-between px-4"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-base">🏃‍♂️</span>
+                      <span>Modify Movement</span>
+                    </span>
+                    <Badge className="bg-amber-500/15 text-amber-400 font-extrabold">+1" Move</Badge>
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-[#2c3548]/50 bg-[#121620] flex justify-end">
+              <Button 
+                onClick={() => setBuffModal(null)}
+                variant="outline"
+                className="w-full border-[#2c3548] text-gray-400 text-xs font-bold uppercase py-2 rounded-xl"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectUnitToBuffAbility && (
+        <div className="fixed inset-0 bg-[#080a0f]/90 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-[#151923] border border-amber-500/30 rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b border-[#2c3548]/60 bg-amber-500/5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-amber-400 animate-pulse" />
+                <h3 className="text-xs font-black text-white uppercase tracking-wider">
+                  Target Selection
+                </h3>
+              </div>
+              <button 
+                onClick={() => setSelectUnitToBuffAbility(null)}
+                className="text-gray-400 hover:text-white text-xs font-black p-1 hover:bg-[#2c3548]/50 rounded transition-all"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-5 space-y-4 text-left">
+              <div className="bg-[#1c2230] p-3 rounded-lg border border-[#2c3548]/30">
+                <h4 className="text-xxs font-black text-amber-500 uppercase tracking-widest mb-1">
+                  ✨ Ability Activated:
+                </h4>
+                <p className="text-xs font-bold text-white mb-1">{selectUnitToBuffAbility.name}</p>
+                <p className="text-[10px] text-gray-300 italic whitespace-pre-line leading-relaxed">
+                  "{selectUnitToBuffAbility.effect}"
+                </p>
+              </div>
+
+              <p className="text-xxs text-gray-400 leading-relaxed font-medium">
+                Choose a friendly unit from your roster to receive this ability's benefit:
+              </p>
+
+              <div className="grid grid-cols-1 gap-2">
+                {gameState.units.filter(u => !u.isSlain).map(u => {
+                  const uRules = faction.units.find(rules => rules.id === u.unitId);
+                  if (!uRules) return null;
+                  return (
+                    <Button
+                      key={u.id}
+                      onClick={() => {
+                        // Parse effect text to find what stats are modified
+                        const effectLower = (selectUnitToBuffAbility.effect || '').toLowerCase();
+                        const allowed: ('attacks' | 'save' | 'ward' | 'move')[] = [];
+                        
+                        if (
+                          effectLower.includes('attacks characteristic') || 
+                          effectLower.includes('add 1 to the attacks') || 
+                          effectLower.includes('modify attacks') || 
+                          effectLower.includes('attack characteristic') ||
+                          effectLower.includes('attacks characteristic of')
+                        ) {
+                          allowed.push('attacks');
+                        }
+                        if (
+                          effectLower.includes('save roll') || 
+                          effectLower.includes('save characteristic') || 
+                          effectLower.includes('add 1 to save') ||
+                          effectLower.includes('add 1 to the save')
+                        ) {
+                          allowed.push('save');
+                        }
+                        if (
+                          effectLower.includes('ward roll') || 
+                          effectLower.includes('ward characteristic') || 
+                          effectLower.includes('add 1 to ward') ||
+                          effectLower.includes('add 1 to the ward')
+                        ) {
+                          allowed.push('ward');
+                        }
+                        if (
+                          effectLower.includes('move') || 
+                          effectLower.includes('run') || 
+                          effectLower.includes('charge') ||
+                          effectLower.includes('movement')
+                        ) {
+                          allowed.push('move');
+                        }
+                        
+                        const finalAllowed = allowed.length > 0 ? allowed : undefined;
+
+                        setSelectUnitToBuffAbility(null);
+                        if (allowed.length === 0) {
+                          // No direct stat modifiers parsed; log the targeting action and close cleanly
+                          if (gameState) {
+                            const updated = { ...gameState };
+                            updated.logs.unshift(`🎯 Selected unit [${uRules.name}] as the target for "${selectUnitToBuffAbility.name}".`);
+                            saveGame(updated);
+                          }
+                          showToast(`Selected ${uRules.name} for ${selectUnitToBuffAbility.name}!`, 'success');
+                        } else if (allowed.length === 1) {
+                          const singleStat = allowed[0];
+                          let modifierVal = 1;
+                          let labelVal = '';
+                          if (singleStat === 'attacks') labelVal = '+1 Attacks';
+                          else if (singleStat === 'save') labelVal = '+1 Save';
+                          else if (singleStat === 'ward') labelVal = '+1 Ward';
+                          else if (singleStat === 'move') labelVal = '+1" Move';
+                          
+                          applyBuff(u.id, singleStat, modifierVal, labelVal, selectUnitToBuffAbility.phase);
+                        } else {
+                          setBuffModal({ 
+                            isOpen: true, 
+                            unitId: u.id, 
+                            unitName: uRules.name,
+                            allowedStats: finalAllowed,
+                            expiresPhase: selectUnitToBuffAbility.phase
+                          });
+                        }
+                      }}
+                      className="bg-[#1c2230] hover:bg-[#252c3d] border border-[#2c3548] text-white hover:text-amber-400 text-xs font-bold py-2 rounded-xl transition-all flex items-center justify-between px-4 h-11"
+                    >
+                      <span className="font-semibold text-gray-200">{uRules.name}</span>
+                      <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] font-black uppercase">Select</Badge>
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-[#2c3548]/50 bg-[#121620] flex gap-2">
+              <Button 
+                onClick={() => setSelectUnitToBuffAbility(null)}
+                variant="outline"
+                className="w-full border-[#2c3548] text-gray-400 text-xs font-bold uppercase py-2 rounded-xl"
+              >
+                Cancel
               </Button>
             </div>
           </div>

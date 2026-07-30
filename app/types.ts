@@ -13,6 +13,23 @@ export interface Weapon {
 
 export type AbilityLimit = 'once-per-turn' | 'once-per-battle' | 'none';
 
+export interface RuleAction {
+  type: 'modify_stat' | 'apply_passive' | 'spawn_prompt' | 'heal';
+  target: 'all_friendly' | 'selected_unit' | 'self';
+  stat?: 'run' | 'charge' | 'hit' | 'wound' | 'rend' | 'save' | 'ward' | 'attacks' | 'damage';
+  modifier?: number;
+  description: string;
+  condition?: {
+    round?: number;
+    phase?: string;
+  };
+}
+
+export interface RuleDefinition {
+  trigger: 'start_of_battle' | 'start_of_round' | 'start_of_phase' | 'unit_attack';
+  actions: RuleAction[];
+}
+
 export interface Ability {
   id: string;
   name: string;
@@ -22,6 +39,8 @@ export interface Ability {
   once: AbilityLimit;
   passiveAppliedPhase?: GamePhase; // phase this passive is applied to
   isDefense?: boolean; // is this a defensive ability
+  sourceType?: 'trait' | 'regiment' | 'enhancement' | 'unit'; // where did this ability come from
+  ruleDefinition?: RuleDefinition; // declarative rule configurations
 }
 
 export interface Unit {
@@ -46,6 +65,7 @@ export interface Faction {
   regimentAbilities: Ability[];
   enhancements: Ability[];
   units: Unit[];
+  isTested?: boolean;
 }
 
 export interface UnitState {
@@ -64,7 +84,18 @@ export interface UnitState {
   fought: boolean;
 }
 
+export interface AppliedModifier {
+  id: string; // unique ID for tracking/removal
+  unitId: string; // UnitState.id of target
+  stat: 'attacks' | 'hit' | 'wound' | 'rend' | 'damage' | 'save' | 'ward' | 'move' | 'charge' | 'run';
+  modifier: number;
+  label: string;
+  expiresRound: number; // round number when it expires (normally at the end of the round activated in)
+  expiresPhase?: GamePhase;
+}
+
 export interface GameState {
+  matchId?: string;
   round: number; // 1, 2, 3, 4
   activeTurn: 'me' | 'opponent'; // whose turn is it currently
   currentPhase: GamePhase;
@@ -78,4 +109,5 @@ export interface GameState {
     [instanceAbilityId: string]: boolean; // key = "abilityId" -> used status
   };
   logs: string[];
+  appliedModifiers?: AppliedModifier[];
 }

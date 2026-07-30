@@ -420,6 +420,19 @@ export default function AdminPage() {
     });
   };
 
+  const handleToggleTested = (id: string, checked: boolean) => {
+    const updated = customFactions.map(f => {
+      if (f.id === id) {
+        return { ...f, isTested: checked };
+      }
+      return f;
+    });
+    setCustomFactions(updated);
+    localStorage.setItem('custom_factions', JSON.stringify(updated));
+    saveFactionsToDisk(updated);
+    showToast(`Updated tested status of "${customFactions.find(f => f.id === id)?.name}"!`, 'success');
+  };
+
   // CRUD: Save visual editor state back into localStorage
   const handleSaveEditorData = () => {
     if (!editorFaction) return;
@@ -619,11 +632,18 @@ export default function AdminPage() {
               <p className="text-gray-400 text-xs">Manage, create, and refine Warhammer Spearhead custom rules</p>
             </div>
           </div>
-          <Link href="/">
-            <Button size="sm" variant="outline" className="border-[#2d3748] text-gray-300 hover:text-white hover:bg-[#1d2433] text-xs">
-              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back to Setup
-            </Button>
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/test">
+              <Button size="sm" variant="outline" className="border-amber-500/20 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500/30 text-xs font-extrabold h-8.5 rounded-lg">
+                🧪 Rules Test Harness
+              </Button>
+            </Link>
+            <Link href="/">
+              <Button size="sm" variant="outline" className="border-[#2d3748] text-gray-300 hover:text-white hover:bg-[#1d2433] text-xs h-8.5 rounded-lg">
+                <ArrowLeft className="h-4 w-4 mr-1.5" /> Back to Setup
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -1470,9 +1490,23 @@ export default function AdminPage() {
                   <div className="divide-y divide-[#222834]">
                     {customFactions.map((f) => (
                       <div key={f.id} className="p-4 flex items-center justify-between hover:bg-[#1a1f2c]/50 transition-colors duration-150">
-                        <div>
-                          <p className="text-sm font-black text-white">{f.name}</p>
-                          <p className="text-xs text-gray-400">{f.spearheadName} • <span className="text-amber-500 font-medium italic">{f.units.length} unit rosters</span></p>
+                        <div className="flex items-center gap-3">
+                          <input 
+                            type="checkbox" 
+                            id={`tested-${f.id}`}
+                            checked={f.isTested || false} 
+                            onChange={(e) => handleToggleTested(f.id, e.target.checked)}
+                            className="h-4.5 w-4.5 rounded border-[#2c3548] bg-[#0f121a] text-amber-500 focus:ring-amber-500/20 cursor-pointer"
+                          />
+                          <label htmlFor={`tested-${f.id}`} className="cursor-pointer select-none">
+                            <p className="text-sm font-black text-white flex items-center gap-2">
+                              {f.name}
+                              {f.isTested && (
+                                <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] hover:bg-emerald-500/10 py-0 px-1.5 font-bold">Tested</Badge>
+                              )}
+                            </p>
+                            <p className="text-xs text-gray-400">{f.spearheadName} • <span className="text-amber-500 font-medium italic">{f.units.length} unit rosters</span></p>
+                          </label>
                         </div>
                         <div className="flex gap-2">
                           <Button size="sm" onClick={() => handleEditFaction(f)} className="bg-[#222834] hover:bg-[#2d3748] text-xs text-gray-300">

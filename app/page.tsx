@@ -38,6 +38,7 @@ export default function HomePage() {
     return [...DEFAULT_FACTIONS].sort((a, b) => a.name.localeCompare(b.name));
   });
   const [hasActiveGame, setHasActiveGame] = useState(false);
+  const [showUntested, setShowUntested] = useState(false);
 
   // Single Player (User) Choices
   const [factionId, setFactionId] = useState('');
@@ -151,6 +152,7 @@ export default function HomePage() {
 
     // Create full simplified GameState
     const initialGameState: GameState = {
+      matchId: Math.random().toString(36).substring(2, 9),
       round: 1,
       activeTurn: firstPlayer,
       currentPhase: 'start',
@@ -188,6 +190,18 @@ export default function HomePage() {
           <p className="text-gray-400 max-w-lg mx-auto text-sm md:text-base leading-relaxed">
             Your personal tabletop game companion. Select your faction, track your wounds, and trigger your rules & reactive abilities at the perfect moments.
           </p>
+          <div className="flex gap-4 justify-center mt-6">
+            <Link href="/admin">
+              <Button size="sm" className="bg-[#1c2230] border border-[#2c3548] text-gray-300 hover:text-white hover:bg-amber-500/15 text-xs font-bold px-4 py-1.5 h-9 rounded-xl">
+                ⚙️ Visual CMS Admin
+              </Button>
+            </Link>
+            <Link href="/test">
+              <Button size="sm" className="bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20 text-xs font-black px-4 py-1.5 h-9 rounded-xl">
+                🧪 Rules Test Harness
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -234,17 +248,36 @@ export default function HomePage() {
           <CardContent className="p-8 space-y-6">
             
             {/* Faction Select */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400 uppercase">Select Your Faction</label>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-gray-400 uppercase">Select Your Faction</label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="show-untested-factions"
+                    checked={showUntested} 
+                    onChange={(e) => setShowUntested(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border-[#2c3548] bg-[#1c2230] text-amber-500 focus:ring-amber-500/20 cursor-pointer" 
+                  />
+                  <label htmlFor="show-untested-factions" className="text-xxs text-gray-400 font-bold cursor-pointer select-none">
+                    Show untested factions
+                  </label>
+                </div>
+              </div>
               <select
                 value={factionId}
                 onChange={(e) => setFactionId(e.target.value)}
                 className="w-full h-11 bg-[#1c2230] border border-[#2c3548] rounded-xl px-3 text-sm focus:border-amber-500 text-white font-medium"
               >
                 <option value="">-- Choose Your Faction --</option>
-                {factions.map(f => (
-                  <option key={f.id} value={f.id}>{f.name} ({f.spearheadName})</option>
-                ))}
+                {factions
+                  .filter(f => showUntested || f.isTested)
+                  .map(f => (
+                    <option key={f.id} value={f.id}>
+                      {f.name} ({f.spearheadName}){!f.isTested ? ' (Untested)' : ''}
+                    </option>
+                  ))
+                }
               </select>
             </div>
 
