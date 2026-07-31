@@ -190,18 +190,6 @@ export default function HomePage() {
           <p className="text-gray-400 max-w-lg mx-auto text-sm md:text-base leading-relaxed">
             Your personal tabletop game companion. Select your faction, track your wounds, and trigger your rules & reactive abilities at the perfect moments.
           </p>
-          <div className="flex gap-4 justify-center mt-6">
-            <Link href="/admin">
-              <Button size="sm" className="bg-[#1c2230] border border-[#2c3548] text-gray-300 hover:text-white hover:bg-amber-500/15 text-xs font-bold px-4 py-1.5 h-9 rounded-xl">
-                ⚙️ Visual CMS Admin
-              </Button>
-            </Link>
-            <Link href="/test">
-              <Button size="sm" className="bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20 text-xs font-black px-4 py-1.5 h-9 rounded-xl">
-                🧪 Rules Test Harness
-              </Button>
-            </Link>
-          </div>
         </div>
       </header>
 

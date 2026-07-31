@@ -149,6 +149,10 @@ export function getActiveModifiers(
   if (unitId && gameState.appliedModifiers) {
     gameState.appliedModifiers.forEach(mod => {
       if (mod.unitId === unitId && mod.stat === stat) {
+        // Exclude Blessing of Nurgle from standard attacking modifiers because it is a defensive reaction
+        if (stat === 'wound' && mod.label.includes('Nurgle')) {
+          return;
+        }
         modifiers.push({
           modifier: mod.modifier,
           description: mod.label

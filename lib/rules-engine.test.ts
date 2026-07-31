@@ -407,6 +407,52 @@ describe('AoS Companion Rules Engine', () => {
       const mods = getActiveModifiers(mockGameState, mockFaction, 'rend', 'chaos_knights_1', 'Cursed Lances');
       expect(mods.length).toBe(0);
     });
+
+    test('Blessing of Nurgle defensive modifier is excluded from attacking wound modifiers list', () => {
+      const mockFaction: Faction = {
+        id: 'slaves-to-darkness-bloodwind-legion',
+        name: 'Slaves to Darkness',
+        battleTraits: [],
+        regimentAbilities: [],
+        enhancements: [],
+        units: []
+      };
+
+      const mockGameState: GameState = {
+        round: 1,
+        activeTurn: 'me',
+        currentPhase: 'combat',
+        factionId: 'slaves-to-darkness-bloodwind-legion',
+        selectedBattleTraitId: 'all',
+        selectedRegimentAbilityId: '',
+        selectedEnhancementId: '',
+        victoryPoints: 0,
+        logs: [],
+        usedAbilities: {},
+        units: [
+          {
+            id: 'chaos_lord_1',
+            unitId: 'chaos-lord',
+            currentWounds: 0,
+            isSlain: false
+          }
+        ],
+        appliedModifiers: [
+          {
+            id: 'eye-of-gods-nurgle',
+            unitId: 'chaos_lord_1',
+            stat: 'wound',
+            modifier: -1,
+            label: 'Blessing of Nurgle (Eye of Gods)',
+            expiresRound: 99
+          }
+        ]
+      };
+
+      const mods = getActiveModifiers(mockGameState, mockFaction, 'wound', 'chaos_lord_1');
+      // Blessing of Nurgle should be excluded from offensive weapon wound modifier list because it is defensive!
+      expect(mods.length).toBe(0);
+    });
   });
 
 });

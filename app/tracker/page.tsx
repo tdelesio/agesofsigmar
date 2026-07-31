@@ -845,44 +845,44 @@ export default function TrackerPage() {
           unitId: unitId,
           stat: 'ward' as const,
           modifier: 1, // Ward 6+ (modifier of 1 lowering target 7+ to 6+)
-          label: 'Ward of Tzeentch (Ward 6+)',
+          label: 'Ward of Tzeentch (Eye of Gods)',
           expiresRound: expiresRound
         };
         updated.appliedModifiers = [...(updated.appliedModifiers || []), newMod];
-        updated.logs.unshift(`🔮 ${uRules.name} ascended: Gained Ward of Tzeentch (Ward 6+)!`);
+        updated.logs.unshift(`🔮 ${uRules.name} ascended: Gained Ward of Tzeentch (Eye of Gods)!`);
       } else if (eyeOfTheGodsSelectedReward === 'run') {
         const newMod = {
           id: `eyeOfTheGods-run-${unitId}-${Date.now()}`,
           unitId: unitId,
           stat: 'run' as const,
           modifier: 1,
-          label: 'Grace of Slaanesh (+1 Run)',
+          label: 'Grace of Slaanesh (+1 Run) (Eye of Gods)',
           expiresRound: expiresRound
         };
         updated.appliedModifiers = [...(updated.appliedModifiers || []), newMod];
-        updated.logs.unshift(`🔮 ${uRules.name} ascended: Gained Grace of Slaanesh (+1 Run)!`);
+        updated.logs.unshift(`🔮 ${uRules.name} ascended: Gained Grace of Slaanesh (+1 Run) (Eye of Gods)!`);
       } else if (eyeOfTheGodsSelectedReward === 'wound') {
         const newMod = {
           id: `eyeOfTheGods-wound-${unitId}-${Date.now()}`,
           unitId: unitId,
           stat: 'wound' as const,
           modifier: -1, // Subtracts 1 from target's wound rolls
-          label: 'Blessing of Nurgle (-1 to Wound)',
+          label: 'Blessing of Nurgle (Eye of Gods)',
           expiresRound: expiresRound
         };
         updated.appliedModifiers = [...(updated.appliedModifiers || []), newMod];
-        updated.logs.unshift(`🔮 ${uRules.name} ascended: Gained Blessing of Nurgle (-1 to Wound)!`);
+        updated.logs.unshift(`🔮 ${uRules.name} ascended: Gained Blessing of Nurgle (Eye of Gods)!`);
       } else if (eyeOfTheGodsSelectedReward === 'rend') {
         const newMod = {
           id: `eyeOfTheGods-rend-${unitId}-${Date.now()}`,
           unitId: unitId,
           stat: 'rend' as const,
           modifier: 1,
-          label: 'Fury of Khorne (+1 Rend)',
+          label: 'Fury of Khorne (Eye of Gods)',
           expiresRound: expiresRound
         };
         updated.appliedModifiers = [...(updated.appliedModifiers || []), newMod];
-        updated.logs.unshift(`🔮 ${uRules.name} ascended: Gained Fury of Khorne (+1 Rend)!`);
+        updated.logs.unshift(`🔮 ${uRules.name} ascended: Gained Fury of Khorne (Eye of Gods)!`);
       }
     };
 
@@ -1114,6 +1114,24 @@ export default function TrackerPage() {
                             });
                           }
                         });
+
+                        // Append active Eye of the Gods defensive blessings (like Blessing of Nurgle)
+                        if (gameState.appliedModifiers) {
+                          gameState.appliedModifiers.forEach(mod => {
+                            if (mod.unitId === u.id && (mod.label.includes('Nurgle') || mod.label.includes('Tzeentch'))) {
+                              defAbilities.push({
+                                source: uRules.name,
+                                name: mod.label,
+                                timing: 'Passive (Defensive)',
+                                effect: mod.label.includes('Nurgle')
+                                  ? 'Subtract 1 from wound rolls targeting this unit.'
+                                  : 'This unit has a 6+ ward roll.',
+                                id: mod.id,
+                                key: mod.id
+                              });
+                            }
+                          });
+                        }
                       }
                     });
 
@@ -1691,6 +1709,24 @@ export default function TrackerPage() {
                             });
                           }
                         });
+
+                        // Append active Eye of the Gods defensive blessings (like Blessing of Nurgle)
+                        if (gameState.appliedModifiers) {
+                          gameState.appliedModifiers.forEach(mod => {
+                            if (mod.unitId === u.id && (mod.label.includes('Nurgle') || mod.label.includes('Tzeentch'))) {
+                              defAbilities.push({
+                                source: uRules.name,
+                                name: mod.label,
+                                timing: 'Passive (Defensive)',
+                                effect: mod.label.includes('Nurgle')
+                                  ? 'Subtract 1 from wound rolls targeting this unit.'
+                                  : 'This unit has a 6+ ward roll.',
+                                id: mod.id,
+                                key: mod.id
+                              });
+                            }
+                          });
+                        }
                       }
                     });
 
