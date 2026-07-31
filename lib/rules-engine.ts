@@ -256,8 +256,13 @@ export function calculateStatValue(
   const isTargetRoll = ['save', 'ward', 'hit', 'wound'].includes(statKey);
   
   if (isTargetRoll) {
+    // According to AoS, net target roll modifications are capped at [-1, 1]
+    let cappedTotalMod = totalMod;
+    if (cappedTotalMod > 1) cappedTotalMod = 1;
+    if (cappedTotalMod < -1) cappedTotalMod = -1;
+
     // Target rolls (Save 4+, Ward 6+). Positive modifier lowers required roll (makes it easier).
-    modifiedNum = actualBaseNum - totalMod;
+    modifiedNum = actualBaseNum - cappedTotalMod;
     if (modifiedNum < 2) modifiedNum = 2; // Roll of 1 is always failure in AoS
   } else {
     // Standard scaling stats (Attacks, Move, Damage). Positive modifier increases the stat.

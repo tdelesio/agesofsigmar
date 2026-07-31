@@ -57,6 +57,7 @@ export default function TrackerPage() {
     sourceAbilityId?: string;
     restrictToChaosOnly?: boolean;
     applyToAllUnits?: boolean;
+    restrictToUnitId?: string;
   } | null>(null);
   const [eyeOfTheGodsSelectedUnitId, setEyeOfTheGodsSelectedUnitId] = useState<string>('');
   const [eyeOfTheGodsSelectedReward, setEyeOfTheGodsSelectedReward] = useState<string>('');
@@ -392,12 +393,16 @@ export default function TrackerPage() {
         });
         return;
       } else if (abilityId === 'favouredOfThePantheon' || abilityId.endsWith('-favouredOfThePantheon')) {
+        const chaosLordUnit = gameState.units.find(u => u.unitId === 'chaosLord');
         setEyeOfTheGodsModal({
           isOpen: true,
           sourceAbilityName: 'Favoured of the Pantheon',
           sourceAbilityId: abilityId,
-          applyToAllUnits: true
+          restrictToUnitId: 'chaosLord'
         });
+        if (chaosLordUnit) {
+          setEyeOfTheGodsSelectedUnitId(chaosLordUnit.id);
+        }
         return;
       }
     }
@@ -588,8 +593,8 @@ export default function TrackerPage() {
   };
 
   // Fetch active modifiers for a given stat based on current round/phase/selections
-  function getActiveModifiers(stat: string, unitId?: string): { modifier: number; description: string }[] {
-    return libGetActiveModifiers(gameState, faction || null, stat, unitId);
+  function getActiveModifiers(stat: string, unitId?: string, weaponName?: string): { modifier: number; description: string }[] {
+    return libGetActiveModifiers(gameState, faction || null, stat, unitId, weaponName);
   }
 
   // Helper to parse "Battle Damaged" passive abilities and determine if a characteristic is currently degraded
@@ -607,7 +612,10 @@ export default function TrackerPage() {
       else baseNum = parseInt(baseValue, 10) || 0;
 
       return (
-        <span className="inline-flex items-center gap-1">
+        <span 
+          className="inline-flex items-center gap-1 cursor-help"
+          title="Battle Damaged: Degraded characteristics due to sustained wounds"
+        >
           <span className="font-extrabold text-red-500 text-xs">{override}{suffix}</span>
           <span className="text-[10px] text-gray-500 line-through font-medium">({baseNum}{suffix})</span>
           <Badge className="bg-red-500/15 text-red-400 border border-red-500/20 text-[8px] px-1 py-0 font-black uppercase tracking-wider shrink-0 select-none">
@@ -617,7 +625,7 @@ export default function TrackerPage() {
       );
     }
 
-    const mods = getActiveModifiers(statKey, unitId);
+    const mods = getActiveModifiers(statKey, unitId, weaponName);
     const totalMod = mods.reduce((acc, m) => acc + m.modifier, 0);
 
     if (totalMod === 0) {
@@ -627,28 +635,41 @@ export default function TrackerPage() {
     // Determine numerical base value
     const { baseNum, modifiedNum, isNan } = calculateStatValue(baseValue, statKey, totalMod);
 
+    // According to AoS, net target roll modifications are capped at [-1, 1]
+    const isRollStat = ['save', 'ward', 'hit', 'wound', 'run', 'charge'].includes(statKey);
+    let cappedTotalMod = totalMod;
+    if (isRollStat) {
+      if (cappedTotalMod > 1) cappedTotalMod = 1;
+      if (cappedTotalMod < -1) cappedTotalMod = -1;
+    }
+
+    // Build descriptions for hovering tool tip listing all contributing buffs
+    const tooltipText = mods
+      .map(m => `${m.description}: ${m.modifier > 0 ? '+' : ''}${m.modifier}`)
+      .join('\n');
+
     if (isNan) {
       // Fallback for non-numeric stats (e.g. "D3" or "D6")
-      const sign = totalMod > 0 ? '+' : '';
+      const sign = cappedTotalMod > 0 ? '+' : '';
       return (
-        <span className="inline-flex items-center gap-1">
+        <span className="inline-flex items-center gap-1 cursor-help" title={tooltipText}>
           <span>{baseValue}{suffix}</span>
           <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 text-[9px] px-1 py-0 font-bold uppercase tracking-wider shrink-0 select-none">
-            {sign}{totalMod}
+            {sign}{cappedTotalMod}
           </Badge>
         </span>
       );
     }
 
-    const badgeColorClass = totalMod > 0 ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-red-500/15 text-red-400 border-red-500/20';
-    const sign = totalMod > 0 ? '+' : '';
+    const badgeColorClass = cappedTotalMod > 0 ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-red-500/15 text-red-400 border-red-500/20';
+    const sign = cappedTotalMod > 0 ? '+' : '';
 
     return (
-      <span className="inline-flex items-center gap-1">
+      <span className="inline-flex items-center gap-1 cursor-help" title={tooltipText}>
         <span className="font-extrabold text-white text-xs">{modifiedNum}{suffix}</span>
         <span className="text-[10px] text-gray-400 font-medium">({baseNum}{suffix})</span>
         <Badge className={`text-[8px] px-1 py-0 font-black uppercase tracking-wider shrink-0 select-none border ${badgeColorClass}`}>
-          {sign}{totalMod}
+          {sign}{cappedTotalMod}
         </Badge>
       </span>
     );
@@ -2800,7 +2821,27 @@ export default function TrackerPage() {
             {/* Content */}
             <div className="p-5 space-y-5 overflow-y-auto max-h-[70vh]">
               {/* Step 1: Select Friendly Unit (Skip if applyToAllUnits is true) */}
-              {!eyeOfTheGodsModal.applyToAllUnits ? (
+              {eyeOfTheGodsModal.applyToAllUnits ? (
+                <div className="p-3.5 rounded-xl bg-purple-950/20 border border-purple-500/30 flex items-start gap-2.5">
+                  <span className="text-lg leading-none">🌟</span>
+                  <div>
+                    <h5 className="text-xxs font-black text-purple-400 uppercase tracking-wide">Favoured of the Pantheon Active</h5>
+                    <p className="text-xxs text-gray-300 mt-1 leading-normal">
+                      This trial blesses <strong>ALL friendly units</strong> simultaneously! Step 1 unit selection is automated.
+                    </p>
+                  </div>
+                </div>
+              ) : eyeOfTheGodsModal.restrictToUnitId ? (
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5">
+                  <span className="text-lg leading-none">👑</span>
+                  <div>
+                    <h5 className="text-xxs font-black text-amber-400 uppercase tracking-wide">Restricted to Chaos Lord</h5>
+                    <p className="text-xxs text-gray-300 mt-1 leading-normal">
+                      Favoured of the Pantheon is only applied to the <strong>Chaos Lord himself</strong>! Step 1 unit selection is automated.
+                    </p>
+                  </div>
+                </div>
+              ) : (
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-rose-400 uppercase tracking-widest flex items-center gap-1">
                     <User className="h-3 w-3" /> Step 1: Choose Friendly Unit
@@ -2839,16 +2880,6 @@ export default function TrackerPage() {
                           </button>
                         );
                       })}
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3.5 rounded-xl bg-purple-950/20 border border-purple-500/30 flex items-start gap-2.5">
-                  <span className="text-lg leading-none">🌟</span>
-                  <div>
-                    <h5 className="text-xxs font-black text-purple-400 uppercase tracking-wide">Favoured of the Pantheon Active</h5>
-                    <p className="text-xxs text-gray-300 mt-1 leading-normal">
-                      This trial blesses <strong>ALL friendly units</strong> simultaneously! Step 1 unit selection is automated.
-                    </p>
                   </div>
                 </div>
               )}

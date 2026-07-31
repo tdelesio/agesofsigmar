@@ -28,10 +28,22 @@ describe('AoS Companion Rules Engine', () => {
       expect(modifiedNum).toBe(6);
     });
 
-    test('Ward rolls: unit with no base ward (0) receiving multiple modifiers (2) gets 5+ ward', () => {
+    test('Ward rolls: unit with no base ward (0) receiving multiple modifiers (2) gets capped to +1 (6+ ward)', () => {
       const { baseNum, modifiedNum } = calculateStatValue(0, 'ward', 2);
       expect(baseNum).toBe(0);
-      expect(modifiedNum).toBe(5);
+      expect(modifiedNum).toBe(6); // Capped to +1 (6+ ward)
+    });
+
+    test('Save rolls: base 4+ with +2 modifier gets capped to +1 (resulting in 3+)', () => {
+      const { baseNum, modifiedNum } = calculateStatValue('4', 'save', 2);
+      expect(baseNum).toBe(4);
+      expect(modifiedNum).toBe(3); // Capped to +1
+    });
+
+    test('Hit rolls: base 3+ with -2 modifier gets capped to -1 (resulting in 4+)', () => {
+      const { baseNum, modifiedNum } = calculateStatValue('3', 'hit', -2);
+      expect(baseNum).toBe(3);
+      expect(modifiedNum).toBe(4); // Capped to -1
     });
 
     test('Target rolls cannot be modified below 2+ (Save rolls capped)', () => {
