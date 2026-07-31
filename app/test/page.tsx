@@ -17,7 +17,7 @@ import { Faction, Unit, GamePhase, Ability } from '../types';
 
 interface UATAssertion {
   id: string;
-  status: 'pass' | 'fail';
+  status: 'pass' | 'fail' | 'warn';
   category: 'Timing Check' | 'Once-Lock Violation' | 'Defensive Status' | 'Schema Diagnostics';
   scenario: string;
   ruleName: string;
@@ -64,9 +64,10 @@ export default function TestPage() {
   const [totalAssertions, setTotalAssertions] = useState<number>(0);
   const [passCount, setPassCount] = useState<number>(0);
   const [failCount, setFailCount] = useState<number>(0);
+  const [warnCount, setWarnCount] = useState<number>(0);
   const [runDuration, setRunDuration] = useState<number>(0);
   const [hasRun, setHasRun] = useState<boolean>(false);
-  const [filterMode, setFilterMode] = useState<'all' | 'fail' | 'pass'>('fail');
+  const [filterMode, setFilterMode] = useState<'all' | 'fail' | 'pass' | 'warn'>('fail');
 
   // Custom Toast state
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
@@ -160,10 +161,10 @@ export default function TestPage() {
               status = updatedAbility.isDefense ? 'pass' : 'fail';
             } else if (ast.category === 'Schema Diagnostics' && ast.message.includes('passiveAppliedPhase')) {
               actual = `passiveAppliedPhase: ${updatedAbility.passiveAppliedPhase || 'undefined'}`;
-              status = updatedAbility.passiveAppliedPhase ? 'pass' : 'fail';
+              status = updatedAbility.passiveAppliedPhase ? 'pass' : 'warn';
             } else if (ast.category === 'Schema Diagnostics' && ast.message.includes('Passive Audit:')) {
               actual = `passiveAppliedPhase: ${updatedAbility.passiveAppliedPhase || 'undefined'}`;
-              status = 'pass';
+              status = updatedAbility.passiveAppliedPhase ? 'pass' : 'warn';
               message = `Passive Audit: ${updatedAbility.name} is active in ${updatedAbility.passiveAppliedPhase ? `'${updatedAbility.passiveAppliedPhase}' phase` : 'ALL phases (Always Active)'}.`;
             }
 
@@ -199,7 +200,7 @@ export default function TestPage() {
     let assertionIdCounter = 1;
 
     const addAssertion = (
-      status: 'pass' | 'fail',
+      status: 'pass' | 'fail' | 'warn',
       category: UATAssertion['category'],
       scenario: string,
       ruleName: string,
@@ -307,7 +308,7 @@ export default function TestPage() {
       if (ability.phase === 'passive') {
         const hasPhase = !!ability.passiveAppliedPhase;
         addAssertion(
-          hasPhase ? 'pass' : 'fail',
+          hasPhase ? 'pass' : 'warn',
           'Schema Diagnostics',
           'Passive Audit Scan',
           abilityName,
@@ -589,11 +590,13 @@ export default function TestPage() {
 
     const passes = loggedAssertions.filter(a => a.status === 'pass').length;
     const fails = loggedAssertions.filter(a => a.status === 'fail').length;
+    const warns = loggedAssertions.filter(a => a.status === 'warn').length;
 
     setAssertions(loggedAssertions);
     setTotalAssertions(loggedAssertions.length);
     setPassCount(passes);
     setFailCount(fails);
+    setWarnCount(warns);
     setRunDuration(duration);
     setIsRunning(false);
     setHasRun(true);
@@ -787,6 +790,16 @@ export default function TestPage() {
                     Failed Checks ({failCount})
                   </button>
                   <button
+                    onClick={() => setFilterMode('warn')}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                      filterMode === 'warn' 
+                        ? 'bg-amber-500/20 text-amber-400 font-extrabold shadow-inner' 
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Warnings ({warnCount})
+                  </button>
+                  <button
                     onClick={() => setFilterMode('pass')}
                     className={`px-3 py-1 rounded-lg font-bold transition-all ${
                       filterMode === 'pass' 
@@ -827,9 +840,11 @@ export default function TestPage() {
                               <Badge className={`text-[8px] font-black uppercase tracking-wider py-0.5 border ${
                                 ast.status === 'pass' 
                                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25' 
-                                  : 'bg-red-500/10 text-red-400 border-red-500/25'
+                                  : ast.status === 'warn'
+                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/25'
+                                    : 'bg-red-500/10 text-red-400 border-red-500/25'
                               }`}>
-                                {ast.status === 'pass' ? 'ASSERT PASS' : 'ASSERT FAIL'}
+                                {ast.status === 'pass' ? 'ASSERT PASS' : ast.status === 'warn' ? 'WARNING' : 'ASSERT FAIL'}
                               </Badge>
                               <Badge variant="outline" className="border-zinc-800 text-gray-400 text-[8px] font-bold uppercase">{ast.category}</Badge>
                               <span className="text-[10px] text-gray-500 font-medium truncate max-w-[150px]" title={ast.source}>{ast.source}</span>
@@ -839,6 +854,16 @@ export default function TestPage() {
                             <p className="text-[9px] text-indigo-400 font-bold tracking-wide truncate max-w-[500px]" title={ast.scenario}>
                               📍 {ast.scenario}
                             </p>
+
+                            {/* Detailed Rule Effect Description */}
+                            {ast.ability && ast.ability.effect && (
+                              <div className="bg-[#0f121a]/80 border border-[#222834]/60 rounded-xl p-3 mt-2 text-xxs text-zinc-300 leading-relaxed shadow-inner">
+                                <span className="text-[9px] text-amber-500 font-black block uppercase tracking-widest mb-1.5 border-b border-[#222834]/40 pb-1">
+                                  📖 Passive Ability Rule Text
+                                </span>
+                                {ast.ability.effect}
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 w-full md:w-auto shrink-0">
@@ -884,7 +909,7 @@ export default function TestPage() {
                               <span className="text-[8px] text-gray-500 uppercase tracking-widest font-sans font-extrabold">Expected Constraint:</span>
                               <span className="text-emerald-400 font-bold truncate max-w-[150px]" title={ast.expected}>{ast.expected}</span>
                               <span className="text-[8px] text-gray-500 uppercase tracking-widest font-sans font-extrabold mt-1">Actual Parser State:</span>
-                              <span className={`font-bold truncate max-w-[150px] ${ast.status === 'pass' ? 'text-emerald-400' : 'text-red-400'}`} title={ast.actual}>{ast.actual}</span>
+                              <span className={`font-bold truncate max-w-[150px] ${ast.status === 'pass' ? 'text-emerald-400' : ast.status === 'warn' ? 'text-amber-400' : 'text-red-400'}`} title={ast.actual}>{ast.actual}</span>
                             </div>
 
                             {/* Github Creator Link */}
