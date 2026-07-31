@@ -2,7 +2,8 @@ import { describe, test, expect } from 'vitest';
 import { 
   calculateStatValue, 
   getBattleDamagedOverride, 
-  isTargetingSingularFriendlyUnit 
+  isTargetingSingularFriendlyUnit,
+  getActiveModifiers
 } from './rules-engine';
 import { GameState, Faction } from '@/app/types';
 
@@ -18,6 +19,18 @@ describe('AoS Companion Rules Engine', () => {
     test('Ward rolls (inverse scaling roll math): base 6+ with +1 modifier lowers the required roll to 5+', () => {
       const { baseNum, modifiedNum } = calculateStatValue('6', 'ward', 1);
       expect(baseNum).toBe(6);
+      expect(modifiedNum).toBe(5);
+    });
+
+    test('Ward rolls: unit with no base ward (0) receiving a modifier treats base as 7 (7 - 1 = 6+)', () => {
+      const { baseNum, modifiedNum } = calculateStatValue(0, 'ward', 1);
+      expect(baseNum).toBe(0);
+      expect(modifiedNum).toBe(6);
+    });
+
+    test('Ward rolls: unit with no base ward (0) receiving multiple modifiers (2) gets 5+ ward', () => {
+      const { baseNum, modifiedNum } = calculateStatValue(0, 'ward', 2);
+      expect(baseNum).toBe(0);
       expect(modifiedNum).toBe(5);
     });
 
@@ -229,6 +242,158 @@ describe('AoS Companion Rules Engine', () => {
 
     test('Plural global abilities: "Flask of Shademist" (target friendly units) does NOT trigger unit selection overlays', () => {
       expect(isTargetingSingularFriendlyUnit('Subtract 1 from hit rolls for attacks that target friendly units.')).toBe(false);
+    });
+  });
+
+  describe('getActiveModifiers & getDynamicChargeModifiers: charge-conditional modifiers', () => {
+    test('Unit has charged: should apply Impaling Charge rend modifier to Cursed Lances', () => {
+      const mockFaction: Faction = {
+        id: 'slaves-to-darkness-bloodwind-legion',
+        name: 'Slaves to Darkness',
+        spearheadName: 'Bloodwind Legion',
+        battleTraits: [],
+        regimentAbilities: [],
+        enhancements: [],
+        units: [
+          {
+            id: 'chaos-knights',
+            name: 'Chaos Knights',
+            isHero: false,
+            health: 3,
+            save: 3,
+            control: 1,
+            move: 10,
+            models: 5,
+            ward: 0,
+            weapons: [
+              {
+                name: 'Cursed Lances',
+                range: 'Melee',
+                attacks: '2',
+                hit: 3,
+                wound: 3,
+                rend: 1,
+                damage: '2'
+              }
+            ],
+            abilities: [
+              {
+                id: 'impalingCharge',
+                name: 'Impaling Charge',
+                phase: 'passive',
+                once: 'none',
+                effect: 'Add 1 to the Rend characteristic of this unit\'s Cursed Lances if it charged in the same turn.'
+              }
+            ]
+          }
+        ]
+      };
+
+      const mockGameState: GameState = {
+        round: 1,
+        activeTurn: 'me',
+        currentPhase: 'combat',
+        factionId: 'slaves-to-darkness-bloodwind-legion',
+        selectedBattleTraitId: 'all',
+        selectedRegimentAbilityId: '',
+        selectedEnhancementId: '',
+        victoryPoints: 0,
+        logs: [],
+        usedAbilities: {},
+        units: [
+          {
+            id: 'chaos_knights_1',
+            unitId: 'chaos-knights',
+            currentWounds: 0,
+            isSlain: false,
+            moved: true,
+            ran: false,
+            retreated: false,
+            shot: false,
+            charged: true, // Mark as charged!
+            fought: false
+          }
+        ]
+      };
+
+      const mods = getActiveModifiers(mockGameState, mockFaction, 'rend', 'chaos_knights_1', 'Cursed Lances');
+      expect(mods.length).toBe(1);
+      expect(mods[0].modifier).toBe(1);
+      expect(mods[0].description).toContain('Impaling Charge');
+    });
+
+    test('Unit did NOT charge: should NOT apply Impaling Charge rend modifier', () => {
+      const mockFaction: Faction = {
+        id: 'slaves-to-darkness-bloodwind-legion',
+        name: 'Slaves to Darkness',
+        spearheadName: 'Bloodwind Legion',
+        battleTraits: [],
+        regimentAbilities: [],
+        enhancements: [],
+        units: [
+          {
+            id: 'chaos-knights',
+            name: 'Chaos Knights',
+            isHero: false,
+            health: 3,
+            save: 3,
+            control: 1,
+            move: 10,
+            models: 5,
+            ward: 0,
+            weapons: [
+              {
+                name: 'Cursed Lances',
+                range: 'Melee',
+                attacks: '2',
+                hit: 3,
+                wound: 3,
+                rend: 1,
+                damage: '2'
+              }
+            ],
+            abilities: [
+              {
+                id: 'impalingCharge',
+                name: 'Impaling Charge',
+                phase: 'passive',
+                once: 'none',
+                effect: 'Add 1 to the Rend characteristic of this unit\'s Cursed Lances if it charged in the same turn.'
+              }
+            ]
+          }
+        ]
+      };
+
+      const mockGameState: GameState = {
+        round: 1,
+        activeTurn: 'me',
+        currentPhase: 'combat',
+        factionId: 'slaves-to-darkness-bloodwind-legion',
+        selectedBattleTraitId: 'all',
+        selectedRegimentAbilityId: '',
+        selectedEnhancementId: '',
+        victoryPoints: 0,
+        logs: [],
+        usedAbilities: {},
+        units: [
+          {
+            id: 'chaos_knights_1',
+            unitId: 'chaos-knights',
+            currentWounds: 0,
+            isSlain: false,
+            moved: true,
+            ran: false,
+            retreated: false,
+            shot: false,
+            charged: false, // NOT charged
+            fought: false
+          }
+        ]
+      };
+
+      const mods = getActiveModifiers(mockGameState, mockFaction, 'rend', 'chaos_knights_1', 'Cursed Lances');
+      expect(mods.length).toBe(0);
     });
   });
 

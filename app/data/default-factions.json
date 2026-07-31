@@ -11462,7 +11462,8 @@
           }
         ]
       }
-    ]
+    ],
+    "isTested": true
   },
   {
     "id": "slaves-to-darkness-darkoath-raiders",
@@ -11980,7 +11981,8 @@
         "effect": "Each time a friendly VAMPIRE unit uses a Fight ability, after all of its attacks have been resolved, Heal (X) that VAMPIRE unit where X is the number of damage points allocated by those attacks.",
         "phase": "passive",
         "timing": "Passive",
-        "once": "none"
+        "once": "none",
+        "passiveAppliedPhase": "combat"
       }
     ],
     "regimentAbilities": [
@@ -12025,7 +12027,8 @@
         "phase": "passive",
         "timing": "Passive",
         "once": "none",
-        "isDefense": true
+        "isDefense": true,
+        "passiveAppliedPhase": "shooting"
       },
       {
         "id": "spiritGale",
@@ -12107,7 +12110,8 @@
             "effect": "Models in this unit can pass across enemy Infantry models as if this unit had Fly.",
             "phase": "passive",
             "timing": "Passive",
-            "once": "none"
+            "once": "none",
+            "passiveAppliedPhase": "movement"
           }
         ],
         "models": 5
@@ -12140,7 +12144,8 @@
             "effect": "Add 1 to wound rolls for attacks made by this unit that target a damaged unit.",
             "phase": "passive",
             "timing": "Passive",
-            "once": "none"
+            "once": "none",
+            "passiveAppliedPhase": "combat"
           }
         ],
         "models": 3
@@ -12243,7 +12248,8 @@
         "effect": "Add 1 to wound rolls for combat attacks made by friendly non-Hero units that target a unit that has fewer models than the attacking unit.",
         "phase": "passive",
         "timing": "Passive",
-        "once": "none"
+        "once": "none",
+        "passiveAppliedPhase": "combat"
       },
       {
         "id": "deathmarch",
@@ -12261,7 +12267,8 @@
         "effect": "The Rend characteristic of your general's Baleful Tomb Blade is 2.",
         "phase": "passive",
         "timing": "Passive",
-        "once": "none"
+        "once": "none",
+        "passiveAppliedPhase": "combat"
       },
       {
         "id": "stolenAnimus",
@@ -12269,7 +12276,8 @@
         "effect": "Each time your general scores a critical hit, Heal (2) your general after the Attack ability has been resolved.",
         "phase": "passive",
         "timing": "Passive",
-        "once": "none"
+        "once": "none",
+        "passiveAppliedPhase": "combat"
       },
       {
         "id": "propelledByHate",
@@ -12351,7 +12359,8 @@
             "effect": "While your general is within this unit's combat range, both this unit and your general have Ward (5+).",
             "phase": "passive",
             "timing": "Passive",
-            "once": "none"
+            "once": "none",
+            "isDefense": true
           }
         ]
       },
@@ -12462,7 +12471,8 @@
           }
         ]
       }
-    ]
+    ],
+    "isTested": true
   },
   {
     "id": "stormcast-eternals-yndrastas-spearhead",

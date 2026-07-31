@@ -50,6 +50,17 @@ export default function TrackerPage() {
     phase?: GamePhase;
   } | null>(null);
 
+  // Eye of the Gods Ascension selection states
+  const [eyeOfTheGodsModal, setEyeOfTheGodsModal] = useState<{
+    isOpen: boolean;
+    sourceAbilityName: string;
+    sourceAbilityId?: string;
+    restrictToChaosOnly?: boolean;
+    applyToAllUnits?: boolean;
+  } | null>(null);
+  const [eyeOfTheGodsSelectedUnitId, setEyeOfTheGodsSelectedUnitId] = useState<string>('');
+  const [eyeOfTheGodsSelectedReward, setEyeOfTheGodsSelectedReward] = useState<string>('');
+
   const showToast = (message: string, type: 'error' | 'success' = 'success') => {
     setToast({ message, type });
     setTimeout(() => {
@@ -362,6 +373,35 @@ export default function TrackerPage() {
 
     const isUnlimited = foundAb && foundAb.once === 'none';
     const wasUsed = !!updated.usedAbilities[abilityId];
+
+    // Intercept Slaves to Darkness Eye of the Gods triggers when activating them (when wasUsed is false)
+    if (!wasUsed) {
+      if (abilityId === 'eyeOfTheGods' || abilityId.endsWith('-eyeOfTheGods')) {
+        setEyeOfTheGodsModal({
+          isOpen: true,
+          sourceAbilityName: 'Eye of the Gods (Battle Trait)',
+          sourceAbilityId: abilityId
+        });
+        return;
+      } else if (abilityId === 'theDreadBanner' || abilityId.endsWith('-theDreadBanner')) {
+        setEyeOfTheGodsModal({
+          isOpen: true,
+          sourceAbilityName: 'The Dread Banner',
+          sourceAbilityId: abilityId,
+          restrictToChaosOnly: true
+        });
+        return;
+      } else if (abilityId === 'favouredOfThePantheon' || abilityId.endsWith('-favouredOfThePantheon')) {
+        setEyeOfTheGodsModal({
+          isOpen: true,
+          sourceAbilityName: 'Favoured of the Pantheon',
+          sourceAbilityId: abilityId,
+          applyToAllUnits: true
+        });
+        return;
+      }
+    }
+
     updated.usedAbilities[abilityId] = !wasUsed;
 
     updated.logs.unshift(`⚡ Triggered ability: "${abilityName}"`);
@@ -449,6 +489,16 @@ export default function TrackerPage() {
       if (updated.round < 4) {
         updated.round += 1;
         updated.logs.unshift(`🌟 --- START OF BATTLE ROUND ${updated.round} --- 🌟`);
+
+        // Automatically trigger Slaves to Darkness Eye of the Gods Battle Trait selection popup at start of new round
+        if (updated.factionId === 'slaves-to-darkness-bloodwind-legion') {
+          setEyeOfTheGodsModal({
+            isOpen: true,
+            sourceAbilityName: 'Eye of the Gods (Round End Battle Trait)',
+            sourceAbilityId: 'eyeOfTheGods'
+          });
+        }
+
         // Automatically expire temporary round buffs
         if (updated.appliedModifiers) {
           updated.appliedModifiers = updated.appliedModifiers.filter(mod => mod.expiresRound >= updated.round);
@@ -743,6 +793,101 @@ export default function TrackerPage() {
     }
   };
 
+  const handleConfirmEyeOfTheGods = () => {
+    if (!eyeOfTheGodsModal || !gameState) return;
+    
+    // Validate unit selection unless it applies to all units
+    if (!eyeOfTheGodsModal.applyToAllUnits && !eyeOfTheGodsSelectedUnitId) {
+      showToast('Please select a unit to receive the blessing!', 'error');
+      return;
+    }
+
+    if (!eyeOfTheGodsSelectedReward) {
+      showToast('Please select a reward from the Ascension table!', 'error');
+      return;
+    }
+
+    const updated = { ...gameState };
+    const expiresRound = 99; // Rest of battle
+
+    const applyRewardToUnit = (unitId: string) => {
+      const u = updated.units.find(uState => uState.id === unitId);
+      if (!u) return;
+      const uRules = faction?.units.find(r => r.id === u.unitId);
+      if (!uRules) return;
+
+      if (eyeOfTheGodsSelectedReward === 'snubbed') {
+        updated.logs.unshift(`🔮 ${uRules.name} was SNUBBED BY THE GODS! (No effect)`);
+      } else if (eyeOfTheGodsSelectedReward === 'ward') {
+        const newMod = {
+          id: `eyeOfTheGods-ward-${unitId}-${Date.now()}`,
+          unitId: unitId,
+          stat: 'ward' as const,
+          modifier: 1, // Ward 6+ (modifier of 1 lowering target 7+ to 6+)
+          label: 'Ward of Tzeentch (Ward 6+)',
+          expiresRound: expiresRound
+        };
+        updated.appliedModifiers = [...(updated.appliedModifiers || []), newMod];
+        updated.logs.unshift(`🔮 ${uRules.name} ascended: Gained Ward of Tzeentch (Ward 6+)!`);
+      } else if (eyeOfTheGodsSelectedReward === 'run') {
+        const newMod = {
+          id: `eyeOfTheGods-run-${unitId}-${Date.now()}`,
+          unitId: unitId,
+          stat: 'run' as const,
+          modifier: 1,
+          label: 'Grace of Slaanesh (+1 Run)',
+          expiresRound: expiresRound
+        };
+        updated.appliedModifiers = [...(updated.appliedModifiers || []), newMod];
+        updated.logs.unshift(`🔮 ${uRules.name} ascended: Gained Grace of Slaanesh (+1 Run)!`);
+      } else if (eyeOfTheGodsSelectedReward === 'wound') {
+        const newMod = {
+          id: `eyeOfTheGods-wound-${unitId}-${Date.now()}`,
+          unitId: unitId,
+          stat: 'wound' as const,
+          modifier: -1, // Subtracts 1 from target's wound rolls
+          label: 'Blessing of Nurgle (-1 to Wound)',
+          expiresRound: expiresRound
+        };
+        updated.appliedModifiers = [...(updated.appliedModifiers || []), newMod];
+        updated.logs.unshift(`🔮 ${uRules.name} ascended: Gained Blessing of Nurgle (-1 to Wound)!`);
+      } else if (eyeOfTheGodsSelectedReward === 'rend') {
+        const newMod = {
+          id: `eyeOfTheGods-rend-${unitId}-${Date.now()}`,
+          unitId: unitId,
+          stat: 'rend' as const,
+          modifier: 1,
+          label: 'Fury of Khorne (+1 Rend)',
+          expiresRound: expiresRound
+        };
+        updated.appliedModifiers = [...(updated.appliedModifiers || []), newMod];
+        updated.logs.unshift(`🔮 ${uRules.name} ascended: Gained Fury of Khorne (+1 Rend)!`);
+      }
+    };
+
+    if (eyeOfTheGodsModal.applyToAllUnits) {
+      updated.units.filter(u => !u.isSlain).forEach(u => {
+        applyRewardToUnit(u.id);
+      });
+      updated.logs.unshift(`🌟 Favoured of the Pantheon applied blessings to ALL units!`);
+    } else {
+      applyRewardToUnit(eyeOfTheGodsSelectedUnitId);
+    }
+
+    // Mark source ability as used if provided
+    if (eyeOfTheGodsModal.sourceAbilityId) {
+      updated.usedAbilities[eyeOfTheGodsModal.sourceAbilityId] = true;
+    }
+
+    saveGame(updated);
+    showToast('Ascension blessing applied successfully!', 'success');
+    
+    // Clear selection
+    setEyeOfTheGodsModal(null);
+    setEyeOfTheGodsSelectedUnitId('');
+    setEyeOfTheGodsSelectedReward('');
+  };
+
   return (
     <div className="min-h-screen bg-[#0d1015] text-gray-100 flex flex-col font-sans">
       
@@ -1012,7 +1157,7 @@ export default function TrackerPage() {
                                     <span>SAVE:</span>
                                     {renderStatWithModifier(uRules.save, 'save', u.id, '+')}
                                   </Badge>
-                                  {uRules.ward > 0 ? (
+                                  {uRules.ward > 0 || getActiveModifiers('ward', u.id).length > 0 ? (
                                     <Badge className="bg-emerald-600/15 text-emerald-400 border border-emerald-500/20 text-[9px] font-black uppercase flex items-center gap-1">
                                       <span>WARD:</span>
                                       {renderStatWithModifier(uRules.ward, 'ward', u.id, '+')}
@@ -1169,7 +1314,7 @@ export default function TrackerPage() {
                               {renderStatWithModifier(uRules.move, 'move', u.id, '"')}
                             </div>
                             {(() => {
-                              const runMods = getActiveModifiers('run');
+                              const runMods = getActiveModifiers('run', u.id);
                               if (runMods.length > 0) {
                                 return (
                                   <div className="text-emerald-400 font-extrabold text-[10px] flex items-center gap-0.5 mt-0.5">
@@ -1464,10 +1609,22 @@ export default function TrackerPage() {
               <Card className="border-[#222834] bg-[#151923] text-white">
                 <CardHeader className="border-b border-[#222834] py-4">
                   <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-1.5 text-rose-400">
-                    <Swords className="h-4 w-4" /> My Melee Combat Activations
+                    {gameState.activeTurn === 'opponent' ? (
+                      <>
+                        <Shield className="h-4 w-4" /> My Defensive Reactions & Responses
+                      </>
+                    ) : (
+                      <>
+                        <Swords className="h-4 w-4" /> My Melee Combat Activations
+                      </>
+                    )}
                   </CardTitle>
                   <CardDescription className="text-xxs text-gray-400">
-                    Alternate selecting fighting units with your opponent. Toggle the "Fight" button on your active units as you activate them.
+                    {gameState.activeTurn === 'opponent' ? (
+                      "Your opponent's turn! Use defensive reactions first, then proceed with alternating melee activations."
+                    ) : (
+                      "Alternate selecting fighting units with your opponent. Toggle the \"Fight\" button on your active units as you activate them."
+                    )}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 space-y-4">
@@ -1557,6 +1714,14 @@ export default function TrackerPage() {
                     );
                   })()}
 
+                  {gameState.activeTurn === 'opponent' && (
+                    <div className="pt-2 border-t border-[#2c3548]/30">
+                      <h4 className="text-xxs font-black text-rose-400 uppercase tracking-widest pb-1.5 flex items-center gap-1.5">
+                        <Swords className="h-3.5 w-3.5" /> My Melee Combat Activations:
+                      </h4>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {gameState.units.filter(u => !u.isSlain).map((u) => {
                       const uRules = faction.units.find(rules => rules.id === u.unitId);
@@ -1572,7 +1737,7 @@ export default function TrackerPage() {
                               <h5 className="text-xs font-black text-white">{uRules.name}</h5>
                               <div className="text-xxs text-amber-500 font-semibold flex items-center gap-2 flex-wrap mt-0.5">
                                 <span className="flex items-center gap-1">Save: {renderStatWithModifier(uRules.save, 'save', u.id, '+')}</span>
-                                {uRules.ward > 0 && (
+                                {(uRules.ward > 0 || getActiveModifiers('ward', u.id).length > 0) && (
                                   <span className="flex items-center gap-1">| Ward: {renderStatWithModifier(uRules.ward, 'ward', u.id, '+')}</span>
                                 )}
                               </div>
@@ -2045,7 +2210,17 @@ export default function TrackerPage() {
                           </div>
                           <p className="text-xxs text-gray-400 mt-1 leading-normal">
                             Move: {uRules.move}" • Save: {uRules.save}+ • Control: {uRules.control} • Max HP: {uRules.health}
-                            {uRules.ward > 0 && ` • Ward: ${uRules.ward}+`}
+                            {(uRules.ward > 0 || getActiveModifiers('ward', u.id).length > 0) && (
+                              <>
+                                {' • Ward: '}
+                                {(() => {
+                                  const totalMod = getActiveModifiers('ward', u.id).reduce((acc, m) => acc + m.modifier, 0);
+                                  const { modifiedNum } = calculateStatValue(uRules.ward, 'ward', totalMod);
+                                  return modifiedNum;
+                                })()}
+                                +
+                              </>
+                            )}
                           </p>
                         </div>
 
@@ -2590,6 +2765,155 @@ export default function TrackerPage() {
                 className="w-full border-[#2c3548] text-gray-400 text-xs font-bold uppercase py-2 rounded-xl"
               >
                 Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {eyeOfTheGodsModal && eyeOfTheGodsModal.isOpen && (
+        <div className="fixed inset-0 bg-[#080a0f]/95 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+          <div className="bg-[#151923] border border-amber-500/40 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col my-8">
+            {/* Header */}
+            <div className="p-5 border-b border-[#2c3548]/60 bg-gradient-to-r from-amber-500/10 to-rose-500/10 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Sparkles className="h-6 w-6 text-amber-400 animate-pulse animate-duration-1000" />
+                <div>
+                  <h3 className="text-xs font-black text-white uppercase tracking-widest">
+                    {eyeOfTheGodsModal.sourceAbilityName}
+                  </h3>
+                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mt-0.5">
+                    Eye of the Gods Ascension Table
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setEyeOfTheGodsModal(null)}
+                className="text-gray-400 hover:text-white h-7 w-7 rounded-lg"
+              >
+                <span className="text-sm font-bold">×</span>
+              </Button>
+            </div>
+
+            {/* Content */}
+            <div className="p-5 space-y-5 overflow-y-auto max-h-[70vh]">
+              {/* Step 1: Select Friendly Unit (Skip if applyToAllUnits is true) */}
+              {!eyeOfTheGodsModal.applyToAllUnits ? (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-rose-400 uppercase tracking-widest flex items-center gap-1">
+                    <User className="h-3 w-3" /> Step 1: Choose Friendly Unit
+                  </label>
+                  <p className="text-xxs text-gray-400 leading-normal">
+                    Select the unit that is undergoing the Trial of Ascension:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                    {gameState.units
+                      .filter(u => !u.isSlain)
+                      .filter(u => {
+                        if (eyeOfTheGodsModal.restrictToChaosOnly) {
+                          // The Dread Banner: limited to Chaos Warriors or Chaos Knights
+                          const rules = faction?.units.find(r => r.id === u.unitId);
+                          return rules?.name.toLowerCase().includes('chaos warriors') || 
+                                 rules?.name.toLowerCase().includes('chaos knights');
+                        }
+                        return true;
+                      })
+                      .map(u => {
+                        const rules = faction?.units.find(r => r.id === u.unitId);
+                        if (!rules) return null;
+                        const isSelected = eyeOfTheGodsSelectedUnitId === u.id;
+                        return (
+                          <button
+                            key={u.id}
+                            type="button"
+                            onClick={() => setEyeOfTheGodsSelectedUnitId(u.id)}
+                            className={`p-3 text-left rounded-xl border text-xs font-bold transition-all flex items-center justify-between
+                              ${isSelected
+                                ? 'bg-amber-500/10 border-amber-400 text-white shadow-lg'
+                                : 'bg-[#1c2230] border-[#2c3548] text-gray-300 hover:text-white hover:border-[#3d4963]'}`}
+                          >
+                            <span>{rules.name}</span>
+                            {isSelected && <Badge className="bg-amber-500/20 text-amber-400 text-[8px] uppercase font-black">Selected</Badge>}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-xl bg-purple-950/20 border border-purple-500/30 flex items-start gap-2.5">
+                  <span className="text-lg leading-none">🌟</span>
+                  <div>
+                    <h5 className="text-xxs font-black text-purple-400 uppercase tracking-wide">Favoured of the Pantheon Active</h5>
+                    <p className="text-xxs text-gray-300 mt-1 leading-normal">
+                      This trial blesses <strong>ALL friendly units</strong> simultaneously! Step 1 unit selection is automated.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Choose Eye of the Gods Blessing */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-rose-400 uppercase tracking-widest flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" /> Step 2: Choose Blessing from the Table
+                </label>
+                <p className="text-xxs text-gray-400 leading-normal">
+                  Select one of the five trials of ascension from the Eye of the Gods table:
+                </p>
+
+                <div className="space-y-2 mt-2">
+                  {[
+                    { id: 'snubbed', name: '1. Snubbed by the Gods', desc: 'No Effect (The gods look away in silence).', emoji: '💀', color: 'border-zinc-700 hover:border-zinc-500 bg-zinc-900/10' },
+                    { id: 'ward', name: '2. Ward of Tzeentch', desc: 'Grants this unit a Ward of 6+. If they already have a Ward, increases their Ward by 1.', emoji: '💖', color: 'border-cyan-500/30 hover:border-cyan-500/50 bg-cyan-950/10' },
+                    { id: 'run', name: '3. Grace of Slaanesh', desc: 'Add 1 to run rolls for this unit.', emoji: '🏃‍♂️', color: 'border-fuchsia-500/30 hover:border-fuchsia-500/50 bg-fuchsia-950/10' },
+                    { id: 'wound', name: '4. Blessing of Nurgle', desc: 'Subtract 1 from wound rolls for attacks targeting this unit.', emoji: '🤢', color: 'border-emerald-500/30 hover:border-emerald-500/50 bg-emerald-950/10' },
+                    { id: 'rend', name: '5. Fury of Khorne', desc: 'Add 1 to the Rend characteristic of this unit\'s melee weapons.', emoji: '⚔️', color: 'border-red-500/30 hover:border-red-500/50 bg-red-950/10' }
+                  ].map(reward => {
+                    const isSelected = eyeOfTheGodsSelectedReward === reward.id;
+                    return (
+                      <button
+                        key={reward.id}
+                        type="button"
+                        onClick={() => setEyeOfTheGodsSelectedReward(reward.id)}
+                        className={`w-full text-left p-3.5 rounded-xl border transition-all flex gap-3 relative
+                          ${isSelected
+                            ? 'bg-amber-500/10 border-amber-400 text-white shadow-lg'
+                            : `bg-[#1c2230] border-transparent text-gray-300 hover:text-white ${reward.color}`}`}
+                      >
+                        <span className="text-xl leading-none shrink-0 self-center">{reward.emoji}</span>
+                        <div className="space-y-0.5">
+                          <h4 className="text-xs font-black text-white">{reward.name}</h4>
+                          <p className="text-[10px] text-gray-400 leading-normal">{reward.desc}</p>
+                        </div>
+                        {isSelected && (
+                          <Badge className="absolute right-3.5 top-3.5 bg-amber-500/20 text-amber-400 text-[8px] uppercase font-black">
+                            Active
+                          </Badge>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-[#2c3548]/50 bg-[#121620] flex gap-2">
+              <Button
+                type="button"
+                onClick={() => setEyeOfTheGodsModal(null)}
+                variant="outline"
+                className="w-1/3 border-[#2c3548] text-gray-400 text-xs font-bold uppercase py-2.5 rounded-xl"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirmEyeOfTheGods}
+                className="w-2/3 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs uppercase py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-amber-950/20"
+              >
+                <Sparkles className="h-3.5 w-3.5" /> Confirm Ascension
               </Button>
             </div>
           </div>

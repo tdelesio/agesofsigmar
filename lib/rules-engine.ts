@@ -1,11 +1,99 @@
 import { GameState, Faction, Ability } from '@/app/types';
 
+// Helper to parse charge-conditional passive abilities and return dynamic modifiers
+export function getDynamicChargeModifiers(
+  uState: any,
+  uRules: any,
+  stat: string,
+  weaponName?: string
+): { modifier: number; description: string }[] {
+  const mods: { modifier: number; description: string }[] = [];
+  if (!uState || !uRules || !uRules.abilities) return mods;
+
+  uRules.abilities.forEach((ability: any) => {
+    const effectLower = (ability.effect || '').toLowerCase();
+    
+    // Check if it's a charge-conditional rule
+    const hasChargeCondition = effectLower.includes('charged in the same turn') || effectLower.includes('has charged');
+    if (!hasChargeCondition) return;
+
+    const isNotChargedCondition = effectLower.includes('has not charged') || effectLower.includes('not charged');
+    
+    // Evaluate condition
+    let conditionMet = false;
+    if (isNotChargedCondition) {
+      conditionMet = !uState.charged;
+    } else {
+      conditionMet = !!uState.charged;
+    }
+
+    if (!conditionMet) return;
+
+    // Now check if it modifies this stat
+    if (stat === 'rend') {
+      if (effectLower.includes('add 1 to the rend characteristic') || effectLower.includes('add 1 to rend') || effectLower.includes('add 1 to the rend')) {
+        let weaponMatch = true;
+        if (weaponName) {
+          const isMeleeWeaponTerm = effectLower.includes('melee weapons');
+          const isSpecificWeaponMentioned = effectLower.includes(weaponName.toLowerCase());
+          weaponMatch = isMeleeWeaponTerm || isSpecificWeaponMentioned;
+        }
+        if (weaponMatch) {
+          mods.push({
+            modifier: 1,
+            description: `${ability.name} (${isNotChargedCondition ? 'Not Charged' : 'Charged'})`
+          });
+        }
+      }
+    } else if (stat === 'attacks') {
+      if (effectLower.includes('add 1 to the attacks characteristic') || effectLower.includes('add 1 to attacks') || effectLower.includes('add 1 to the attacks')) {
+        let weaponMatch = true;
+        if (weaponName) {
+          const isMeleeWeaponTerm = effectLower.includes('melee weapons');
+          const isSpecificWeaponMentioned = effectLower.includes(weaponName.toLowerCase());
+          weaponMatch = isMeleeWeaponTerm || isSpecificWeaponMentioned;
+        }
+        if (weaponMatch) {
+          mods.push({
+            modifier: 1,
+            description: `${ability.name} (${isNotChargedCondition ? 'Not Charged' : 'Charged'})`
+          });
+        }
+      }
+    } else if (stat === 'wound') {
+      if (effectLower.includes('add 1 to wound rolls') || effectLower.includes('add 1 to the wound rolls')) {
+        mods.push({
+          modifier: 1,
+          description: `${ability.name} (Charged)`
+        });
+      }
+    } else if (stat === 'hit') {
+      if (effectLower.includes('add 1 to hit rolls') || effectLower.includes('add 1 to the hit rolls')) {
+        mods.push({
+          modifier: 1,
+          description: `${ability.name} (Charged)`
+        });
+      }
+    } else if (stat === 'save') {
+      if (effectLower.includes('add 1 to save rolls') || effectLower.includes('add 1 to the save rolls')) {
+        mods.push({
+          modifier: 1,
+          description: `${ability.name} (${isNotChargedCondition ? 'Not Charged' : 'Charged'})`
+        });
+      }
+    }
+  });
+
+  return mods;
+}
+
 // Fetch active modifiers for a given stat based on current round/phase/selections
 export function getActiveModifiers(
   gameState: GameState | null,
   faction: Faction | null,
   stat: string,
-  unitId?: string
+  unitId?: string,
+  weaponName?: string
 ): { modifier: number; description: string }[] {
   if (!gameState || !faction) return [];
   const modifiers: { modifier: number; description: string }[] = [];
@@ -67,6 +155,18 @@ export function getActiveModifiers(
         });
       }
     });
+  }
+
+  // 5. Dynamic charge-conditional passive abilities
+  if (unitId) {
+    const uState = gameState.units.find(u => u.id === unitId);
+    if (uState && !uState.isSlain) {
+      const uRules = faction.units.find(r => r.id === uState.unitId);
+      if (uRules) {
+        const chargeMods = getDynamicChargeModifiers(uState, uRules, stat, weaponName);
+        modifiers.push(...chargeMods);
+      }
+    }
   }
 
   return modifiers;
@@ -145,20 +245,27 @@ export function calculateStatValue(
     return { baseNum: 0, modifiedNum: 0, isNan: true };
   }
 
-  let modifiedNum = baseNum;
+  // Custom Override: If a unit has NO inherent ward (baseNum is 0) and we apply a ward modifier (like Ward 6+ or +1 Ward),
+  // we treat their base ward as 7. Subtracting totalMod from 7 allows them to gain a valid ward (e.g. 7 - 1 = 6+ ward).
+  let actualBaseNum = baseNum;
+  if (statKey === 'ward' && baseNum === 0 && totalMod > 0) {
+    actualBaseNum = 7;
+  }
+
+  let modifiedNum = actualBaseNum;
   const isTargetRoll = ['save', 'ward', 'hit', 'wound'].includes(statKey);
   
   if (isTargetRoll) {
     // Target rolls (Save 4+, Ward 6+). Positive modifier lowers required roll (makes it easier).
-    modifiedNum = baseNum - totalMod;
+    modifiedNum = actualBaseNum - totalMod;
     if (modifiedNum < 2) modifiedNum = 2; // Roll of 1 is always failure in AoS
   } else {
     // Standard scaling stats (Attacks, Move, Damage). Positive modifier increases the stat.
-    modifiedNum = baseNum + totalMod;
+    modifiedNum = actualBaseNum + totalMod;
     if (modifiedNum < 1) modifiedNum = 1; // Cap at minimum of 1
   }
 
-  return { baseNum, modifiedNum, isNan: false };
+  return { baseNum: baseNum, modifiedNum, isNan: false };
 }
 
 // Determines if an ability effect targets a singular friendly unit
