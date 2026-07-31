@@ -56,6 +56,7 @@ describe('AoS Companion Rules Engine', () => {
     const mockFaction: Faction = {
       id: 'sylvaneth',
       name: 'Sylvaneth',
+      spearheadName: 'Sylvaneth Spearhead',
       battleTraits: [],
       regimentAbilities: [],
       enhancements: [],
@@ -63,19 +64,21 @@ describe('AoS Companion Rules Engine', () => {
         {
           id: 'treelord',
           name: 'Treelord',
-          role: 'Hero',
+          isHero: true,
           health: 14,
           save: 3,
           control: 5,
+          move: 5,
           models: 1,
+          ward: 0,
           weapons: [
             {
               name: 'Massive Impaling Talons',
               range: 'Melee',
               attacks: '2',
-              hit: '3',
-              wound: '3',
-              rend: '2',
+              hit: 3,
+              wound: 3,
+              rend: 2,
               damage: '3'
             }
           ],
@@ -84,7 +87,7 @@ describe('AoS Companion Rules Engine', () => {
               id: 'battleDamaged',
               name: 'Battle Damaged',
               phase: 'passive',
-              declare: 'Always active',
+              once: 'none',
               effect: 'While this unit has 10 or more damage points, the Attacks characteristic of its Massive Impaling Talons is 1.'
             }
           ]
@@ -95,7 +98,13 @@ describe('AoS Companion Rules Engine', () => {
     test('Unit healthy (0 current wounds): battle damaged override should be null', () => {
       const mockGameState: GameState = {
         round: 1,
+        activeTurn: 'me',
         currentPhase: 'hero',
+        factionId: 'sylvaneth',
+        selectedBattleTraitId: 'all',
+        selectedRegimentAbilityId: '',
+        selectedEnhancementId: '',
+        victoryPoints: 0,
         logs: [],
         usedAbilities: {},
         units: [
@@ -103,7 +112,13 @@ describe('AoS Companion Rules Engine', () => {
             id: 'treelord_1',
             unitId: 'treelord',
             currentWounds: 0,
-            isSlain: false
+            isSlain: false,
+            moved: false,
+            ran: false,
+            retreated: false,
+            shot: false,
+            charged: false,
+            fought: false
           }
         ]
       };
@@ -121,7 +136,13 @@ describe('AoS Companion Rules Engine', () => {
     test('Unit heavily damaged (11 wounds >= 10 threshold): attacks of Massive Impaling Talons should degrade to 1', () => {
       const mockGameState: GameState = {
         round: 1,
+        activeTurn: 'me',
         currentPhase: 'combat',
+        factionId: 'sylvaneth',
+        selectedBattleTraitId: 'all',
+        selectedRegimentAbilityId: '',
+        selectedEnhancementId: '',
+        victoryPoints: 0,
         logs: [],
         usedAbilities: {},
         units: [
@@ -129,7 +150,13 @@ describe('AoS Companion Rules Engine', () => {
             id: 'treelord_1',
             unitId: 'treelord',
             currentWounds: 11,
-            isSlain: false
+            isSlain: false,
+            moved: false,
+            ran: false,
+            retreated: false,
+            shot: false,
+            charged: false,
+            fought: false
           }
         ]
       };
@@ -147,7 +174,13 @@ describe('AoS Companion Rules Engine', () => {
     test('Unit damaged but other weapon requested: should return null (prevent accidental cross-contamination of other weapons)', () => {
       const mockGameState: GameState = {
         round: 1,
+        activeTurn: 'me',
         currentPhase: 'combat',
+        factionId: 'sylvaneth',
+        selectedBattleTraitId: 'all',
+        selectedRegimentAbilityId: '',
+        selectedEnhancementId: '',
+        victoryPoints: 0,
         logs: [],
         usedAbilities: {},
         units: [
@@ -155,7 +188,13 @@ describe('AoS Companion Rules Engine', () => {
             id: 'treelord_1',
             unitId: 'treelord',
             currentWounds: 11,
-            isSlain: false
+            isSlain: false,
+            moved: false,
+            ran: false,
+            retreated: false,
+            shot: false,
+            charged: false,
+            fought: false
           }
         ]
       };

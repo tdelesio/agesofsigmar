@@ -12024,7 +12024,8 @@
         "effect": "Ignore negative modifiers to save rolls for shooting attacks that target your general.",
         "phase": "passive",
         "timing": "Passive",
-        "once": "none"
+        "once": "none",
+        "isDefense": true
       },
       {
         "id": "spiritGale",

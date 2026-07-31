@@ -95,6 +95,92 @@ export default function TestPage() {
     return factions.find(f => f.id === factionId);
   }, [factionId, factions]);
 
+  const updateAbilityInFaction = (targetFactionId: string, abilityId: string, updates: Partial<Ability>) => {
+    const savedStr = localStorage.getItem('custom_factions');
+    let customFactions: Faction[] = [];
+    if (savedStr) {
+      try {
+        customFactions = JSON.parse(savedStr);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    let custFaction = customFactions.find(f => f.id === targetFactionId);
+    if (!custFaction) {
+      const defFaction = DEFAULT_FACTIONS.find(f => f.id === targetFactionId);
+      if (defFaction) {
+        custFaction = JSON.parse(JSON.stringify(defFaction));
+        customFactions.push(custFaction!);
+      }
+    }
+
+    if (!custFaction) return;
+
+    const applyUpdates = (abilities: Ability[]) => {
+      const idx = abilities.findIndex(a => a.id === abilityId);
+      if (idx !== -1) {
+        abilities[idx] = { ...abilities[idx], ...updates };
+        return true;
+      }
+      return false;
+    };
+
+    let updated = false;
+
+    if (applyUpdates(custFaction.battleTraits)) updated = true;
+    if (!updated && applyUpdates(custFaction.regimentAbilities)) updated = true;
+    if (!updated && applyUpdates(custFaction.enhancements)) updated = true;
+    if (!updated) {
+      for (const unit of custFaction.units) {
+        if (applyUpdates(unit.abilities)) {
+          updated = true;
+          break;
+        }
+      }
+    }
+
+    if (updated) {
+      localStorage.setItem('custom_factions', JSON.stringify(customFactions));
+      const merged = mergeFactions(DEFAULT_FACTIONS, customFactions);
+      setFactions(merged);
+      
+      showToast(`Updated "${abilityId}" successfully!`, 'success');
+
+      setAssertions(prev => 
+        prev.map(ast => {
+          if (ast.ability.id === abilityId) {
+            const updatedAbility = { ...ast.ability, ...updates };
+            let status = ast.status;
+            let actual = ast.actual;
+            let message = ast.message;
+            
+            if (ast.category === 'Schema Diagnostics' && ast.message.includes('isDefense')) {
+              actual = `isDefense: ${updatedAbility.isDefense ? 'true' : 'false'}`;
+              status = updatedAbility.isDefense ? 'pass' : 'fail';
+            } else if (ast.category === 'Schema Diagnostics' && ast.message.includes('passiveAppliedPhase')) {
+              actual = `passiveAppliedPhase: ${updatedAbility.passiveAppliedPhase || 'undefined'}`;
+              status = updatedAbility.passiveAppliedPhase ? 'pass' : 'fail';
+            } else if (ast.category === 'Schema Diagnostics' && ast.message.includes('Passive Audit:')) {
+              actual = `passiveAppliedPhase: ${updatedAbility.passiveAppliedPhase || 'undefined'}`;
+              status = 'pass';
+              message = `Passive Audit: ${updatedAbility.name} is active in ${updatedAbility.passiveAppliedPhase ? `'${updatedAbility.passiveAppliedPhase}' phase` : 'ALL phases (Always Active)'}.`;
+            }
+
+            return {
+              ...ast,
+              status,
+              actual,
+              message,
+              ability: updatedAbility
+            };
+          }
+          return ast;
+        })
+      );
+    }
+  };
+
   // --- PROGRAMMATIC Headless UAT Audit Engine ---
   const handleRunUATAudit = async () => {
     if (!selectedFaction) {
@@ -215,6 +301,22 @@ export default function TestPage() {
             ability
           );
         }
+      }
+
+      // Check 1.5: Passive Audit Scan (so they can all be flagged in one shot)
+      if (ability.phase === 'passive') {
+        const hasPhase = !!ability.passiveAppliedPhase;
+        addAssertion(
+          hasPhase ? 'pass' : 'fail',
+          'Schema Diagnostics',
+          'Passive Audit Scan',
+          abilityName,
+          sourceName,
+          `Passive Audit: ${abilityName} is active in ${ability.passiveAppliedPhase ? `'${ability.passiveAppliedPhase}' phase` : 'ALL phases (Always Active)'}.`,
+          'passiveAppliedPhase: [SpecificPhase] | "Always Active"',
+          `passiveAppliedPhase: ${ability.passiveAppliedPhase || 'undefined'}`,
+          ability
+        );
       }
 
       // Check 1.3: "Once per Battle" text constraint mismatch
@@ -739,7 +841,44 @@ export default function TestPage() {
                             </p>
                           </div>
 
-                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto shrink-0">
+                          <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 w-full md:w-auto shrink-0">
+                            {/* Quick Modify Controls */}
+                            <div className="flex flex-col gap-1.5 bg-[#171d2b] border border-[#2b3547]/50 rounded-xl p-2.5 text-left min-w-[200px] shadow-inner">
+                              <span className="text-[8px] text-amber-500 font-extrabold uppercase tracking-wider">Quick Modify Config</span>
+                              
+                              {/* Defensive Toggle */}
+                              <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <input 
+                                  type="checkbox" 
+                                  checked={!!ast.ability.isDefense} 
+                                  onChange={(e) => updateAbilityInFaction(factionId, ast.ability.id, { isDefense: e.target.checked })}
+                                  className="rounded border-[#2a3449] bg-[#0d1017] text-amber-500 focus:ring-amber-500/20 focus:ring-opacity-25 h-3.5 w-3.5 cursor-pointer accent-amber-500" 
+                                />
+                                <span className="text-[10px] font-bold text-gray-300">Is Defensive (Opponent Turn)</span>
+                              </label>
+
+                              {/* Applied Phase (only if passive or timing is passive) */}
+                              {ast.ability.phase === 'passive' && (
+                                <div className="flex flex-col gap-0.5 mt-0.5">
+                                  <span className="text-[7.5px] text-gray-400 font-bold uppercase">Applied Phase:</span>
+                                  <select
+                                    value={ast.ability.passiveAppliedPhase || ''}
+                                    onChange={(e) => updateAbilityInFaction(factionId, ast.ability.id, { passiveAppliedPhase: (e.target.value || undefined) as GamePhase })}
+                                    className="bg-[#0f121a] border border-[#2c3547] text-[9.5px] rounded px-1.5 py-0.5 text-white font-extrabold focus:border-amber-500 focus:outline-none"
+                                  >
+                                    <option value="">-- Always Active (All Phases) --</option>
+                                    <option value="start">Start of Turn</option>
+                                    <option value="hero">Hero Phase</option>
+                                    <option value="movement">Movement Phase</option>
+                                    <option value="shooting">Shooting Phase</option>
+                                    <option value="charge">Charge Phase</option>
+                                    <option value="combat">Combat Phase</option>
+                                    <option value="end">End of Turn</option>
+                                  </select>
+                                </div>
+                              )}
+                            </div>
+
                             {/* Verification criteria info blocks */}
                             <div className="bg-[#0f121a] border border-[#222834] rounded-lg p-2 text-[9px] font-mono flex flex-col justify-center text-left">
                               <span className="text-[8px] text-gray-500 uppercase tracking-widest font-sans font-extrabold">Expected Constraint:</span>
@@ -754,7 +893,7 @@ export default function TestPage() {
                                 href={getGithubIssueUrl(ast)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex justify-center items-center gap-1.5 h-9 bg-zinc-800 hover:bg-zinc-700 text-white font-black text-xxs px-4 rounded-xl transition-colors shadow-sm shrink-0"
+                                className="inline-flex justify-center items-center gap-1.5 h-9 bg-[#222834] hover:bg-[#2d3648] text-white font-black text-xxs px-4 rounded-xl transition-colors shadow-sm shrink-0 border border-[#2b3547]/40"
                               >
                                 <Github className="h-3.5 w-3.5" /> File Issue <ExternalLink className="h-2.5 w-2.5" />
                               </a>
