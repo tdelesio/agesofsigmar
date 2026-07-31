@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ReactNode, Suspense } from "react";
+import { Analytics } from "@vercel/analytics/react";
 
 
 const inter = Inter({ subsets: ["latin"] });
@@ -47,7 +48,7 @@ export default function RootLayout({
       <Suspense fallback={null}>
         {children}
       </Suspense>
-
+      <Analytics />
       </body>
     </html>
   );
