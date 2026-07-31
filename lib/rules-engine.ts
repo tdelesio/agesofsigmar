@@ -1,5 +1,98 @@
 import { GameState, Faction, Ability } from '@/app/types';
 
+// Helper to evaluate dynamic, text-based conditional modifiers for an ability (covers general-restrictions and charge-restrictions)
+export function evaluateDynamicModifiersForAbility(
+  ability: any,
+  uState: any,
+  uRules: any,
+  stat: string,
+  weaponName?: string
+): { modifier: number; description: string }[] {
+  const mods: { modifier: number; description: string }[] = [];
+  if (!ability || !ability.effect) return mods;
+
+  const effectLower = (ability.effect || '').toLowerCase();
+
+  // 1. Check for general restriction (Age of Sigmar general is designated by the 'isHero' unit flag in Spearhead)
+  const isGeneralAbility = effectLower.includes("your general's") || effectLower.includes("your general");
+  if (isGeneralAbility) {
+    if (!uRules || !uRules.isHero) {
+      return []; // Not the general, so this ability doesn't apply to this unit
+    }
+  }
+
+  // 2. Check if it's a charge-conditional rule
+  const hasChargeCondition = effectLower.includes('charged in the same turn') || effectLower.includes('has charged') || effectLower.includes('charged this phase');
+  
+  if (hasChargeCondition) {
+    const isNotChargedCondition = effectLower.includes('has not charged') || effectLower.includes('not charged');
+    let conditionMet = false;
+    if (isNotChargedCondition) {
+      conditionMet = !uState.charged;
+    } else {
+      conditionMet = !!uState.charged;
+    }
+
+    if (!conditionMet) return [];
+  }
+
+  // 3. Now check if it modifies this stat
+  if (stat === 'rend') {
+    if (effectLower.includes('add 1 to the rend characteristic') || effectLower.includes('add 1 to rend') || effectLower.includes('add 1 to the rend')) {
+      let weaponMatch = true;
+      if (weaponName) {
+        const isMeleeWeaponTerm = effectLower.includes('melee weapons');
+        const isSpecificWeaponMentioned = effectLower.includes(weaponName.toLowerCase());
+        weaponMatch = isMeleeWeaponTerm || isSpecificWeaponMentioned || isGeneralAbility;
+      }
+      if (weaponMatch) {
+        mods.push({
+          modifier: 1,
+          description: `${ability.name} (${hasChargeCondition ? 'Charged' : 'Passive'})`
+        });
+      }
+    }
+  } else if (stat === 'attacks') {
+    if (effectLower.includes('add 1 to the attacks characteristic') || effectLower.includes('add 1 to attacks') || effectLower.includes('add 1 to the attacks')) {
+      let weaponMatch = true;
+      if (weaponName) {
+        const isMeleeWeaponTerm = effectLower.includes('melee weapons');
+        const isSpecificWeaponMentioned = effectLower.includes(weaponName.toLowerCase());
+        weaponMatch = isMeleeWeaponTerm || isSpecificWeaponMentioned || isGeneralAbility;
+      }
+      if (weaponMatch) {
+        mods.push({
+          modifier: 1,
+          description: `${ability.name} (${hasChargeCondition ? 'Charged' : 'Passive'})`
+        });
+      }
+    }
+  } else if (stat === 'wound') {
+    if (effectLower.includes('add 1 to wound rolls') || effectLower.includes('add 1 to the wound rolls')) {
+      mods.push({
+        modifier: 1,
+        description: `${ability.name} (${hasChargeCondition ? 'Charged' : 'Passive'})`
+      });
+    }
+  } else if (stat === 'hit') {
+    if (effectLower.includes('add 1 to hit rolls') || effectLower.includes('add 1 to the hit rolls')) {
+      mods.push({
+        modifier: 1,
+        description: `${ability.name} (${hasChargeCondition ? 'Charged' : 'Passive'})`
+      });
+    }
+  } else if (stat === 'save') {
+    if (effectLower.includes('add 1 to save rolls') || effectLower.includes('add 1 to the save rolls')) {
+      mods.push({
+        modifier: 1,
+        description: `${ability.name} (${hasChargeCondition ? 'Charged' : 'Passive'})`
+      });
+    }
+  }
+
+  return mods;
+}
+
 // Helper to parse charge-conditional passive abilities and return dynamic modifiers
 export function getDynamicChargeModifiers(
   uState: any,
@@ -11,77 +104,8 @@ export function getDynamicChargeModifiers(
   if (!uState || !uRules || !uRules.abilities) return mods;
 
   uRules.abilities.forEach((ability: any) => {
-    const effectLower = (ability.effect || '').toLowerCase();
-    
-    // Check if it's a charge-conditional rule
-    const hasChargeCondition = effectLower.includes('charged in the same turn') || effectLower.includes('has charged');
-    if (!hasChargeCondition) return;
-
-    const isNotChargedCondition = effectLower.includes('has not charged') || effectLower.includes('not charged');
-    
-    // Evaluate condition
-    let conditionMet = false;
-    if (isNotChargedCondition) {
-      conditionMet = !uState.charged;
-    } else {
-      conditionMet = !!uState.charged;
-    }
-
-    if (!conditionMet) return;
-
-    // Now check if it modifies this stat
-    if (stat === 'rend') {
-      if (effectLower.includes('add 1 to the rend characteristic') || effectLower.includes('add 1 to rend') || effectLower.includes('add 1 to the rend')) {
-        let weaponMatch = true;
-        if (weaponName) {
-          const isMeleeWeaponTerm = effectLower.includes('melee weapons');
-          const isSpecificWeaponMentioned = effectLower.includes(weaponName.toLowerCase());
-          weaponMatch = isMeleeWeaponTerm || isSpecificWeaponMentioned;
-        }
-        if (weaponMatch) {
-          mods.push({
-            modifier: 1,
-            description: `${ability.name} (${isNotChargedCondition ? 'Not Charged' : 'Charged'})`
-          });
-        }
-      }
-    } else if (stat === 'attacks') {
-      if (effectLower.includes('add 1 to the attacks characteristic') || effectLower.includes('add 1 to attacks') || effectLower.includes('add 1 to the attacks')) {
-        let weaponMatch = true;
-        if (weaponName) {
-          const isMeleeWeaponTerm = effectLower.includes('melee weapons');
-          const isSpecificWeaponMentioned = effectLower.includes(weaponName.toLowerCase());
-          weaponMatch = isMeleeWeaponTerm || isSpecificWeaponMentioned;
-        }
-        if (weaponMatch) {
-          mods.push({
-            modifier: 1,
-            description: `${ability.name} (${isNotChargedCondition ? 'Not Charged' : 'Charged'})`
-          });
-        }
-      }
-    } else if (stat === 'wound') {
-      if (effectLower.includes('add 1 to wound rolls') || effectLower.includes('add 1 to the wound rolls')) {
-        mods.push({
-          modifier: 1,
-          description: `${ability.name} (Charged)`
-        });
-      }
-    } else if (stat === 'hit') {
-      if (effectLower.includes('add 1 to hit rolls') || effectLower.includes('add 1 to the hit rolls')) {
-        mods.push({
-          modifier: 1,
-          description: `${ability.name} (Charged)`
-        });
-      }
-    } else if (stat === 'save') {
-      if (effectLower.includes('add 1 to save rolls') || effectLower.includes('add 1 to the save rolls')) {
-        mods.push({
-          modifier: 1,
-          description: `${ability.name} (${isNotChargedCondition ? 'Not Charged' : 'Charged'})`
-        });
-      }
-    }
+    const dMods = evaluateDynamicModifiersForAbility(ability, uState, uRules, stat, weaponName);
+    mods.push(...dMods);
   });
 
   return mods;
@@ -97,6 +121,9 @@ export function getActiveModifiers(
 ): { modifier: number; description: string }[] {
   if (!gameState || !faction) return [];
   const modifiers: { modifier: number; description: string }[] = [];
+
+  const uState = unitId ? gameState.units.find(u => u.id === unitId) : null;
+  const uRules = (uState && faction.units) ? faction.units.find(r => r.id === uState.unitId) : null;
 
   const processAbility = (ability: Ability) => {
     if (ability.ruleDefinition) {
@@ -126,6 +153,12 @@ export function getActiveModifiers(
           }
         }
       });
+    }
+
+    // Process dynamic condition-based and text-based modifiers for this ability if unit state is active!
+    if (uState && uRules) {
+      const dynMods = evaluateDynamicModifiersForAbility(ability, uState, uRules, stat, weaponName);
+      modifiers.push(...dynMods);
     }
   };
 

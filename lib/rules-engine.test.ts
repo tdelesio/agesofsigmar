@@ -412,6 +412,7 @@ describe('AoS Companion Rules Engine', () => {
       const mockFaction: Faction = {
         id: 'slaves-to-darkness-bloodwind-legion',
         name: 'Slaves to Darkness',
+        spearheadName: 'Bloodwind Legion',
         battleTraits: [],
         regimentAbilities: [],
         enhancements: [],
@@ -434,7 +435,13 @@ describe('AoS Companion Rules Engine', () => {
             id: 'chaos_lord_1',
             unitId: 'chaos-lord',
             currentWounds: 0,
-            isSlain: false
+            isSlain: false,
+            moved: false,
+            ran: false,
+            retreated: false,
+            shot: false,
+            charged: false,
+            fought: false
           }
         ],
         appliedModifiers: [
@@ -452,6 +459,158 @@ describe('AoS Companion Rules Engine', () => {
       const mods = getActiveModifiers(mockGameState, mockFaction, 'wound', 'chaos_lord_1');
       // Blessing of Nurgle should be excluded from offensive weapon wound modifier list because it is defensive!
       expect(mods.length).toBe(0);
+    });
+
+    test('Mark of Khorne: should apply +1 Rend to General (isHero) when they charged, but NOT when they did not charge, and NOT to other units', () => {
+      const mockFaction: Faction = {
+        id: 'slaves-to-darkness-bloodwind-legion',
+        name: 'Slaves to Darkness',
+        spearheadName: 'Bloodwind Legion',
+        battleTraits: [],
+        regimentAbilities: [],
+        enhancements: [
+          {
+            id: 'markOfKhorne',
+            name: 'Mark of Khorne',
+            effect: 'Add 1 to the Rend characteristic of your general\'s melee weapons if they charged in the same turn.',
+            phase: 'passive',
+            timing: 'Passive',
+            once: 'none'
+          }
+        ],
+        units: [
+          {
+            id: 'chaos-lord',
+            name: 'Chaos Lord',
+            isHero: true,
+            health: 6,
+            save: 3,
+            control: 2,
+            move: 5,
+            models: 1,
+            ward: 0,
+            weapons: [
+              {
+                name: 'Reaperblade',
+                range: 'Melee',
+                attacks: '5',
+                hit: 3,
+                wound: 3,
+                rend: 1,
+                damage: '2'
+              }
+            ],
+            abilities: []
+          },
+          {
+            id: 'chaos-knights',
+            name: 'Chaos Knights',
+            isHero: false,
+            health: 3,
+            save: 3,
+            control: 1,
+            move: 10,
+            models: 5,
+            ward: 0,
+            weapons: [
+              {
+                name: 'Cursed Lances',
+                range: 'Melee',
+                attacks: '2',
+                hit: 3,
+                wound: 3,
+                rend: 1,
+                damage: '2'
+              }
+            ],
+            abilities: []
+          }
+        ]
+      };
+
+      // Case 1: General (Chaos Lord) charged
+      const stateGenCharged: GameState = {
+        round: 1,
+        activeTurn: 'me',
+        currentPhase: 'combat',
+        factionId: 'slaves-to-darkness-bloodwind-legion',
+        selectedBattleTraitId: '',
+        selectedRegimentAbilityId: '',
+        selectedEnhancementId: 'markOfKhorne',
+        victoryPoints: 0,
+        logs: [],
+        usedAbilities: {},
+        units: [
+          {
+            id: 'chaos_lord_1',
+            unitId: 'chaos-lord',
+            currentWounds: 0,
+            isSlain: false,
+            moved: false,
+            ran: false,
+            retreated: false,
+            shot: false,
+            charged: true,
+            fought: false
+          }
+        ]
+      };
+
+      const modsGenCharged = getActiveModifiers(stateGenCharged, mockFaction, 'rend', 'chaos_lord_1', 'Reaperblade');
+      expect(modsGenCharged.length).toBe(1);
+      expect(modsGenCharged[0].modifier).toBe(1);
+      expect(modsGenCharged[0].description).toBe('Mark of Khorne (Charged)');
+
+      // Case 2: General (Chaos Lord) did not charge
+      const stateGenNotCharged: GameState = {
+        ...stateGenCharged,
+        units: [
+          {
+            id: 'chaos_lord_1',
+            unitId: 'chaos-lord',
+            currentWounds: 0,
+            isSlain: false,
+            moved: false,
+            ran: false,
+            retreated: false,
+            shot: false,
+            charged: false,
+            fought: false
+          }
+        ]
+      };
+      const modsGenNotCharged = getActiveModifiers(stateGenNotCharged, mockFaction, 'rend', 'chaos_lord_1', 'Reaperblade');
+      expect(modsGenNotCharged.length).toBe(0);
+
+      // Case 3: Non-General (Chaos Knights) charged
+      const stateKnightsCharged: GameState = {
+        round: 1,
+        activeTurn: 'me',
+        currentPhase: 'combat',
+        factionId: 'slaves-to-darkness-bloodwind-legion',
+        selectedBattleTraitId: '',
+        selectedRegimentAbilityId: '',
+        selectedEnhancementId: 'markOfKhorne',
+        victoryPoints: 0,
+        logs: [],
+        usedAbilities: {},
+        units: [
+          {
+            id: 'chaos_knights_1',
+            unitId: 'chaos-knights',
+            currentWounds: 0,
+            isSlain: false,
+            moved: false,
+            ran: false,
+            retreated: false,
+            shot: false,
+            charged: true,
+            fought: false
+          }
+        ]
+      };
+      const modsKnightsCharged = getActiveModifiers(stateKnightsCharged, mockFaction, 'rend', 'chaos_knights_1', 'Cursed Lances');
+      expect(modsKnightsCharged.length).toBe(0); // Only applies to general!
     });
   });
 
