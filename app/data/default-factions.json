@@ -6437,7 +6437,8 @@
           }
         ]
       }
-    ]
+    ],
+    "isTested": true
   },
   {
     "id": "maggotkin-of-nurgle-bleak-host",
@@ -11225,7 +11226,8 @@
         "effect": "Add 3 to the control scores of friendly Chaos Warriors units.",
         "phase": "passive",
         "timing": "Passive",
-        "once": "none"
+        "once": "none",
+        "passiveAppliedPhase": "end"
       }
     ],
     "enhancements": [
@@ -11251,7 +11253,8 @@
         "effect": "Subtract 1 from wound rolls for combat attacks that target your general.",
         "phase": "passive",
         "timing": "Passive",
-        "once": "none"
+        "once": "none",
+        "isDefense": true
       },
       {
         "id": "markOfSlaanesh",
@@ -11259,7 +11262,8 @@
         "effect": "Your general has Strike-first.",
         "phase": "passive",
         "timing": "Passive",
-        "once": "none"
+        "once": "none",
+        "passiveAppliedPhase": "combat"
       }
     ],
     "units": [
@@ -11383,7 +11387,8 @@
             "effect": "Add 1 to wound rolls for combat attacks made by this unit that target an enemy unit that is contesting an objective you do not control.",
             "phase": "passive",
             "timing": "Passive",
-            "once": "none"
+            "once": "none",
+            "passiveAppliedPhase": "combat"
           }
         ]
       },
@@ -11458,7 +11463,8 @@
             "effect": "Add 1 to the Rend characteristic of this unit's Cursed Lances if it charged in the same turn.",
             "phase": "passive",
             "timing": "Passive",
-            "once": "none"
+            "once": "none",
+            "passiveAppliedPhase": "combat"
           }
         ]
       }

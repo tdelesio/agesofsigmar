@@ -182,8 +182,11 @@ export function getActiveModifiers(
   if (unitId && gameState.appliedModifiers) {
     gameState.appliedModifiers.forEach(mod => {
       if (mod.unitId === unitId && mod.stat === stat) {
-        // Exclude Blessing of Nurgle from standard attacking modifiers because it is a defensive reaction
+        // Exclude Blessing of Nurgle and Shining Company from standard attacking modifiers because they are defensive
         if (stat === 'wound' && mod.label.includes('Nurgle')) {
+          return;
+        }
+        if (stat === 'hit' && mod.label.includes('Shining Company')) {
           return;
         }
         modifiers.push({
@@ -291,19 +294,21 @@ export function calculateStatValue(
 
   let modifiedNum = actualBaseNum;
   const isTargetRoll = ['save', 'ward', 'hit', 'wound'].includes(statKey);
+  const isCappedStat = ['save', 'ward', 'hit', 'wound', 'run', 'charge', 'rend', 'attacks', 'damage'].includes(statKey);
   
-  if (isTargetRoll) {
-    // According to AoS, net target roll modifications are capped at [-1, 1]
-    let cappedTotalMod = totalMod;
+  let cappedTotalMod = totalMod;
+  if (isCappedStat) {
     if (cappedTotalMod > 1) cappedTotalMod = 1;
     if (cappedTotalMod < -1) cappedTotalMod = -1;
+  }
 
+  if (isTargetRoll) {
     // Target rolls (Save 4+, Ward 6+). Positive modifier lowers required roll (makes it easier).
     modifiedNum = actualBaseNum - cappedTotalMod;
     if (modifiedNum < 2) modifiedNum = 2; // Roll of 1 is always failure in AoS
   } else {
     // Standard scaling stats (Attacks, Move, Damage). Positive modifier increases the stat.
-    modifiedNum = actualBaseNum + totalMod;
+    modifiedNum = actualBaseNum + (isCappedStat ? cappedTotalMod : totalMod);
     if (modifiedNum < 1) modifiedNum = 1; // Cap at minimum of 1
   }
 

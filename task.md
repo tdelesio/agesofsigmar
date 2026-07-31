@@ -1,13 +1,23 @@
-# Task List - Automated Programmatic UAT Test Suite (`/test`)
+# Task List - Slaves to Darkness & Combat UI Restructuring
 
-- [x] Create `/test` directory and page (`app/test/page.tsx`)
-  - [x] Initialize headless test runner state machines
-  - [x] Implement programmatic State Space Traversal (Rounds 1-4, Turns me/opponent, 7 Phases)
-  - [x] Implement schema and heuristic static scanning for rules attributes
-  - [x] Implement once-per-turn state unlock checks in simulated runner
-  - [x] Implement once-per-battle lock preservation checks in simulated runner
-  - [x] Implement opponent-turn defensive reaction presence assertions
-  - [x] Render beautiful premium dashboard displaying failures logs with filters
-- [x] Embed 1-click pre-filled GitHub Issue draft creation URL builder
-- [x] Add navigation links to `/test` in home and admin panels
-- [x] Run production verification & compilation checks
+- [x] Implement Rules Engine Updates (`lib/rules-engine.ts`)
+  - [x] Add generic `getDynamicChargeModifiers` parsing function
+  - [x] Support `"Ward 6+"` and `"Ward of Tzeentch"` custom overrides in `calculateStatValue`
+  - [x] Update `getActiveModifiers` signature to accept `weaponName`
+  - [x] Integrate `getDynamicChargeModifiers` into `getActiveModifiers`
+- [x] Implement Combat Phase Restructuring & Buff Summaries (`app/tracker/page.tsx`)
+  - [x] Restructure and modularize Combat Phase layouts into helper methods:
+    - [x] `renderCombatActiveStrategy()`
+    - [x] `renderCombatDefensiveResponses()`
+    - [x] `renderCombatUnitActivations()` with detailed active applied buffs summary panel
+    - [x] `renderCombatPassiveRules()`
+  - [x] Dynamically order sections based on turn:
+    - [x] **Player turn (`'me'`)**: Active Strategy ➔ Unit activations ➔ Defensive responses ➔ Passive rules
+    - [x] **Opponent turn (`'opponent'`)**: Defensive responses ➔ Unit activations ➔ Active Strategy ➔ Passive rules
+  - [x] Hide default bottom rendering blocks (`ACTIVE/REACTIVE ABILITIES` and `🧬 PHASE-APPLIED PASSIVE ABILITIES`) during Combat Phase
+- [x] Slaves to Darkness & Eye of the Gods Integration
+  - [x] Handle `ward` rendering when base is 0 but has active modifiers
+  - [x] Build the interactive custom `Eye of the Gods Ascension Table` modal in JSX
+- [x] Verification and Testing
+  - [x] Run automated Vitest suite to ensure no regressions
+  - [x] Check strict type-safety compilation with `npx tsc --noEmit`
