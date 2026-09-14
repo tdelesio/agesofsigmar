@@ -40,7 +40,7 @@ export default function TrackerPage() {
     isOpen: boolean;
     unitId: string;
     unitName: string;
-    allowedStats?: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage')[];
+    allowedStats?: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage' | 'charge')[];
     expiresPhase?: GamePhase;
   } | null>(null);
 
@@ -610,6 +610,11 @@ export default function TrackerPage() {
     if (currentPhaseIndex > 0) {
       const updated = { ...gameState };
       updated.currentPhase = phases[currentPhaseIndex - 1].id;
+      // Reset once-per-phase abilities (like Relentless Discipline) on phase changes
+      if (updated.usedAbilities) {
+        delete updated.usedAbilities['relentlessDiscipline'];
+        delete updated.usedAbilities['relentlessDiscipline-2'];
+      }
       saveGame(updated);
     }
   };
@@ -622,6 +627,12 @@ export default function TrackerPage() {
     if (currentPhaseIndex < phases.length - 1) {
       // Step to next phase in current turn
       updated.currentPhase = phases[currentPhaseIndex + 1].id;
+      
+      // Reset once-per-phase abilities (like Relentless Discipline) on phase changes
+      if (updated.usedAbilities) {
+        delete updated.usedAbilities['relentlessDiscipline'];
+        delete updated.usedAbilities['relentlessDiscipline-2'];
+      }
       
       // Auto-expire modifiers that expire in the phase we are leaving
       if (updated.appliedModifiers) {
@@ -1309,6 +1320,34 @@ export default function TrackerPage() {
                     </CardHeader>
                     <CardContent className="p-4 pt-1">
                       <p className="text-xxs text-gray-400 leading-normal whitespace-pre-line font-medium">{ability.effect}</p>
+                      
+                      {['relentlessDiscipline', 'relentlessDiscipline-2'].includes(ability.id) && (
+                        <div className="mt-3 pt-2.5 border-t border-[#222834] space-y-2 text-[10px] text-gray-300">
+                          <div className="flex items-center gap-1.5 bg-amber-500/5 border border-amber-500/10 rounded-lg p-2">
+                            <span className="text-amber-400">🎲</span>
+                            <div>
+                              <p className="font-extrabold text-amber-400 uppercase tracking-wide text-[9px]">
+                                Discipline Roll Success: {gameState.selectedRegimentAbilityId === 'immaculateGeneralship' ? '3+' : '4+'}
+                              </p>
+                              {gameState.selectedRegimentAbilityId === 'immaculateGeneralship' && (
+                                <p className="text-[8px] text-gray-400 mt-0.5 font-medium">
+                                  (Reduced from 4+ via <strong className="text-amber-500">Immaculate Generalship</strong> +1 modifier)
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-start gap-1.5 bg-[#151923]/80 rounded-lg p-2 border border-[#222834]">
+                            <span className="text-sky-400 mt-0.5">ℹ️</span>
+                            <div>
+                              <p className="font-extrabold text-sky-400 uppercase tracking-wide text-[9px]">Heralds of Nagash Note</p>
+                              <p className="text-[8px] text-gray-400 mt-0.5 leading-relaxed font-medium">
+                                Add <strong className="text-sky-400">+1 to the discipline roll</strong> if the target unit is wholly within 12" of friendly <strong className="text-gray-300">Morghast Archai</strong> models.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                     {isUsed && (
                       <div className="absolute inset-0 bg-[#0d1015]/10 flex items-center justify-center">
@@ -2101,6 +2140,34 @@ export default function TrackerPage() {
                 </CardHeader>
                 <CardContent className="p-4 pt-1">
                   <p className="text-xxs text-gray-400 leading-normal whitespace-pre-line font-medium">{ability.effect}</p>
+                  
+                  {['relentlessDiscipline', 'relentlessDiscipline-2'].includes(ability.id) && (
+                    <div className="mt-3 pt-2.5 border-t border-[#222834] space-y-2 text-[10px] text-gray-300">
+                      <div className="flex items-center gap-1.5 bg-amber-500/5 border border-amber-500/10 rounded-lg p-2">
+                        <span className="text-amber-400">🎲</span>
+                        <div>
+                          <p className="font-extrabold text-amber-400 uppercase tracking-wide text-[9px]">
+                            Discipline Roll Success: {gameState.selectedRegimentAbilityId === 'immaculateGeneralship' ? '3+' : '4+'}
+                          </p>
+                          {gameState.selectedRegimentAbilityId === 'immaculateGeneralship' && (
+                            <p className="text-[8px] text-gray-400 mt-0.5 font-medium">
+                              (Reduced from 4+ via <strong className="text-amber-500">Immaculate Generalship</strong> +1 modifier)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start gap-1.5 bg-[#151923]/80 rounded-lg p-2 border border-[#222834]">
+                        <span className="text-sky-400 mt-0.5">ℹ️</span>
+                        <div>
+                          <p className="font-extrabold text-sky-400 uppercase tracking-wide text-[9px]">Heralds of Nagash Note</p>
+                          <p className="text-[8px] text-gray-400 mt-0.5 leading-relaxed font-medium">
+                            Add <strong className="text-sky-400">+1 to the discipline roll</strong> if the target unit is wholly within 12" of friendly <strong className="text-gray-300">Morghast Archai</strong> models.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
                 {isUsed && (
                   <div className="absolute inset-0 bg-[#0d1015]/10 flex items-center justify-center">
@@ -3650,6 +3717,22 @@ export default function TrackerPage() {
                       <span>Modify Damage</span>
                     </span>
                     <Badge className="bg-orange-500/15 text-orange-400 font-extrabold">+1 Damage</Badge>
+                  </Button>
+                )}
+
+                {(!buffModal.allowedStats || buffModal.allowedStats.includes('charge')) && (
+                  <Button
+                    onClick={() => {
+                      applyBuff(buffModal.unitId, 'charge', 1, '+1 Charge', buffModal.expiresPhase);
+                      setBuffModal(null);
+                    }}
+                    className="bg-[#1c2230] hover:bg-[#252c3d] border border-[#2c3548] text-white hover:text-emerald-400 text-xs font-bold py-2.5 rounded-xl transition-all flex items-center justify-between px-4"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-base">⚡</span>
+                      <span>Modify Charge Rolls</span>
+                    </span>
+                    <Badge className="bg-emerald-500/15 text-emerald-400 font-extrabold">+1 Charge</Badge>
                   </Button>
                 )}
               </div>
