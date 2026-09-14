@@ -1214,14 +1214,14 @@ export default function TrackerPage() {
       }));
     });
 
-    if (abilities.length === 0 && unitAbilities.length === 0) return null;
+    const hasAbilities = abilities.length > 0 || unitAbilities.length > 0;
 
     return (
       <Card className="border-[#222834] bg-[#151923] text-white">
         <CardHeader className="border-b border-[#222834] py-3.5">
           <div className="flex justify-between items-center">
             <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-1.5 text-amber-400">
-              <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" /> 
+              <Sparkles className="h-4.5 w-4.5 text-amber-500 animate-pulse" /> 
               Abilities (Round {gameState.round})
             </CardTitle>
             <Badge variant="outline" className="uppercase text-[9px] border-amber-500/30 bg-amber-500/10 text-amber-400 font-bold px-2 py-0.5">
@@ -1233,92 +1233,96 @@ export default function TrackerPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Faction-Level Strategy Cards */}
-            {abilities.map(ability => {
-              const isUsed = !!gameState.usedAbilities[ability.id];
-              const style = getAbilityStyleClasses(ability.sourceType);
-              return (
-                <Card 
-                  key={ability.id} 
-                  onClick={() => toggleAbilityUsed(ability.id, ability.name, ability.effect, 'combat')}
-                  className={`cursor-pointer transition-all duration-300 relative overflow-hidden text-white border
-                    ${isUsed 
-                      ? 'bg-zinc-800/30 border-transparent saturate-0 opacity-40' 
-                      : `${style.bg} ${style.border} hover:scale-[1.01]`}`}
-                >
-                  <CardHeader className="p-4 pb-1">
-                    <div className="flex justify-between items-start gap-2">
-                      <div>
-                        <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded mb-1 border ${style.badgeBg}`}>
-                          {style.label}
-                        </Badge>
-                        <CardTitle className="text-xs font-bold text-white">{ability.name}</CardTitle>
-                      </div>
-                      {ability.once !== 'none' && (
-                        <Badge variant="secondary" className="bg-[#151923] text-amber-400 text-xxs uppercase shrink-0">
-                          {ability.once.replace('-', ' ')}
-                        </Badge>
-                      )}
-                    </div>
-                    {ability.timing && <CardDescription className="text-xxs text-amber-400/80 mt-0.5">{ability.timing}</CardDescription>}
-                  </CardHeader>
-                  <CardContent className="p-4 pt-1">
-                    <p className="text-xxs text-gray-400 leading-normal whitespace-pre-line">{ability.effect}</p>
-                  </CardContent>
-                  {isUsed && (
-                    <div className="absolute inset-0 bg-[#0d1015]/10 flex items-center justify-center">
-                      <span className="text-lg font-black text-gray-500 uppercase rotate-[-12deg] tracking-widest bg-zinc-900/60 px-3 py-1 rounded border border-gray-600">USED</span>
-                    </div>
-                  )}
-                </Card>
-              );
-            })}
-
-            {/* Unit-Specific Strategy Cards */}
-            {unitAbilities.map(ability => {
-              const isUsed = !!gameState.usedAbilities[ability.instanceKey];
-              const style = getAbilityStyleClasses(ability.sourceType);
-              return (
-                <Card 
-                  key={ability.instanceKey} 
-                  onClick={() => toggleAbilityUsed(ability.instanceKey, `${ability.unitName}: ${ability.name}`, ability.effect, 'combat')}
-                  className={`cursor-pointer transition-all duration-300 relative overflow-hidden text-white border
-                    ${isUsed 
-                      ? 'bg-zinc-800/30 border-transparent saturate-0 opacity-40' 
-                      : `${style.bg} ${style.border} hover:scale-[1.01]`}`}
-                >
-                  <CardHeader className="p-4 pb-1">
-                    <div className="flex justify-between items-start gap-2">
-                      <div>
-                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                          <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded border ${style.badgeBg}`}>
+          {hasAbilities && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Faction-Level Strategy Cards */}
+              {abilities.map(ability => {
+                const isUsed = !!gameState.usedAbilities[ability.id];
+                const style = getAbilityStyleClasses(ability.sourceType);
+                return (
+                  <Card 
+                    key={ability.id} 
+                    onClick={() => toggleAbilityUsed(ability.id, ability.name, ability.effect, 'combat')}
+                    className={`cursor-pointer transition-all duration-300 relative overflow-hidden text-white border
+                      ${isUsed 
+                        ? 'bg-zinc-800/30 border-transparent saturate-0 opacity-40' 
+                        : `${style.bg} ${style.border} hover:scale-[1.01]`}`}
+                  >
+                    <CardHeader className="p-4 pb-1">
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded mb-1 border ${style.badgeBg}`}>
                             {style.label}
                           </Badge>
-                          <span className="text-[9px] font-extrabold text-amber-500 uppercase tracking-wider">{ability.unitName}</span>
+                          <CardTitle className="text-xs font-bold text-white">{ability.name}</CardTitle>
                         </div>
-                        <CardTitle className="text-xs font-bold text-white mt-0.5">{ability.name}</CardTitle>
+                        {ability.once !== 'none' && (
+                          <Badge variant="secondary" className="bg-[#151923] text-amber-400 text-xxs uppercase shrink-0 font-bold">
+                            {ability.once.replace('-', ' ')}
+                          </Badge>
+                        )}
                       </div>
-                      {ability.once !== 'none' && (
-                        <Badge variant="secondary" className="bg-[#151923] text-amber-400 text-xxs uppercase shrink-0">
-                          {ability.once.replace('-', ' ')}
-                        </Badge>
-                      )}
-                    </div>
-                    {ability.timing && <CardDescription className="text-xxs text-amber-400/80 mt-0.5">{ability.timing}</CardDescription>}
-                  </CardHeader>
-                  <CardContent className="p-4 pt-1">
-                    <p className="text-xxs text-gray-400 leading-normal whitespace-pre-line">{ability.effect}</p>
-                  </CardContent>
-                  {isUsed && (
-                    <div className="absolute inset-0 bg-[#0d1015]/10 flex items-center justify-center">
-                      <span className="text-lg font-black text-gray-500 uppercase rotate-[-12deg] tracking-widest bg-zinc-900/60 px-3 py-1 rounded border border-gray-600">USED</span>
-                    </div>
-                  )}
-                </Card>
-              );
-            })}
-          </div>
+                      {ability.timing && <CardDescription className="text-xxs text-amber-400/80 mt-0.5 font-semibold">{ability.timing}</CardDescription>}
+                    </CardHeader>
+                    <CardContent className="p-4 pt-1">
+                      <p className="text-xxs text-gray-400 leading-normal whitespace-pre-line font-medium">{ability.effect}</p>
+                    </CardContent>
+                    {isUsed && (
+                      <div className="absolute inset-0 bg-[#0d1015]/10 flex items-center justify-center">
+                        <span className="text-lg font-black text-gray-500 uppercase rotate-[-12deg] tracking-widest bg-zinc-900/60 px-3 py-1 rounded border border-gray-600">USED</span>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+
+              {/* Unit-Specific Strategy Cards */}
+              {unitAbilities.map(ability => {
+                const isUsed = !!gameState.usedAbilities[ability.instanceKey];
+                const style = getAbilityStyleClasses(ability.sourceType);
+                return (
+                  <Card 
+                    key={ability.instanceKey} 
+                    onClick={() => toggleAbilityUsed(ability.instanceKey, `${ability.unitName}: ${ability.name}`, ability.effect, 'combat')}
+                    className={`cursor-pointer transition-all duration-300 relative overflow-hidden text-white border
+                      ${isUsed 
+                        ? 'bg-zinc-800/30 border-transparent saturate-0 opacity-40' 
+                        : `${style.bg} ${style.border} hover:scale-[1.01]`}`}
+                  >
+                    <CardHeader className="p-4 pb-1">
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                            <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded border ${style.badgeBg}`}>
+                              {style.label}
+                            </Badge>
+                            <span className="text-[9px] font-extrabold text-amber-500 uppercase tracking-wider">{ability.unitName}</span>
+                          </div>
+                          <CardTitle className="text-xs font-bold text-white mt-0.5">{ability.name}</CardTitle>
+                        </div>
+                        {ability.once !== 'none' && (
+                          <Badge variant="secondary" className="bg-[#151923] text-amber-400 text-xxs uppercase shrink-0 font-bold">
+                            {ability.once.replace('-', ' ')}
+                          </Badge>
+                        )}
+                      </div>
+                      {ability.timing && <CardDescription className="text-xxs text-amber-400/80 mt-0.5 font-semibold">{ability.timing}</CardDescription>}
+                    </CardHeader>
+                    <CardContent className="p-4 pt-1">
+                      <p className="text-xxs text-gray-400 leading-normal whitespace-pre-line font-medium">{ability.effect}</p>
+                    </CardContent>
+                    {isUsed && (
+                      <div className="absolute inset-0 bg-[#0d1015]/10 flex items-center justify-center">
+                        <span className="text-lg font-black text-gray-500 uppercase rotate-[-12deg] tracking-widest bg-zinc-900/60 px-3 py-1 rounded border border-gray-600">USED</span>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+          
+          {renderGlobalCoreAbilities('combat')}
         </CardContent>
       </Card>
     );
@@ -1899,6 +1903,94 @@ export default function TrackerPage() {
       </Card>
     );
   };
+
+  const renderGlobalCoreAbilities = (phase: string) => {
+    // Only display global abilities in Movement, Shooting, Charge, and Combat phases
+    if (!['movement', 'shooting', 'charge', 'combat'].includes(phase)) return null;
+
+    // Define core global abilities
+    const globalAbilitiesMap: Record<string, { name: string; type: string; effect: string; ruleRef?: string }[]> = {
+      movement: [
+        { 
+          name: 'Normal Move', 
+          type: 'CORE MOVEMENT', 
+          effect: 'Pick 1 friendly unit that has not yet moved this phase. The unit can move a distance up to its Move characteristic.',
+          ruleRef: 'Rule 12.0'
+        },
+        { 
+          name: 'Run', 
+          type: 'CORE MOVEMENT', 
+          effect: 'Pick 1 friendly unit that has not yet moved this phase. Add D6" to its Move characteristic for the phase. It cannot shoot or charge later this turn.',
+          ruleRef: 'Rule 13.0'
+        },
+        { 
+          name: 'Retreat', 
+          type: 'CORE MOVEMENT', 
+          effect: 'Pick 1 friendly unit that is within 3" of an enemy unit. The unit can move a distance up to its Move characteristic, but must end the move more than 3" from all enemy units. It cannot shoot or charge later this turn.',
+          ruleRef: 'Rule 14.0'
+        }
+      ],
+      shooting: [
+        { 
+          name: 'Shoot', 
+          type: 'CORE SHOOT', 
+          effect: 'Pick 1 friendly unit that is not within 3" of an enemy unit, and did not Run or Retreat this turn. It can target enemy units within range using its missile (ranged) weapons.',
+          ruleRef: 'Rule 16.0'
+        }
+      ],
+      charge: [
+        { 
+          name: 'Charge', 
+          type: 'CORE CHARGE', 
+          effect: 'Pick 1 friendly unit that is within 12" of an enemy unit and did not Run or Retreat. Roll 2D6. If the charge roll is high enough to move the unit within combat range (1/2") of an enemy unit, the charge is successful and the unit makes a charge move.',
+          ruleRef: 'Rule 17.0'
+        }
+      ],
+      combat: [
+        { 
+          name: 'Fight', 
+          type: 'CORE COMBAT', 
+          effect: 'Pick 1 friendly unit that is within 3" of an enemy unit or has made a charge move this turn. Pile in up to 3" towards the closest enemy model, then resolve melee attacks with its melee weapons.',
+          ruleRef: 'Rule 19.0'
+        }
+      ]
+    };
+
+    const list = globalAbilitiesMap[phase];
+    if (!list || list.length === 0) return null;
+
+    return (
+      <div className="space-y-3 mt-4 pt-4 border-t border-[#222834]/40 text-left">
+        <div className="flex justify-between items-center pb-1">
+          <h4 className="text-xxs font-black text-sky-400 uppercase tracking-widest flex items-center gap-1.5">
+            <span>🌍</span> Global Core Abilities ({phase.toUpperCase()} PHASE):
+          </h4>
+          <Badge className="bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[8px] font-black uppercase tracking-wider">
+            FREE FOR ALL UNITS
+          </Badge>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          {list.map((ab, idx) => (
+            <Card key={idx} className="bg-[#151923]/45 border border-[#2c3548]/30 hover:border-sky-500/30 transition-all p-3.5 space-y-1.5 shadow-sm relative overflow-hidden">
+              <div className="flex justify-between items-start gap-1">
+                <div>
+                  <span className="text-[8px] font-extrabold text-sky-400 uppercase tracking-widest block">{ab.type}</span>
+                  <h5 className="text-xs font-black text-white mt-0.5">{ab.name}</h5>
+                </div>
+                {ab.ruleRef && (
+                  <Badge variant="outline" className="text-gray-500 border-gray-800 text-[8px] font-semibold py-0">
+                    {ab.ruleRef}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-[10px] text-gray-300 leading-normal font-medium">{ab.effect}</p>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const renderNonCombatActiveStrategy = () => {
     if (gameState.currentPhase === 'combat') return null;
 
@@ -1914,7 +2006,10 @@ export default function TrackerPage() {
       return getUnitAbilitiesForPhase(uRules, gameState.currentPhase).map(ab => ({ ...ab, unitId: u.id, unitName: uRules.name }));
     });
 
-    if (factionAbilities.length === 0 && unitAbilities.length === 0) return null;
+    const hasAbilities = factionAbilities.length > 0 || unitAbilities.length > 0;
+    const hasGlobal = ['movement', 'shooting', 'charge'].includes(gameState.currentPhase);
+
+    if (!hasAbilities && !hasGlobal) return null;
 
     return (
       <div className="space-y-4 bg-[#11141c]/40 border border-[#222834]/50 p-4 rounded-2xl">
@@ -1930,7 +2025,8 @@ export default function TrackerPage() {
           </Badge>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {hasAbilities && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Faction-Level Strategy Cards */}
           {factionAbilities.map(ability => {
             const isUsed = !!gameState.usedAbilities[ability.id];
@@ -2017,6 +2113,9 @@ export default function TrackerPage() {
             );
           })}
         </div>
+        )}
+
+        {renderGlobalCoreAbilities(gameState.currentPhase)}
       </div>
     );
   };
