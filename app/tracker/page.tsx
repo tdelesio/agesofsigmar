@@ -336,6 +336,56 @@ export default function TrackerPage() {
     saveGame(updated);
   };
 
+  const healWoundsById = (unitInstanceId: string, amount: number) => {
+    if (!gameState) return;
+    const updated = { ...gameState };
+    const uState = updated.units.find(u => u.id === unitInstanceId);
+    if (!uState) return;
+    const uRules = faction.units.find(u => u.id === uState.unitId);
+    if (!uRules) return;
+
+    const maxModels = uState.maxModels ?? uRules.models ?? 1;
+    if (uState.maxModels === undefined) uState.maxModels = maxModels;
+    if (uState.modelsCount === undefined) uState.modelsCount = maxModels;
+
+    let woundsHealed = 0;
+    let modelsRestored = 0;
+    let revived = false;
+
+    for (let i = 0; i < amount; i++) {
+      if (uState.isSlain) {
+        uState.isSlain = false;
+        uState.modelsCount = 1;
+        uState.currentWounds = 0;
+        revived = true;
+      } else {
+        if (uState.currentWounds > 0) {
+          uState.currentWounds -= 1;
+          woundsHealed++;
+        } else {
+          if (uState.modelsCount < uState.maxModels) {
+            uState.modelsCount += 1;
+            uState.currentWounds = uRules.health - 1;
+            modelsRestored++;
+          }
+        }
+      }
+    }
+
+    const logParts: string[] = [];
+    if (revived) logParts.push("revived with 1 model");
+    if (woundsHealed > 0) logParts.push(`healed ${woundsHealed} wound(s)`);
+    if (modelsRestored > 0) logParts.push(`restored ${modelsRestored} slain model(s)`);
+
+    if (logParts.length > 0) {
+      updated.logs.unshift(`💚 [Mend/Heal] Your ${uRules.name} was ${logParts.join(" and ")}.`);
+    } else {
+      updated.logs.unshift(`💚 [Mend/Heal] Tried to heal your ${uRules.name} but they are already at full strength.`);
+    }
+
+    saveGame(updated);
+  };
+
   const adjustModelsById = (unitInstanceId: string, amount: number) => {
     const updated = { ...gameState };
     const uState = updated.units.find(u => u.id === unitInstanceId);
@@ -3304,6 +3354,86 @@ export default function TrackerPage() {
                   </Button>
                 )}
               </div>
+
+              {(!buffModal.allowedStats) && (
+                <div className="bg-[#1c2230] border border-[#2c3548]/80 p-3 rounded-xl space-y-2.5 shadow-md mt-4">
+                  <div className="flex items-center gap-2 text-emerald-400 font-extrabold text-xs uppercase tracking-wider">
+                    <span>💚</span>
+                    <span>Heal Unit Wounds</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 leading-normal font-medium">
+                    Choose an amount of wounds to heal on <strong className="text-white">{buffModal.unitName}</strong> (automatically returns slain models and reduces wounds):
+                  </p>
+                  <div className="grid grid-cols-6 gap-1.5">
+                    {[1, 2, 3, 4, 5, 6].map(num => (
+                      <Button
+                        key={num}
+                        onClick={() => {
+                          healWoundsById(buffModal.unitId, num);
+                          setBuffModal(null);
+                        }}
+                        className="bg-[#151923] hover:bg-emerald-600/80 border border-[#2c3548] text-gray-200 hover:text-white font-black text-xs py-1.5 rounded-lg transition-all"
+                      >
+                        {num}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(!buffModal.allowedStats) && (
+                <div className="bg-[#1c2230] border border-[#2c3548]/80 p-3 rounded-xl space-y-2.5 shadow-md mt-4">
+                  <div className="flex items-center gap-2 text-amber-400 font-extrabold text-xs uppercase tracking-wider">
+                    <span>🔥</span>
+                    <span>Critical Hit Buffs</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 leading-normal font-medium">
+                    Select a critical hit modifier to apply to <strong className="text-white">{buffModal.unitName}</strong>'s weapons for the rest of this round:
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      onClick={() => {
+                        applyBuff(buffModal.unitId, 'hit', 0, 'Crit (2 Hits)', buffModal.expiresPhase);
+                        setBuffModal(null);
+                      }}
+                      className="bg-[#151923] hover:bg-amber-500/10 border border-[#2c3548] hover:border-amber-500/20 text-white hover:text-amber-400 text-xs font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 h-10"
+                    >
+                      <span className="text-[11px]">💥</span>
+                      <span className="text-[10px]">Crit (2 Hits)</span>
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        applyBuff(buffModal.unitId, 'hit', 0, 'Crit (Mortal)', buffModal.expiresPhase);
+                        setBuffModal(null);
+                      }}
+                      className="bg-[#151923] hover:bg-rose-500/10 border border-[#2c3548] hover:border-rose-500/20 text-white hover:text-rose-400 text-xs font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 h-10"
+                    >
+                      <span className="text-[11px]">💀</span>
+                      <span className="text-[10px]">Crit (Mortal)</span>
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        applyBuff(buffModal.unitId, 'hit', 0, 'Crit (Auto-wound)', buffModal.expiresPhase);
+                        setBuffModal(null);
+                      }}
+                      className="bg-[#151923] hover:bg-blue-500/10 border border-[#2c3548] hover:border-blue-500/20 text-white hover:text-blue-400 text-xs font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 h-10"
+                    >
+                      <span className="text-[11px]">⚡</span>
+                      <span className="text-[10px]">Crit (Auto-wound)</span>
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        applyBuff(buffModal.unitId, 'damage', 0, 'Crit (+1 Damage)', buffModal.expiresPhase);
+                        setBuffModal(null);
+                      }}
+                      className="bg-[#151923] hover:bg-orange-500/10 border border-[#2c3548] hover:border-orange-500/20 text-white hover:text-orange-400 text-xs font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 h-10"
+                    >
+                      <span className="text-[11px]">💥</span>
+                      <span className="text-[10px]">Crit (+1 Damage)</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Footer */}
