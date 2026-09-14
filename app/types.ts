@@ -99,6 +99,8 @@ export interface GameState {
   matchId?: string;
   round: number; // 1, 2, 3, 4
   activeTurn: 'me' | 'opponent'; // whose turn is it currently
+  roundFirstPlayer?: 'me' | 'opponent'; // who went first in the current round
+  previousRoundFirstPlayer?: 'me' | 'opponent'; // who went first in the previous round
   currentPhase: GamePhase;
   factionId: string;
   selectedBattleTraitId: string;
@@ -106,6 +108,10 @@ export interface GameState {
   selectedEnhancementId: string;
   units: UnitState[];
   victoryPoints: number;
+  opponentVictoryPoints?: number; // opponent's Victory Points
+  isUnderdog?: boolean; // is Player (Me) the underdog this round?
+  meDoubleUpped?: boolean; // did Player (Me) take a double turn?
+  opponentDoubleUpped?: boolean; // did Opponent take a double turn?
   usedAbilities: {
     [instanceAbilityId: string]: boolean; // key = "abilityId" -> used status
   };

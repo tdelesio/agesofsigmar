@@ -154,7 +154,7 @@ export default function HomePage() {
     const initialGameState: GameState = {
       matchId: Math.random().toString(36).substring(2, 9),
       round: 1,
-      activeTurn: firstPlayer,
+      activeTurn: 'me',
       currentPhase: 'start',
       factionId: faction.id,
       selectedBattleTraitId: traitId,
@@ -163,7 +163,7 @@ export default function HomePage() {
       units: unitStates,
       victoryPoints: 0,
       usedAbilities: {},
-      logs: [`Match initialized! Playing as ${faction.name}. Turn 1 goes to ${firstPlayer === 'me' ? 'Player (Me)' : 'Opponent'}`],
+      logs: [`Match initialized! Playing as ${faction.name}.`],
     };
 
     localStorage.setItem('active_spearhead_game', JSON.stringify(initialGameState));
@@ -445,36 +445,7 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Who Goes First Selector */}
-            {faction && (
-              <div className="border-t border-[#222834] pt-6 flex flex-col items-center space-y-4">
-                <label className="text-sm font-bold text-gray-400 uppercase tracking-wider">Choose First Turn Active Player (Round 1)</label>
-                <div className="flex gap-4">
-                  <Button
-                    type="button"
-                    variant={firstPlayer === 'me' ? 'default' : 'outline'}
-                    onClick={() => setFirstPlayer('me')}
-                    className={`h-11 px-6 font-bold text-xs rounded-xl
-                      ${firstPlayer === 'me' 
-                        ? 'bg-amber-500 text-white hover:bg-amber-600' 
-                        : 'border-[#2c3548] text-gray-300 hover:bg-[#1c2230]'}`}
-                  >
-                    <User className="h-4 w-4 mr-2" /> Me First
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={firstPlayer === 'opponent' ? 'default' : 'outline'}
-                    onClick={() => setFirstPlayer('opponent')}
-                    className={`h-11 px-6 font-bold text-xs rounded-xl
-                      ${firstPlayer === 'opponent' 
-                        ? 'bg-red-500 text-white hover:bg-red-600' 
-                        : 'border-[#2c3548] text-gray-300 hover:bg-[#1c2230]'}`}
-                  >
-                    <Users className="h-4 w-4 mr-2" /> Opponent First
-                  </Button>
-                </div>
-              </div>
-            )}
+
 
           </CardContent>
           

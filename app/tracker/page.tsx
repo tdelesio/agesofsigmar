@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { 
   ArrowLeft, RefreshCw, Swords, Shield, Heart, Trophy, 
   ChevronRight, ChevronLeft, Award, Play, AlertTriangle, 
-  Activity, Sparkles, ScrollText, User, UserCheck, ShieldAlert, AlertCircle
+  Activity, Sparkles, ScrollText, User, UserCheck, ShieldAlert, AlertCircle,
+  Users, TrendingDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -79,6 +80,15 @@ export default function TrackerPage() {
   const [facetOfWarModalOpen, setFacetOfWarModalOpen] = useState<boolean>(false);
   const [selectedFacetUnitId, setSelectedFacetUnitId] = useState<string>('');
 
+  // Round Initializing modal states
+  const [roundInitializingModal, setRoundInitializingModal] = useState<{
+    isOpen: boolean;
+    round: number;
+    goesFirst: 'me' | 'opponent';
+    underdog: 'me' | 'opponent' | 'none';
+    doubleUpDrawOverride: boolean;
+  } | null>(null);
+
   const showToast = (message: string, type: 'error' | 'success' = 'success') => {
     setToast({ message, type });
     setTimeout(() => {
@@ -109,38 +119,20 @@ export default function TrackerPage() {
     }
   }, []);
 
-  // Trigger round start overlay exactly once per round start or on load (declared above early returns)
+  // Trigger round start overlay exactly once per round start or on load (whenever currentPhase is 'start' and roundFirstPlayer is not yet chosen)
   useEffect(() => {
-    if (gameState) {
-      const factionTemplate = factions.find(f => f.id === gameState.factionId);
-      if (factionTemplate) {
-        const shownKey = `shown_round_prompt_${gameState.matchId || 'default'}_${gameState.round}`;
-        let alreadyShown = shownPromptsCache.has(shownKey);
-
-        if (!alreadyShown) {
-          try {
-            if (typeof window !== 'undefined' && window.sessionStorage) {
-              alreadyShown = !!sessionStorage.getItem(shownKey);
-            }
-          } catch (e) {
-            console.warn('sessionStorage is unavailable:', e);
-          }
-        }
-
-        if (!alreadyShown && gameState.currentPhase === 'start') {
-          shownPromptsCache.add(shownKey);
-          try {
-            if (typeof window !== 'undefined' && window.sessionStorage) {
-              sessionStorage.setItem(shownKey, 'true');
-            }
-          } catch (e) {
-            console.warn('sessionStorage is unavailable:', e);
-          }
-          checkRoundStartRules(gameState.round);
-        }
-      }
+    if (gameState && gameState.currentPhase === 'start' && !gameState.roundFirstPlayer) {
+      setRoundInitializingModal({
+        isOpen: true,
+        round: gameState.round,
+        goesFirst: 'me',
+        underdog: gameState.isUnderdog ? 'me' : 'none',
+        doubleUpDrawOverride: false
+      });
+    } else {
+      setRoundInitializingModal(null);
     }
-  }, [gameState?.round, gameState?.currentPhase, gameState?.activeTurn, gameState?.matchId]);
+  }, [gameState?.round, gameState?.currentPhase, gameState?.roundFirstPlayer, gameState?.matchId]);
 
   if (!gameState) {
     return (
@@ -275,9 +267,18 @@ export default function TrackerPage() {
 
   // VP tracking
   const updateVP = (amount: number) => {
+    if (!gameState) return;
     const updated = { ...gameState };
     updated.victoryPoints = Math.max(0, updated.victoryPoints + amount);
     updated.logs.unshift(`[Round ${gameState.round}] Victory Points adjusted by ${amount > 0 ? '+' : ''}${amount}. Total: ${updated.victoryPoints} VPs`);
+    saveGame(updated);
+  };
+
+  const updateOpponentVP = (amount: number) => {
+    if (!gameState) return;
+    const updated = { ...gameState };
+    updated.opponentVictoryPoints = Math.max(0, (updated.opponentVictoryPoints ?? 0) + amount);
+    updated.logs.unshift(`[Round ${gameState.round}] Opponent Victory Points adjusted by ${amount > 0 ? '+' : ''}${amount}. Total: ${updated.opponentVictoryPoints} VPs`);
     saveGame(updated);
   };
 
@@ -670,25 +671,14 @@ export default function TrackerPage() {
 
     updated.logs.unshift(`⚔️ Finished turn for ${lastTurn === 'me' ? 'Me' : 'Opponent'}.`);
 
-    // Increment round if switching back to the player who had priority
-    if (lastTurn === 'opponent') {
+    // Increment round if switching back to the player who had priority (the Turn 2 player finishes their turn)
+    const isRoundOver = lastTurn !== updated.roundFirstPlayer;
+    if (isRoundOver) {
       if (updated.round < 4) {
+        updated.previousRoundFirstPlayer = updated.roundFirstPlayer;
+        updated.roundFirstPlayer = undefined; // Reset roundFirstPlayer so start-of-round setup overlay opens for next round
         updated.round += 1;
         updated.logs.unshift(`🌟 --- START OF BATTLE ROUND ${updated.round} --- 🌟`);
-
-        // Automatically trigger Slaves to Darkness Eye of the Gods Battle Trait selection popup at start of new round
-        if (updated.factionId === 'slaves-to-darkness-bloodwind-legion') {
-          setEyeOfTheGodsModal({
-            isOpen: true,
-            sourceAbilityName: 'Eye of the Gods (Round End Battle Trait)',
-            sourceAbilityId: 'eyeOfTheGods'
-          });
-        }
-
-        // Automatically trigger Lumineth Realm-Lords Facets of War selection popup at start of new round
-        if (updated.factionId === 'lumineth-realm-lords-glittering-phalanx') {
-          setFacetOfWarModalOpen(true);
-        }
 
         // Automatically expire temporary round buffs
         if (updated.appliedModifiers) {
@@ -748,10 +738,70 @@ export default function TrackerPage() {
     setConfirmModal({
       message: 'Are you sure you want to RESET this match? All scores, wounds, and logs will be lost.',
       onConfirm: () => {
+        // Clear session storage of any round tracking prompts
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          try {
+            sessionStorage.clear();
+          } catch (e) {
+            console.warn(e);
+          }
+        }
+        shownPromptsCache.clear();
         localStorage.removeItem('active_spearhead_game');
         router.push('/');
       }
     });
+  };
+
+  const handleConfirmRoundInitialization = () => {
+    if (!gameState || !roundInitializingModal) return;
+    const updated = { ...gameState };
+
+    const selectedGoesFirst = roundInitializingModal.goesFirst;
+    const selectedUnderdog = roundInitializingModal.underdog;
+
+    // Set first player and active turn
+    updated.roundFirstPlayer = selectedGoesFirst;
+    updated.activeTurn = selectedGoesFirst;
+    updated.currentPhase = 'start'; // back to start
+
+    // Set underdog
+    updated.isUnderdog = selectedUnderdog === 'me';
+
+    // Calculate double up
+    let isMeDoubleUpped = false;
+    let isOpponentDoubleUpped = false;
+    if (updated.round > 1 && updated.previousRoundFirstPlayer) {
+      if (updated.previousRoundFirstPlayer === 'me' && selectedGoesFirst === 'opponent') {
+        isOpponentDoubleUpped = true;
+      }
+      if (updated.previousRoundFirstPlayer === 'opponent' && selectedGoesFirst === 'me') {
+        isMeDoubleUpped = true;
+      }
+    }
+    updated.meDoubleUpped = isMeDoubleUpped;
+    updated.opponentDoubleUpped = isOpponentDoubleUpped;
+
+    // Reset used once-per-phase/turn abilities for new round/turn
+    updated.usedAbilities = {};
+
+    updated.logs.unshift(`⚔️ Round ${updated.round} Initialized! Turn 1 goes to ${selectedGoesFirst === 'me' ? 'Player (Me)' : 'Opponent'}. ${selectedUnderdog === 'me' ? 'Player is Underdog.' : selectedUnderdog === 'opponent' ? 'Opponent is Underdog.' : ''}`);
+
+    saveGame(updated);
+    setRoundInitializingModal(null);
+
+    // Cleanly trigger faction round-start traits after setup modal closes, ensuring no overlap
+    if (updated.factionId === 'slaves-to-darkness-bloodwind-legion') {
+      setEyeOfTheGodsModal({
+        isOpen: true,
+        sourceAbilityName: 'Eye of the Gods (Round End Battle Trait)',
+        sourceAbilityId: 'eyeOfTheGods'
+      });
+    }
+
+    if (updated.factionId === 'lumineth-realm-lords-glittering-phalanx') {
+      setFacetOfWarModalOpen(true);
+    }
   };
 
   // Extract phase-specific abilities for reference
@@ -1045,57 +1095,9 @@ export default function TrackerPage() {
     );
   }
 
-  // Check and compile round start rules for active popup modals
+  // Check and compile round start rules for active popup modals (Deprecated in favor of the new unified roundInitializingModal)
   function checkRoundStartRules(round: number) {
-    if (!gameState || !faction) return;
-
-    const roundActions: string[] = [];
-    const prompts: string[] = [];
-
-    const scanAbility = (ability: Ability) => {
-      if (ability.ruleDefinition && ability.ruleDefinition.trigger === 'start_of_round') {
-        ability.ruleDefinition.actions.forEach(action => {
-          // If blood rites, it applies if condition round <= current round, but we notify about the NEW one!
-          if (action.condition?.round === round) {
-            if (action.type === 'modify_stat') {
-              roundActions.push(`🌟 Active Buff: ${action.description}`);
-            } else if (action.type === 'spawn_prompt') {
-              prompts.push(action.description);
-            }
-          }
-        });
-      }
-    };
-
-    if (gameState.selectedBattleTraitId === 'all') {
-      faction.battleTraits.forEach(scanAbility);
-    } else {
-      const trait = faction.battleTraits.find(t => t.id === gameState.selectedBattleTraitId);
-      if (trait) scanAbility(trait);
-    }
-    const regiment = faction.regimentAbilities.find(r => r.id === gameState.selectedRegimentAbilityId);
-    if (regiment) scanAbility(regiment);
-    const enhancement = faction.enhancements.find(e => e.id === gameState.selectedEnhancementId);
-    if (enhancement) scanAbility(enhancement);
-
-    if (roundActions.length > 0 || prompts.length > 0 || round === 1) {
-      setActivePrompt({
-        title: `⚔️ Battle Round ${round} Initializing`,
-        description: round === 1 
-          ? `Welcome to Battle Round 1! Review your pre-game setup maneuvers and active battle round traits.`
-          : `You have successfully advanced to Battle Round ${round}. Please apply the following round-start rules:`,
-        actions: [
-          ...roundActions,
-          ...prompts
-        ],
-        onClose: () => {
-          setActivePrompt(null);
-          if (gameState.factionId === 'lumineth-realm-lords-glittering-phalanx') {
-            setFacetOfWarModalOpen(true);
-          }
-        }
-      });
-    }
+    return;
   }
 
 
@@ -2314,11 +2316,25 @@ export default function TrackerPage() {
             </Badge>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center bg-[#1c2230] rounded-lg border border-[#2c3548]">
-              <button onClick={() => updateVP(-1)} className="px-2.5 py-1 hover:bg-[#2c3548] text-gray-400 font-bold">-</button>
-              <span className="px-3.5 py-1 font-black text-sm text-white">{gameState.victoryPoints} VP</span>
-              <button onClick={() => updateVP(1)} className="px-2.5 py-1 hover:bg-[#2c3548] text-gray-400 font-bold">+</button>
+          <div className="flex items-center gap-6">
+            {/* Player Score */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">ME:</span>
+              <div className="flex items-center bg-[#1c2230] rounded-lg border border-[#2c3548]">
+                <button onClick={() => updateVP(-1)} className="px-2.5 py-1 hover:bg-[#2c3548] text-gray-400 font-bold">-</button>
+                <span className="px-3 py-1 font-black text-xs text-white">{gameState.victoryPoints} VP</span>
+                <button onClick={() => updateVP(1)} className="px-2.5 py-1 hover:bg-[#2c3548] text-gray-400 font-bold">+</button>
+              </div>
+            </div>
+
+            {/* Opponent Score */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">OPP:</span>
+              <div className="flex items-center bg-[#1c2230] rounded-lg border border-[#2c3548]">
+                <button onClick={() => updateOpponentVP(-1)} className="px-2.5 py-1 hover:bg-[#2c3548] text-gray-400 font-bold">-</button>
+                <span className="px-3 py-1 font-black text-xs text-white">{gameState.opponentVictoryPoints ?? 0} VP</span>
+                <button onClick={() => updateOpponentVP(1)} className="px-2.5 py-1 hover:bg-[#2c3548] text-gray-400 font-bold">+</button>
+              </div>
             </div>
           </div>
         </div>
@@ -4094,6 +4110,9 @@ export default function TrackerPage() {
                             else if (singleStat === 'move') {
                               if (selectUnitToBuffAbility.name.toUpperCase().includes('SPEED OF HYSH')) {
                                 labelVal = `Doubled Move (${selectUnitToBuffAbility.name})`;
+                              } else if (selectUnitToBuffAbility.name.toLowerCase().includes('relentless discipline')) {
+                                modifierVal = 2;
+                                labelVal = `+2" Move (${selectUnitToBuffAbility.name})`;
                               } else {
                                 labelVal = `+1" Move (${selectUnitToBuffAbility.name})`;
                               }
@@ -4416,6 +4435,10 @@ export default function TrackerPage() {
                           const singleStat = rollPrompt.allowedStats[0];
                           let modifierVal = 1;
                           let labelVal = `+1 ${singleStat.charAt(0).toUpperCase() + singleStat.slice(1)} (${rollPrompt.abilityName})`;
+                          if (singleStat === 'move' && rollPrompt.abilityName.toLowerCase().includes('relentless discipline')) {
+                            modifierVal = 2;
+                            labelVal = `+2" Move (${rollPrompt.abilityName})`;
+                          }
                           applyBuff(rollPrompt.targetUnitId, singleStat, modifierVal, labelVal, rollPrompt.phase);
                         } else {
                           // General targeted buff with no parsed stats: show generic buff modal to let them select what to modify
@@ -4580,6 +4603,292 @@ export default function TrackerPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {roundInitializingModal?.isOpen && (
+        <div className="fixed inset-0 bg-[#080a0f]/95 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+          <div className="bg-[#11141c] border border-[#2c3548] rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl flex flex-col my-8 animate-scale-in text-left">
+            
+            {/* Header */}
+            <div className="p-6 border-b border-[#222834] bg-[#161a25]/50 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                  <Swords className="h-6 w-6 text-amber-500 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-widest">
+                    Battle Round {roundInitializingModal.round} Setup
+                  </h3>
+                  <p className="text-[10px] text-amber-500 font-bold uppercase tracking-wider mt-0.5">
+                    INITIALIZING NEW BATTLE ROUND
+                  </p>
+                </div>
+              </div>
+              <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1 font-black text-xxs tracking-wider">
+                ROUND {roundInitializingModal.round} / 4
+              </Badge>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh] text-left">
+              
+              {/* Step 1: Who Goes First (Roll-off) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-amber-500">1.</span> Active Player (First Turn)
+                  </h4>
+                  <span className="text-[9px] text-gray-500 font-bold uppercase">PHYSICAL ROLL-OFF</span>
+                </div>
+                <p className="text-xxs text-gray-400 leading-normal">
+                  Roll off in your physical match. The winner of the roll-off chooses who takes the first turn in this round.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setRoundInitializingModal(prev => prev ? { ...prev, goesFirst: 'me' } : null)}
+                    className={`p-4 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all duration-300
+                      ${roundInitializingModal.goesFirst === 'me'
+                        ? 'bg-amber-500/15 border-amber-500 text-white shadow-lg shadow-amber-500/5'
+                        : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
+                  >
+                    <User className="h-4 w-4" /> ME GO FIRST
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRoundInitializingModal(prev => prev ? { ...prev, goesFirst: 'opponent' } : null)}
+                    className={`p-4 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all duration-300
+                      ${roundInitializingModal.goesFirst === 'opponent'
+                        ? 'bg-red-500/15 border-red-500 text-white shadow-lg shadow-red-500/5'
+                        : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
+                  >
+                    <Users className="h-4 w-4" /> OPPONENT FIRST
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 2: Underdog Status */}
+              <div className="space-y-3 border-t border-[#1d222d] pt-5">
+                <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="text-amber-500">2.</span> Determine Underdog Status
+                </h4>
+                <p className="text-xxs text-gray-400 leading-normal">
+                  Select whether you are the Favorite (leading/tied) or the Underdog (trailing in victory points) for this Battle Round.
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setRoundInitializingModal(prev => prev ? { ...prev, underdog: 'me' } : null)}
+                    className={`p-3 rounded-xl border text-xxs font-black flex flex-col items-center justify-center gap-1.5 transition-all duration-300
+                      ${roundInitializingModal.underdog === 'me'
+                        ? 'bg-amber-500/15 border-amber-500 text-white'
+                        : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
+                  >
+                    <TrendingDown className="h-4 w-4 text-amber-500" />
+                    <span>I AM UNDERDOG</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRoundInitializingModal(prev => prev ? { ...prev, underdog: 'opponent' } : null)}
+                    className={`p-3 rounded-xl border text-xxs font-black flex flex-col items-center justify-center gap-1.5 transition-all duration-300
+                      ${roundInitializingModal.underdog === 'opponent'
+                        ? 'bg-red-500/15 border-red-500 text-white'
+                        : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
+                  >
+                    <Trophy className="h-4 w-4 text-red-500" />
+                    <span>OPP IS UNDERDOG</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRoundInitializingModal(prev => prev ? { ...prev, underdog: 'none' } : null)}
+                    className={`p-3 rounded-xl border text-xxs font-black flex flex-col items-center justify-center gap-1.5 transition-all duration-300
+                      ${roundInitializingModal.underdog === 'none'
+                        ? 'bg-zinc-800/40 border-zinc-700 text-white'
+                        : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
+                  >
+                    <Activity className="h-4 w-4 text-gray-400" />
+                    <span>NO UNDERDOG</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 3: Twist Card Reminder */}
+              <div className="space-y-3 border-t border-[#1d222d] pt-5">
+                <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="text-amber-500">3.</span> Twist Card
+                </h4>
+                <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-950/10 flex gap-3">
+                  <div className="text-xl leading-none">🃏</div>
+                  <div className="space-y-1">
+                    <h5 className="text-xxs font-black text-white uppercase tracking-wider">Draw & Apply Twist</h5>
+                    <p className="text-[10px] text-gray-300 leading-relaxed font-medium">
+                      Pull a Twist card from your physical Twist deck and place it face-up. It applies a global battle round trait or passive effect to both players.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 4: Battle Tactic Card Reminder and Double-Turn Restrictions */}
+              <div className="space-y-3 border-t border-[#1d222d] pt-5">
+                <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="text-amber-500">4.</span> Draw Battle Tactics
+                </h4>
+                <div className="p-4 rounded-xl border border-zinc-700/60 bg-[#161a24] space-y-4">
+                  <div className="flex gap-3">
+                    <div className="text-xl leading-none">🎴</div>
+                    <div className="space-y-1 text-left">
+                      <h5 className="text-xxs font-black text-white uppercase tracking-wider">Draw up to 3 Battle Tactic Cards</h5>
+                      <p className="text-[10px] text-gray-300 leading-relaxed font-medium">
+                        You can discard any number of tactics currently in your hand before you draw up to 3.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Double Up Logic Assessment */}
+                  {(() => {
+                    const selectedGoesFirst = roundInitializingModal.goesFirst;
+                    let doubleTurnActive = false;
+                    let activeDoubleTurnPlayer = '';
+
+                    if (roundInitializingModal.round > 1 && gameState?.previousRoundFirstPlayer) {
+                      if (gameState.previousRoundFirstPlayer === 'me' && selectedGoesFirst === 'opponent') {
+                        doubleTurnActive = true;
+                        activeDoubleTurnPlayer = 'Opponent';
+                      } else if (gameState.previousRoundFirstPlayer === 'opponent' && selectedGoesFirst === 'me') {
+                        doubleTurnActive = true;
+                        activeDoubleTurnPlayer = 'You (Player)';
+                      }
+                    }
+
+                    if (!doubleTurnActive) return null;
+
+                    const isMe = activeDoubleTurnPlayer.startsWith('You');
+                    const isUnderdogAndLosing = isMe 
+                      ? (roundInitializingModal.underdog === 'me' && (gameState?.opponentVictoryPoints ?? 0) - (gameState?.victoryPoints ?? 0) > 5)
+                      : (roundInitializingModal.underdog === 'opponent' && (gameState?.victoryPoints ?? 0) - (gameState?.opponentVictoryPoints ?? 0) > 5);
+
+                    return (
+                      <div className={`p-3.5 rounded-lg border text-left space-y-2.5
+                        ${isUnderdogAndLosing
+                          ? 'border-emerald-500/20 bg-emerald-950/10'
+                          : 'border-red-500/20 bg-red-950/10'}`}
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <AlertTriangle className={`h-4 w-4 shrink-0 mt-0.5 ${isUnderdogAndLosing ? 'text-emerald-400' : 'text-red-400'}`} />
+                          <div className="space-y-1">
+                            <h6 className={`text-[10px] font-black uppercase tracking-wider ${isUnderdogAndLosing ? 'text-emerald-400' : 'text-red-400'}`}>
+                              ⚠️ {activeDoubleTurnPlayer.toUpperCase()} DOUBLE-UP ACTIVE
+                            </h6>
+                            <p className="text-[10px] text-gray-300 leading-normal font-medium">
+                              {isMe 
+                                ? "You went second last round and are going first this round (Double Turn)." 
+                                : "Opponent went second last round and is going first this round (Double Turn)."}
+                              {" "}Under standard rules, **Double-Up players CANNOT draw Battle Tactic cards** this round.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="border-t border-white/5 pt-2.5 flex items-center justify-between gap-3 text-xxs">
+                          <span className="text-gray-400 font-medium">
+                            Is the Double-Up player the Underdog AND trailing by &gt;5 VPs?
+                          </span>
+                          <Badge className={isUnderdogAndLosing ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}>
+                            {isUnderdogAndLosing ? 'Eligible to Draw' : 'NOT Eligible'}
+                          </Badge>
+                        </div>
+
+                        {!isUnderdogAndLosing && isMe && (
+                          <div className="flex items-center gap-2 pt-1">
+                            <input
+                              type="checkbox"
+                              id="doubleUpDrawOverride"
+                              checked={roundInitializingModal.doubleUpDrawOverride}
+                              onChange={(e) => setRoundInitializingModal(prev => prev ? { ...prev, doubleUpDrawOverride: e.target.checked } : null)}
+                              className="rounded border-[#2c3548] bg-[#1c2230] text-amber-500 focus:ring-0 cursor-pointer h-3.5 w-3.5"
+                            />
+                            <label htmlFor="doubleUpDrawOverride" className="text-[10px] text-gray-300 font-bold uppercase tracking-wider select-none cursor-pointer">
+                              Force Bypass Restriction (Override Draw)
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Step 5: Faction Specific Round-Start Rules & Abilities */}
+              {(() => {
+                const roundActions: string[] = [];
+                const prompts: string[] = [];
+
+                const scanAbility = (ability: Ability) => {
+                  if (ability.ruleDefinition && ability.ruleDefinition.trigger === 'start_of_round') {
+                    ability.ruleDefinition.actions.forEach(action => {
+                      if (action.condition?.round === roundInitializingModal.round) {
+                        if (action.type === 'modify_stat') {
+                          roundActions.push(action.description);
+                        } else if (action.type === 'spawn_prompt') {
+                          prompts.push(action.description);
+                        }
+                      }
+                    });
+                  }
+                };
+
+                const factionTemplate = factions.find(f => f.id === gameState?.factionId);
+                if (factionTemplate) {
+                  if (gameState?.selectedBattleTraitId === 'all') {
+                    factionTemplate.battleTraits.forEach(scanAbility);
+                  } else {
+                    const trait = factionTemplate.battleTraits.find(t => t.id === gameState?.selectedBattleTraitId);
+                    if (trait) scanAbility(trait);
+                  }
+                  const regiment = factionTemplate.regimentAbilities.find(r => r.id === gameState?.selectedRegimentAbilityId);
+                  if (regiment) scanAbility(regiment);
+                  const enhancement = factionTemplate.enhancements.find(e => e.id === gameState?.selectedEnhancementId);
+                  if (enhancement) scanAbility(enhancement);
+                }
+
+                if (roundActions.length === 0 && prompts.length === 0) return null;
+
+                return (
+                  <div className="space-y-3 border-t border-[#1d222d] pt-5">
+                    <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="text-amber-500">5.</span> Faction Round-Start Rules
+                    </h4>
+                    <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-950/5 space-y-2.5">
+                      {roundActions.map((act, i) => (
+                        <div key={`act-${i}`} className="flex items-start gap-2 text-xxs text-amber-200">
+                          <span className="text-amber-400 mt-0.5">🌟</span>
+                          <span className="font-bold leading-normal">{act}</span>
+                        </div>
+                      ))}
+                      {prompts.map((p, i) => (
+                        <div key={`prompt-${i}`} className="flex items-start gap-2 text-xxs text-amber-200">
+                          <span className="text-amber-400 mt-0.5">❓</span>
+                          <span className="font-bold leading-normal">{p}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-[#222834] bg-[#0c0e16] flex justify-end gap-3">
+              <Button
+                onClick={handleConfirmRoundInitialization}
+                className="h-11 px-6 bg-gradient-to-r from-[#ca8a04] to-amber-500 hover:scale-103 hover:shadow-lg hover:shadow-amber-500/10 text-white font-extrabold text-xs uppercase rounded-xl transition-all"
+              >
+                Let's Begin Turn 1 <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+
           </div>
         </div>
       )}
