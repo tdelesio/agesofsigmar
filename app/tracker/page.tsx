@@ -908,12 +908,7 @@ export default function TrackerPage() {
           : `You have successfully advanced to Battle Round ${round}. Please apply the following round-start rules:`,
         actions: [
           ...roundActions,
-          ...prompts,
-          ...(round === 1 
-            ? (gameState.activeTurn === 'opponent'
-              ? ['🛡️ Vanguard Maneuvers: Since you are going second, pick up to D3 friendly units to make a free normal move of up to 6" before the first turn begins.']
-              : ['🛡️ Opponent Vanguard Maneuvers: Since your opponent is going second, they can pick up to D3 of their units to make a free normal move of up to 6" before your turn begins.'])
-            : [])
+          ...prompts
         ],
         onClose: () => {
           setActivePrompt(null);
