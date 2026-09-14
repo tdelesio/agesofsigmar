@@ -42,6 +42,7 @@ export default function TrackerPage() {
     unitName: string;
     allowedStats?: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage' | 'charge')[];
     expiresPhase?: GamePhase;
+    sourceAbilityName?: string;
   } | null>(null);
 
   const [selectUnitToBuffAbility, setSelectUnitToBuffAbility] = useState<{
@@ -59,7 +60,7 @@ export default function TrackerPage() {
     targetUnitName?: string;
     requiredRoll: string;
     phase?: GamePhase;
-    allowedStats?: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage')[];
+    allowedStats?: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage' | 'charge')[];
   } | null>(null);
 
   // Eye of the Gods Ascension selection states
@@ -899,6 +900,32 @@ export default function TrackerPage() {
       mod.stat === 'move' && 
       (mod.label.toUpperCase().includes('SPEED OF HYSH') || mod.label.toUpperCase().includes('DOUBLED MOVE'))
     );
+
+    // Check if Relentless Discipline Ward (5+) is active on this unit
+    const hasWard5PlusMod = unitId && gameState?.appliedModifiers?.some(mod => 
+      mod.unitId === unitId && 
+      mod.stat === 'ward' && 
+      mod.label.includes('Ward (5+)')
+    );
+
+    if (statKey === 'ward' && hasWard5PlusMod) {
+      let baseNum = 0;
+      if (typeof baseValue === 'number') baseNum = baseValue;
+      else baseNum = parseInt(baseValue, 10) || 0;
+
+      return (
+        <span 
+          className="inline-flex items-center gap-1 cursor-help"
+          title="Relentless Discipline Ward: This unit has Ward (5+) for the rest of the phase."
+        >
+          <span className="font-extrabold text-emerald-400 text-xs">5+</span>
+          <span className="text-[10px] text-gray-500 line-through font-medium">({baseNum === 0 ? '-' : `${baseNum}+`})</span>
+          <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 text-[8px] px-1 py-0 font-black uppercase tracking-wider shrink-0 select-none">
+            WARD 5+
+          </Badge>
+        </span>
+      );
+    }
 
     if (statKey === 'move' && hasSpeedOfHysh) {
       let baseNum = 0;
@@ -3627,23 +3654,30 @@ export default function TrackerPage() {
                 {(!buffModal.allowedStats || buffModal.allowedStats.includes('ward')) && (
                   <Button
                     onClick={() => {
-                      applyBuff(buffModal.unitId, 'ward', 1, '+1 Ward', buffModal.expiresPhase);
+                      const isRelentless = buffModal.sourceAbilityName?.includes('Relentless Discipline');
+                      const label = isRelentless ? `Ward (5+) (${buffModal.sourceAbilityName})` : `+1 Ward (${buffModal.sourceAbilityName || 'Buff'})`;
+                      applyBuff(buffModal.unitId, 'ward', 1, label, buffModal.expiresPhase);
                       setBuffModal(null);
                     }}
                     className="bg-[#1c2230] hover:bg-[#252c3d] border border-[#2c3548] text-white hover:text-purple-400 text-xs font-bold py-2.5 rounded-xl transition-all flex items-center justify-between px-4"
                   >
                     <span className="flex items-center gap-2">
                       <span className="text-base">💖</span>
-                      <span>Modify Ward Roll</span>
+                      <span>{buffModal.sourceAbilityName?.includes('Relentless Discipline') ? 'Apply Ward (5+)' : 'Modify Ward Roll'}</span>
                     </span>
-                    <Badge className="bg-purple-500/15 text-purple-400 font-extrabold">+1 Ward</Badge>
+                    <Badge className="bg-purple-500/15 text-purple-400 font-extrabold">
+                      {buffModal.sourceAbilityName?.includes('Relentless Discipline') ? 'Ward 5+' : '+1 Ward'}
+                    </Badge>
                   </Button>
                 )}
 
                 {(!buffModal.allowedStats || buffModal.allowedStats.includes('move')) && (
                   <Button
                     onClick={() => {
-                      applyBuff(buffModal.unitId, 'move', 1, '+1" Move', buffModal.expiresPhase);
+                      const isRelentless = buffModal.sourceAbilityName?.includes('Relentless Discipline');
+                      const modifier = isRelentless ? 2 : 1;
+                      const label = isRelentless ? `+2" Move (${buffModal.sourceAbilityName})` : `+1" Move (${buffModal.sourceAbilityName || 'Buff'})`;
+                      applyBuff(buffModal.unitId, 'move', modifier, label, buffModal.expiresPhase);
                       setBuffModal(null);
                     }}
                     className="bg-[#1c2230] hover:bg-[#252c3d] border border-[#2c3548] text-white hover:text-amber-400 text-xs font-bold py-2.5 rounded-xl transition-all flex items-center justify-between px-4"
@@ -3652,7 +3686,9 @@ export default function TrackerPage() {
                       <span className="text-base">🏃‍♂️</span>
                       <span>Modify Movement</span>
                     </span>
-                    <Badge className="bg-amber-500/15 text-amber-400 font-extrabold">+1" Move</Badge>
+                    <Badge className="bg-amber-500/15 text-amber-400 font-extrabold">
+                      {buffModal.sourceAbilityName?.includes('Relentless Discipline') ? '+2" Move' : '+1" Move'}
+                    </Badge>
                   </Button>
                 )}
 
@@ -3675,7 +3711,9 @@ export default function TrackerPage() {
                 {(!buffModal.allowedStats || buffModal.allowedStats.includes('wound')) && (
                   <Button
                     onClick={() => {
-                      applyBuff(buffModal.unitId, 'wound', 1, '+1 Wound', buffModal.expiresPhase);
+                      const isRelentless = buffModal.sourceAbilityName?.includes('Relentless Discipline');
+                      const label = isRelentless ? `+1 Wound (${buffModal.sourceAbilityName})` : `+1 Wound (${buffModal.sourceAbilityName || 'Buff'})`;
+                      applyBuff(buffModal.unitId, 'wound', 1, label, buffModal.expiresPhase);
                       setBuffModal(null);
                     }}
                     className="bg-[#1c2230] hover:bg-[#252c3d] border border-[#2c3548] text-white hover:text-teal-400 text-xs font-bold py-2.5 rounded-xl transition-all flex items-center justify-between px-4"
@@ -3723,7 +3761,9 @@ export default function TrackerPage() {
                 {(!buffModal.allowedStats || buffModal.allowedStats.includes('charge')) && (
                   <Button
                     onClick={() => {
-                      applyBuff(buffModal.unitId, 'charge', 1, '+1 Charge', buffModal.expiresPhase);
+                      const isRelentless = buffModal.sourceAbilityName?.includes('Relentless Discipline');
+                      const label = isRelentless ? `+1 Charge (${buffModal.sourceAbilityName})` : `+1 Charge (${buffModal.sourceAbilityName || 'Buff'})`;
+                      applyBuff(buffModal.unitId, 'charge', 1, label, buffModal.expiresPhase);
                       setBuffModal(null);
                     }}
                     className="bg-[#1c2230] hover:bg-[#252c3d] border border-[#2c3548] text-white hover:text-emerald-400 text-xs font-bold py-2.5 rounded-xl transition-all flex items-center justify-between px-4"
@@ -3871,76 +3911,98 @@ export default function TrackerPage() {
                 {gameState.units.filter(u => !u.isSlain).map(u => {
                   const uRules = faction.units.find(rules => rules.id === u.unitId);
                   if (!uRules) return null;
+
+                  // Peerless Cohesion target block check
+                  const isFirstUse = selectUnitToBuffAbility.abilityId === 'relentlessDiscipline';
+                  const isSecondUse = selectUnitToBuffAbility.abilityId === 'relentlessDiscipline-2';
+                  let isTargetBlocked = false;
+                  if (isFirstUse || isSecondUse) {
+                    const otherAbilityLabel = isFirstUse ? 'Relentless Discipline (Second Use)' : 'Relentless Discipline';
+                    const hasOtherDisciplineActiveThisPhase = gameState.appliedModifiers?.some(mod => 
+                      mod.unitId === u.id && 
+                      mod.expiresPhase === gameState.currentPhase && 
+                      mod.label.includes(otherAbilityLabel)
+                    );
+                    if (hasOtherDisciplineActiveThisPhase) {
+                      isTargetBlocked = true;
+                    }
+                  }
+
                   return (
                     <Button
                       key={u.id}
                       onClick={() => {
                         // Parse effect text to find what stats are modified
                         const effectLower = (selectUnitToBuffAbility.effect || '').toLowerCase();
-                        const allowed: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage')[] = [];
+                        let allowed: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage' | 'charge')[] = [];
                         
-                        if (
-                          effectLower.includes('attacks characteristic') || 
-                          effectLower.includes('add 1 to the attacks') || 
-                          effectLower.includes('modify attacks') || 
-                          effectLower.includes('attack characteristic') ||
-                          effectLower.includes('attacks characteristic of')
-                        ) {
-                          allowed.push('attacks');
-                        }
-                        if (
-                          effectLower.includes('save roll') || 
-                          effectLower.includes('save characteristic') || 
-                          effectLower.includes('add 1 to save') ||
-                          effectLower.includes('add 1 to the save')
-                        ) {
-                          allowed.push('save');
-                        }
-                        if (
-                          effectLower.includes('ward roll') || 
-                          effectLower.includes('ward characteristic') || 
-                          effectLower.includes('add 1 to ward') ||
-                          effectLower.includes('add 1 to the ward')
-                        ) {
-                          allowed.push('ward');
-                        }
-                        if (
-                          effectLower.includes('move') || 
-                          effectLower.includes('run') || 
-                          effectLower.includes('charge') ||
-                          effectLower.includes('movement')
-                        ) {
-                          allowed.push('move');
-                        }
-                        if (
-                          effectLower.includes('hit roll') || 
-                          effectLower.includes('hit rolls') || 
-                          effectLower.includes('add 1 to hit') ||
-                          effectLower.includes('add 1 to the hit')
-                        ) {
-                          allowed.push('hit');
-                        }
-                        if (
-                          effectLower.includes('wound roll') || 
-                          effectLower.includes('wound rolls') || 
-                          effectLower.includes('add 1 to wound') ||
-                          effectLower.includes('add 1 to the wound')
-                        ) {
-                          allowed.push('wound');
-                        }
-                        if (
-                          effectLower.includes('rend characteristic') || 
-                          effectLower.includes('add 1 to rend') ||
-                          effectLower.includes('add 1 to the rend')
-                        ) {
-                          allowed.push('rend');
-                        }
-                        if (
-                          effectLower.includes('damage characteristic') || 
-                          effectLower.includes('add 1 to damage') ||
-                          effectLower.includes('add 1 to the damage')
-                        ) {
-                          allowed.push('damage');
+                        const isRelentlessDiscipline = selectUnitToBuffAbility.abilityId.startsWith('relentlessDiscipline');
+                        if (isRelentlessDiscipline) {
+                          allowed = ['move', 'charge', 'wound', 'ward'];
+                        } else {
+                          if (
+                            effectLower.includes('attacks characteristic') || 
+                            effectLower.includes('add 1 to the attacks') || 
+                            effectLower.includes('modify attacks') || 
+                            effectLower.includes('attack characteristic') ||
+                            effectLower.includes('attacks characteristic of')
+                          ) {
+                            allowed.push('attacks');
+                          }
+                          if (
+                            effectLower.includes('save roll') || 
+                            effectLower.includes('save characteristic') || 
+                            effectLower.includes('add 1 to save') ||
+                            effectLower.includes('add 1 to the save')
+                          ) {
+                            allowed.push('save');
+                          }
+                          if (
+                            effectLower.includes('ward roll') || 
+                            effectLower.includes('ward characteristic') || 
+                            effectLower.includes('add 1 to ward') ||
+                            effectLower.includes('add 1 to the ward')
+                          ) {
+                            allowed.push('ward');
+                          }
+                          if (
+                            effectLower.includes('move') || 
+                            effectLower.includes('run') || 
+                            effectLower.includes('charge') ||
+                            effectLower.includes('movement')
+                          ) {
+                            allowed.push('move');
+                          }
+                          if (
+                            effectLower.includes('hit roll') || 
+                            effectLower.includes('hit rolls') || 
+                            effectLower.includes('add 1 to hit') ||
+                            effectLower.includes('add 1 to the hit')
+                          ) {
+                            allowed.push('hit');
+                          }
+                          if (
+                            effectLower.includes('wound roll') || 
+                            effectLower.includes('wound rolls') || 
+                            effectLower.includes('add 1 to wound') ||
+                            effectLower.includes('add 1 to the wound')
+                          ) {
+                            allowed.push('wound');
+                          }
+                          if (
+                            effectLower.includes('rend characteristic') || 
+                            effectLower.includes('add 1 to rend') ||
+                            effectLower.includes('add 1 to the rend')
+                          ) {
+                            allowed.push('rend');
+                          }
+                          if (
+                            effectLower.includes('damage characteristic') || 
+                            effectLower.includes('add 1 to damage') ||
+                            effectLower.includes('add 1 to the damage')
+                          ) {
+                            allowed.push('damage');
+                          }
                         }
                         
                         const finalAllowed = allowed.length > 0 ? allowed : undefined;
@@ -3995,15 +4057,23 @@ export default function TrackerPage() {
                               unitId: u.id, 
                               unitName: uRules.name,
                               allowedStats: finalAllowed,
-                              expiresPhase: selectUnitToBuffAbility.phase
+                              expiresPhase: selectUnitToBuffAbility.phase,
+                              sourceAbilityName: selectUnitToBuffAbility.name
                             });
                           }
                         }
                       }}
-                      className="bg-[#1c2230] hover:bg-[#252c3d] border border-[#2c3548] text-white hover:text-amber-400 text-xs font-bold py-2 rounded-xl transition-all flex items-center justify-between px-4 h-11"
+                      className={`border text-xs font-bold py-2 rounded-xl transition-all flex items-center justify-between px-4 h-11
+                        ${isTargetBlocked 
+                          ? 'bg-red-500/5 border-red-500/20 text-gray-500 cursor-not-allowed opacity-60' 
+                          : 'bg-[#1c2230] hover:bg-[#252c3d] border-[#2c3548] text-white hover:text-amber-400'}`}
                     >
-                      <span className="font-semibold text-gray-200">{uRules.name}</span>
-                      <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] font-black uppercase">Select</Badge>
+                      <span className={`font-semibold ${isTargetBlocked ? 'text-gray-500' : 'text-gray-200'}`}>{uRules.name}</span>
+                      {isTargetBlocked ? (
+                        <Badge className="bg-red-500/10 text-red-400 border border-red-500/20 text-[8px] font-black uppercase">Already Targeted</Badge>
+                      ) : (
+                        <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] font-black uppercase">Select</Badge>
+                      )}
                     </Button>
                   );
                 })}
