@@ -2184,6 +2184,27 @@ export default function TrackerPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 space-y-6">
+
+                  {/* Guarded Hero Rule Banner (Shooting Phase Specific) */}
+                  {gameState.currentPhase === 'shooting' && (
+                    <div className="p-3.5 bg-sky-950/25 border border-sky-500/30 rounded-xl space-y-2.5 shadow-lg relative overflow-hidden text-left">
+                      <div className="absolute right-2 top-2 opacity-5 pointer-events-none select-none">
+                        <Shield className="h-16 w-16 text-sky-400" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <ShieldAlert className="h-4 w-4.5 text-sky-400 animate-pulse" />
+                        <span className="text-xs font-black text-white uppercase tracking-wider">🛡️ Core Passive: Guarded Hero</span>
+                        <Badge className="bg-sky-500/20 text-sky-400 border border-sky-500/20 text-[8px] font-bold px-1.5 uppercase tracking-wide">ACTIVE DEFENSE</Badge>
+                      </div>
+                      <p className="text-[10px] text-sky-300 font-semibold leading-normal">
+                        If a friendly <strong className="text-white font-extrabold">HERO</strong> is within combat range (3") of a friendly non-HERO unit:
+                      </p>
+                      <ul className="text-[10px] text-gray-300 space-y-1 pl-4 list-disc font-medium">
+                        <li>Subtract <span className="text-amber-400 font-bold">-1 from hit rolls</span> for shooting attacks targeting this <strong className="text-white">HERO</strong>.</li>
+                        <li>If the <strong className="text-white">HERO</strong> is <span className="text-sky-300 font-semibold">INFANTRY</span>, they <strong className="text-red-400 font-black">CANNOT</strong> be targeted by shooting attacks from units further than 12" away.</li>
+                      </ul>
+                    </div>
+                  )}
                   
                   {/* Defensive abilities for current phase */}
                   {(() => {
@@ -2311,6 +2332,9 @@ export default function TrackerPage() {
                                   {uRules.isHero && (
                                     <Badge className="bg-amber-500/20 text-amber-400 text-[8px] font-bold border border-amber-500/20">HERO / GENERAL</Badge>
                                   )}
+                                  {uRules.isHero && gameState.currentPhase === 'shooting' && (
+                                    <Badge className="bg-sky-500/20 text-sky-400 text-[8px] font-black border border-sky-500/20 animate-pulse">🛡️ Guarded Hero Target</Badge>
+                                  )}
                                   {uRules.isHero && (() => {
                                     const cb = getCastingRollBonus();
                                     return cb ? (
@@ -2320,6 +2344,21 @@ export default function TrackerPage() {
                                     ) : null;
                                   })()}
                                 </h5>
+                                
+                                {/* Guarded Hero Rule micro-reminder on card */}
+                                {gameState.currentPhase === 'shooting' && uRules.isHero && (
+                                  <div className="mt-2 p-2 bg-sky-950/20 border border-sky-500/20 rounded-lg text-left text-[9px] text-sky-300 font-semibold space-y-0.5">
+                                    <div className="text-white font-black uppercase flex items-center gap-1">
+                                      <span>🛡️ GUARDED HERO REMINDER:</span>
+                                    </div>
+                                    <p className="leading-relaxed">
+                                      • Within 3" of non-Hero? <strong className="text-amber-400 font-bold">-1 to Hit rolls</strong> for shooting targeting them.
+                                    </p>
+                                    <p className="leading-relaxed">
+                                      • Is Infantry? <strong className="text-red-400 font-black">Cannot be targeted</strong> by shooting from further than 12".
+                                    </p>
+                                  </div>
+                                )}
                                 <div className="flex gap-2 items-center mt-1 flex-wrap">
                                   <Badge className="bg-blue-600/15 text-blue-400 border border-blue-500/20 text-[9px] font-black uppercase flex items-center gap-1">
                                     <span>SAVE:</span>
