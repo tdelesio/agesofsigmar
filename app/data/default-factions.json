@@ -9381,7 +9381,9 @@
         "effect": "Subtract 1 from the Rend characteristic of melee weapons used for combat attacks that target this general.",
         "phase": "passive",
         "timing": "Passive",
-        "once": "none"
+        "once": "none",
+        "isDefense": true,
+        "passiveAppliedPhase": "combat"
       },
       {
         "id": "helmOfTyranny",
@@ -9517,7 +9519,8 @@
           }
         ]
       }
-    ]
+    ],
+    "isTested": true
   },
   {
     "id": "ossiarch-bonereapers-tithe-reaper-echelon",

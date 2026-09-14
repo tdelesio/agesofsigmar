@@ -587,12 +587,13 @@ export default function TrackerPage() {
     // Exclude global/passive abilities with plural "friendly units" or plural targeting rules
     if (!wasUsed && isTargetingSingular) {
       const isHeightened = abilityId === 'heightenedReflexes' || abilityId.endsWith('-heightenedReflexes');
+      const isRelentlessRD = abilityId.startsWith('relentlessDiscipline');
       const isPhaseLong = effectLower.includes('this phase') || effectLower.includes('the rest of the phase') || effectLower.includes('for the rest of this phase') || isHeightened;
       setSelectUnitToBuffAbility({ 
         abilityId,
         name: abilityName, 
         effect: effect || '', 
-        phase: isHeightened ? 'combat' : (isPhaseLong && phase && phase !== 'passive' ? phase : undefined) 
+        phase: isRelentlessRD ? (gameState.currentPhase as GamePhase) : (isHeightened ? 'combat' : (isPhaseLong && phase && phase !== 'passive' ? phase : undefined)) 
       });
     }
   };
@@ -804,8 +805,13 @@ export default function TrackerPage() {
 
     // Selected Enhancement
     const enhancement = faction.enhancements.find(e => e.id === gameState.selectedEnhancementId);
-    if (enhancement && enhancement.phase === phase && isAbilityAllowedByRound(enhancement)) {
-      list.push({ ...enhancement, sourceType: 'enhancement' });
+    if (enhancement) {
+      if (
+        (enhancement.phase === phase || (enhancement.phase === 'passive' && enhancement.passiveAppliedPhase === phase)) && 
+        isAbilityAllowedByRound(enhancement)
+      ) {
+        list.push({ ...enhancement, sourceType: 'enhancement' });
+      }
     }
 
     // If relentless discipline is active and we are in movement/charge/combat phase:
@@ -1168,13 +1174,16 @@ export default function TrackerPage() {
           badgeBg: 'bg-orange-950/35 text-[#d27d53] border-[#a0522d]/25',
           label: 'Regiment Ability'
         };
-      case 'enhancement':
+      case 'enhancement': {
+        const generalUnit = faction?.units?.find(u => u.isHero);
+        const suffix = generalUnit ? ` (${generalUnit.name})` : '';
         return {
           border: 'border-amber-500/30 hover:border-amber-500/45',
           bg: 'bg-[#221c12]',
           badgeBg: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-          label: 'Enhancement'
+          label: `Enhancement${suffix}`
         };
+      }
       case 'unit':
       default:
         return {
@@ -1461,7 +1470,26 @@ export default function TrackerPage() {
 
     const enhancement = faction.enhancements.find(a => a.id === gameState.selectedEnhancementId);
     if (enhancement && enhancement.isDefense && (enhancement.phase === 'combat' || enhancement.phase === 'passive')) {
-      defAbilities.push({ source: 'Enhancement', name: enhancement.name, timing: enhancement.timing, effect: enhancement.effect, id: enhancement.id, key: enhancement.id });
+      const generalUnit = faction?.units?.find(u => u.isHero);
+      const sourceName = generalUnit ? `Enhancement (${generalUnit.name})` : 'Enhancement';
+      defAbilities.push({ source: sourceName, name: enhancement.name, timing: enhancement.timing, effect: enhancement.effect, id: enhancement.id, key: enhancement.id });
+    }
+
+    // Specifically check for Lode of Saturation as a defensive response if active
+    if (gameState.selectedEnhancementId === 'lodeOfSaturation') {
+      const lode = faction?.enhancements?.find(e => e.id === 'lodeOfSaturation');
+      if (lode && !defAbilities.some(a => a.id === 'lodeOfSaturation')) {
+        const generalUnit = faction?.units?.find(u => u.isHero);
+        const sourceName = generalUnit ? `Enhancement (${generalUnit.name})` : 'Enhancement';
+        defAbilities.push({
+          source: sourceName,
+          name: lode.name,
+          timing: lode.timing || 'Passive',
+          effect: lode.effect,
+          id: lode.id,
+          key: lode.id
+        });
+      }
     }
 
     // Unit specific defensive abilities
@@ -1671,7 +1699,7 @@ export default function TrackerPage() {
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Model HP</span>
               <div className="flex items-center bg-[#1c2230] rounded border border-[#2c3548] overflow-hidden">
                 <button
-                  onClick={() => adjustWoundsById(u.id, -1)}
+                  onClick={() => adjustWoundsById(u.id, 1)}
                   className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-red-400 font-extrabold text-xs transition-all"
                 >
                   -
@@ -1680,7 +1708,7 @@ export default function TrackerPage() {
                   {uRules.health - (u.currentWounds || 0)} / {uRules.health} HP
                 </span>
                 <button
-                  onClick={() => adjustWoundsById(u.id, 1)}
+                  onClick={() => adjustWoundsById(u.id, -1)}
                   className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-emerald-400 font-extrabold text-xs transition-all"
                 >
                   +
@@ -1830,11 +1858,12 @@ export default function TrackerPage() {
           {/* Unit Passives inside the unit box */}
           {(() => {
             const unitPassives = getUnitPassiveAbilitiesForPhase(uRules, 'combat');
-            if (unitPassives.length === 0) return null;
+            const heroEnhancement = uRules.isHero ? faction?.enhancements?.find(e => e.id === gameState.selectedEnhancementId) : null;
+            if (unitPassives.length === 0 && !heroEnhancement) return null;
             return (
               <div className="mt-2.5 p-3 bg-emerald-950/15 border border-emerald-500/20 rounded-xl space-y-2 text-left">
                 <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-widest flex items-center gap-1.5">
-                  <Sparkles className="h-3 w-3 text-emerald-400 animate-pulse" /> Unit Passives (Combat)
+                  <Sparkles className="h-3 w-3 text-emerald-400 animate-pulse" /> Unit Passives & Enhancements
                 </span>
                 <div className="space-y-2">
                   {unitPassives.map((ab) => (
@@ -1843,6 +1872,17 @@ export default function TrackerPage() {
                       <p className="text-[10px] text-gray-300 mt-0.5 whitespace-pre-line leading-normal">{ab.effect}</p>
                     </div>
                   ))}
+                  {heroEnhancement && (
+                    <div className="border-t border-amber-500/20 pt-1.5 first:border-t-0 first:pt-0">
+                      <div className="flex items-center gap-1">
+                        <h5 className="text-xxs font-black text-amber-400">{heroEnhancement.name}</h5>
+                        <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/25 text-[7px] py-0 px-1 font-black uppercase tracking-wider select-none">
+                          ACTIVE ENHANCEMENT
+                        </Badge>
+                      </div>
+                      <p className="text-[10px] text-gray-300 mt-0.5 whitespace-pre-line leading-normal">{heroEnhancement.effect}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -2646,7 +2686,7 @@ export default function TrackerPage() {
                                 <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Model HP</span>
                                 <div className="flex items-center bg-[#1c2230] rounded border border-[#2c3548] overflow-hidden">
                                   <button
-                                    onClick={() => adjustWoundsById(u.id, -1)}
+                                    onClick={() => adjustWoundsById(u.id, 1)}
                                     className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-red-400 font-extrabold text-xs transition-all"
                                   >
                                     -
@@ -2655,7 +2695,7 @@ export default function TrackerPage() {
                                     {uRules.health - (u.currentWounds || 0)} / {uRules.health} HP
                                   </span>
                                   <button
-                                    onClick={() => adjustWoundsById(u.id, 1)}
+                                    onClick={() => adjustWoundsById(u.id, -1)}
                                     className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-emerald-400 font-extrabold text-xs transition-all"
                                   >
                                     +
@@ -2709,11 +2749,12 @@ export default function TrackerPage() {
                             {/* Unit Passives inside defensive card */}
                             {(() => {
                               const unitPassives = getUnitPassiveAbilitiesForPhase(uRules, gameState.currentPhase);
-                              if (unitPassives.length === 0) return null;
+                              const heroEnhancement = uRules.isHero ? faction?.enhancements?.find(e => e.id === gameState.selectedEnhancementId) : null;
+                              if (unitPassives.length === 0 && !heroEnhancement) return null;
                               return (
                                 <div className="mt-2.5 p-3 bg-emerald-950/15 border border-emerald-500/20 rounded-xl space-y-2 text-left">
                                   <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-widest flex items-center gap-1.5">
-                                    <Sparkles className="h-3 w-3 text-emerald-400 animate-pulse" /> Unit Passives (Defense)
+                                    <Sparkles className="h-3 w-3 text-emerald-400 animate-pulse" /> Unit Passives & Enhancements
                                   </span>
                                   <div className="space-y-2">
                                     {unitPassives.map((ab) => (
@@ -2722,6 +2763,17 @@ export default function TrackerPage() {
                                         <p className="text-[10px] text-gray-300 mt-0.5 whitespace-pre-line leading-normal">{ab.effect}</p>
                                       </div>
                                     ))}
+                                    {heroEnhancement && (
+                                      <div className="border-t border-amber-500/20 pt-1.5 first:border-t-0 first:pt-0">
+                                        <div className="flex items-center gap-1">
+                                          <h5 className="text-xxs font-black text-amber-400">{heroEnhancement.name}</h5>
+                                          <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/25 text-[7px] py-0 px-1 font-black uppercase tracking-wider select-none">
+                                            ACTIVE ENHANCEMENT
+                                          </Badge>
+                                        </div>
+                                        <p className="text-[10px] text-gray-300 mt-0.5 whitespace-pre-line leading-normal">{heroEnhancement.effect}</p>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               );
@@ -2873,7 +2925,7 @@ export default function TrackerPage() {
                             <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Model HP</span>
                             <div className="flex items-center bg-[#1c2230] rounded border border-[#2c3548] overflow-hidden">
                               <button
-                                onClick={() => adjustWoundsById(u.id, -1)}
+                                onClick={() => adjustWoundsById(u.id, 1)}
                                 className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-red-400 font-extrabold text-xs transition-all"
                               >
                                 -
@@ -2882,7 +2934,7 @@ export default function TrackerPage() {
                                 {uRules.health - (u.currentWounds || 0)} / {uRules.health} HP
                               </span>
                               <button
-                                onClick={() => adjustWoundsById(u.id, 1)}
+                                onClick={() => adjustWoundsById(u.id, -1)}
                                 className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-emerald-400 font-extrabold text-xs transition-all"
                               >
                                 +
@@ -3019,11 +3071,12 @@ export default function TrackerPage() {
                           <div className="flex flex-col gap-0.5 mt-0.5">
                             {u.ran && <Badge variant="destructive" className="text-xxs font-bold self-start">RAN (Cannot Charge)</Badge>}
                             {(() => {
-                              const chargeMods = getActiveModifiers('charge');
+                              const chargeMods = getActiveModifiers('charge', u.id);
                               if (chargeMods.length > 0 && !u.ran) {
+                                const totalMod = chargeMods.reduce((acc, m) => acc + m.modifier, 0);
                                 return (
                                   <div className="text-emerald-400 font-extrabold text-[10px] flex items-center gap-0.5 self-start">
-                                    <Sparkles className="h-2.5 w-2.5 animate-pulse" /> +1 to Charge Rolls active
+                                    <Sparkles className="h-2.5 w-2.5 animate-pulse" /> +{totalMod} to Charge Rolls active
                                   </div>
                                 );
                               }
@@ -3308,7 +3361,7 @@ export default function TrackerPage() {
                           {/* HP Counter */}
                           <div className="flex items-center justify-between sm:justify-start bg-[#1c2230] p-1.5 rounded-lg border border-[#2c3548] flex-grow sm:flex-grow-0">
                             <button 
-                              onClick={() => adjustWoundsById(u.id, -1)}
+                              onClick={() => adjustWoundsById(u.id, 1)}
                               className="px-2 py-0.5 hover:bg-[#2c3548] text-gray-400 font-bold text-xs rounded"
                             >
                               -
@@ -3317,7 +3370,7 @@ export default function TrackerPage() {
                               Model HP: <strong className="text-white font-black text-xs">{uRules.health - (u.currentWounds || 0)} / {uRules.health}</strong>
                             </span>
                             <button 
-                              onClick={() => adjustWoundsById(u.id, 1)}
+                              onClick={() => adjustWoundsById(u.id, -1)}
                               className="px-2 py-0.5 hover:bg-[#2c3548] text-gray-400 font-bold text-xs rounded"
                             >
                               +
