@@ -514,7 +514,7 @@ export default function TrackerPage() {
     const updated = { ...gameState };
     
     // Detect unlimited (once: "none") abilities to prevent permanent lockout
-    let foundAb = faction?.battleTraits.find(a => a.id === abilityId) ||
+    let foundAb = faction?.battleTraits.find(a => a.id === abilityId || (abilityId.startsWith(a.id) && a.id === 'relentlessDiscipline')) ||
                   faction?.regimentAbilities.find(a => a.id === abilityId) ||
                   faction?.enhancements.find(a => a.id === abilityId);
     
@@ -698,7 +698,7 @@ export default function TrackerPage() {
       let isOncePerBattleAbility = false;
       
       // 1. Try to find in faction battle traits, regiment abilities, or enhancements
-      let foundAb = faction.battleTraits.find(a => a.id === key) ||
+      let foundAb = faction.battleTraits.find(a => a.id === key || (key.startsWith(a.id) && a.id === 'relentlessDiscipline')) ||
                     faction.regimentAbilities.find(a => a.id === key) ||
                     faction.enhancements.find(a => a.id === key);
       
@@ -752,23 +752,66 @@ export default function TrackerPage() {
 
   const getAbilitiesForPhase = (phase: string): Ability[] => {
     const list: Ability[] = [];
+    
+    // Check if relentless discipline is active for Ossiarch Bonereapers
+    const isOB = faction?.id === 'ossiarch-bonereapers';
+    const isRelentlessActive = isOB && (gameState.selectedBattleTraitId === 'all' || gameState.selectedBattleTraitId === 'relentlessDiscipline');
+
     // Selected Battle Trait(s)
     if (gameState.selectedBattleTraitId === 'all') {
       faction.battleTraits.forEach(t => {
-        if (t.phase === phase && isAbilityAllowedByRound(t)) list.push({ ...t, sourceType: 'trait' });
+        if (t.id === 'relentlessDiscipline') {
+          // Relentless Discipline is active in Movement, Charge, and Combat phases, NOT start phase
+          if (['movement', 'charge', 'combat'].includes(phase) && isRelentlessActive) {
+            list.push({ ...t, sourceType: 'trait' });
+          }
+        } else {
+          if (t.phase === phase && isAbilityAllowedByRound(t)) {
+            list.push({ ...t, sourceType: 'trait' });
+          }
+        }
       });
     } else {
       const trait = faction.battleTraits.find(t => t.id === gameState.selectedBattleTraitId);
-      if (trait && trait.phase === phase && isAbilityAllowedByRound(trait)) list.push({ ...trait, sourceType: 'trait' });
+      if (trait) {
+        if (trait.id === 'relentlessDiscipline') {
+          if (['movement', 'charge', 'combat'].includes(phase) && isRelentlessActive) {
+            list.push({ ...trait, sourceType: 'trait' });
+          }
+        } else if (trait.phase === phase && isAbilityAllowedByRound(trait)) {
+          list.push({ ...trait, sourceType: 'trait' });
+        }
+      }
     }
 
     // Selected Regiment
     const regiment = faction.regimentAbilities.find(r => r.id === gameState.selectedRegimentAbilityId);
-    if (regiment && regiment.phase === phase && isAbilityAllowedByRound(regiment)) list.push({ ...regiment, sourceType: 'regiment' });
+    if (regiment && regiment.phase === phase && isAbilityAllowedByRound(regiment)) {
+      list.push({ ...regiment, sourceType: 'regiment' });
+    }
 
     // Selected Enhancement
     const enhancement = faction.enhancements.find(e => e.id === gameState.selectedEnhancementId);
-    if (enhancement && enhancement.phase === phase && isAbilityAllowedByRound(enhancement)) list.push({ ...enhancement, sourceType: 'enhancement' });
+    if (enhancement && enhancement.phase === phase && isAbilityAllowedByRound(enhancement)) {
+      list.push({ ...enhancement, sourceType: 'enhancement' });
+    }
+
+    // If relentless discipline is active and we are in movement/charge/combat phase:
+    // And if Peerless Cohesion is selected as a regiment ability, push the second use of relentless discipline!
+    if (isRelentlessActive && ['movement', 'charge', 'combat'].includes(phase)) {
+      const baseRD = faction.battleTraits.find(t => t.id === 'relentlessDiscipline');
+      if (baseRD) {
+        const hasPeerlessCohesion = gameState.selectedRegimentAbilityId === 'peerlessCohesion';
+        if (hasPeerlessCohesion) {
+          list.push({
+            ...baseRD,
+            id: 'relentlessDiscipline-2',
+            name: 'Relentless Discipline (Second Use)',
+            sourceType: 'trait'
+          });
+        }
+      }
+    }
 
     return list;
   };
