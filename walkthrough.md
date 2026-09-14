@@ -1,6 +1,35 @@
-# Match State & Rule Engine Implementation Walkthrough
+# Match State, Rules Engine & Combat UI Implementation Walkthrough
 
-We have successfully implemented the **Slaves to Darkness "Eye of the Gods" Ascension Table Modal**, **Generic Turn-Based Charge-Conditional Modifiers**, **Dynamic 0-Base Ward Modifications**, **Structured Opponent-Turn Combat Phase Layout**, and **AoS Target Roll Modifier Capping with Detailed Hover Tooltips** in the Spearhead Combat Tracker.
+We have successfully implemented the **Combat Phase Order of Events Protocol**, **Strike-First / Strike-Last Interactive Groups**, **Active Turn Phase Constraints**, **Round-based Ability Locks (Dread Descent)**, **Slaves to Darkness Eye of the Gods Ascension**, and the **Lumineth Facets of War** in the Spearhead Combat Tracker.
+
+---
+
+## ⚔️ Combat Sequencing, Turn Constraints & Speed Activations [NEW]
+
+We have designed and integrated a premium, official-compliant combat sequence and phase-filtering system that brings total rules purity to Spearhead matches:
+
+### 1. ⏱️ Strike-First & Strike-Last Activation Groups
+We subdivided the Melee Combat Activations panel into three visually distinct, sequential, and beautifully badged categories:
+- **⚡ Strike-First Activations**: High-priority combatants (e.g. units with active Strike-First buffs or charging cavalry) that resolve attacks before standard fighting starts.
+- **⚔️ Normal Combat Activations**: Standard combatants resolving attacks in alternating order.
+- **🛡️ Strike-Last Activations**: Slowed combatants resolving attacks after normal activations conclude.
+- **Tactile Inline Speed Overrides**: Added an elegant segmented control (`⚡ First` / `⚔️ Normal` / `🛡️ Last`) inside each unit card, allowing players to instantly toggle and override a unit's combat order dynamically during intense melee encounters. Custom logs track these speed adjustments in real-time.
+
+### 2. 🔀 Attacker/Defender Order of Events Protocol
+In accordance with official Age of Sigmar 4.0 sequencing, we unified the Combat Phase timeline layout across both turns:
+1. **Attacker declares combat abilities** first inside the renamed `Abilities (Round X)` active strategies block.
+2. **Defender declares reactive responses** next inside `My Defensive Responses`.
+3. **Melee activations are resolved** sequentially by combat speed groups.
+4. **Passive combat rules** are evaluated at the bottom.
+
+### 3. 🚫 Phase Filtering on Opponent Turn
+During the opponent's turn, standard active abilities for the **Hero**, **Movement**, **Shooting**, and **Charge** phases are completely locked and hidden from view. This prevents players from mistakenly triggering active friendly tactics when it is not their active turn, ensuring complete match purity.
+
+### 4. ⏳ Dread Descent Battle Round restriction
+The Ossiarch Bonereapers battle trait **Dread Descent** is locked out and filtered out of all available active strategy and passive listings during **Battle Round 1**. It becomes automatically available starting from Battle Round 2 onwards, perfectly matching the official rules criteria.
+
+### 🏷️ Abilities Relocation and Consistent Naming
+We renamed the main active strategy block to `Abilities (Round X)` and elevated it to render above `My Melee Combat Activations` in the combat timeline, creating a highly cohesive and uniform tactical cockpit across all non-combat and combat phases.
 
 ---
 

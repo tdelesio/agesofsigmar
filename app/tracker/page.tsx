@@ -386,6 +386,39 @@ export default function TrackerPage() {
     saveGame(updated);
   };
 
+  const setUnitCombatOrder = (unitInstanceId: string, order: 'first' | 'normal' | 'last') => {
+    if (!gameState) return;
+    const updated = { ...gameState };
+    const uState = updated.units.find(u => u.id === unitInstanceId);
+    if (!uState) return;
+
+    uState.combatOrder = order;
+    
+    // Add an action log
+    const uRules = faction.units.find(u => u.id === uState.unitId);
+    const orderLabels = { first: 'Strike-First ⚡', normal: 'Normal ⚔️', last: 'Strike-Last 🛡️' };
+    updated.logs.unshift(`[Round ${updated.round}] ⏱️ Set ${uRules?.name || 'Unit'} speed to ${orderLabels[order]}.`);
+
+    saveGame(updated);
+  };
+
+  const getUnitCombatOrder = (u: UnitState, uRules: Unit): 'first' | 'normal' | 'last' => {
+    if (u.combatOrder) return u.combatOrder;
+
+    // Check if there is an applied modifier indicating Strike-First or Strike-Last
+    const hasFirstMod = gameState?.appliedModifiers?.some(
+      m => m.unitId === u.id && m.label.toLowerCase().includes('strike-first')
+    );
+    if (hasFirstMod) return 'first';
+
+    const hasLastMod = gameState?.appliedModifiers?.some(
+      m => m.unitId === u.id && m.label.toLowerCase().includes('strike-last')
+    );
+    if (hasLastMod) return 'last';
+
+    return 'normal';
+  };
+
   const adjustModelsById = (unitInstanceId: string, amount: number) => {
     const updated = { ...gameState };
     const uState = updated.units.find(u => u.id === unitInstanceId);
@@ -709,25 +742,33 @@ export default function TrackerPage() {
   };
 
   // Extract phase-specific abilities for reference
+  const isAbilityAllowedByRound = (ab: Ability): boolean => {
+    if (!gameState) return true;
+    if ((ab.id === 'dreadDescent' || ab.name.toLowerCase() === 'dread descent') && gameState.round === 1) {
+      return false;
+    }
+    return true;
+  };
+
   const getAbilitiesForPhase = (phase: string): Ability[] => {
     const list: Ability[] = [];
     // Selected Battle Trait(s)
     if (gameState.selectedBattleTraitId === 'all') {
       faction.battleTraits.forEach(t => {
-        if (t.phase === phase) list.push({ ...t, sourceType: 'trait' });
+        if (t.phase === phase && isAbilityAllowedByRound(t)) list.push({ ...t, sourceType: 'trait' });
       });
     } else {
       const trait = faction.battleTraits.find(t => t.id === gameState.selectedBattleTraitId);
-      if (trait && trait.phase === phase) list.push({ ...trait, sourceType: 'trait' });
+      if (trait && trait.phase === phase && isAbilityAllowedByRound(trait)) list.push({ ...trait, sourceType: 'trait' });
     }
 
     // Selected Regiment
     const regiment = faction.regimentAbilities.find(r => r.id === gameState.selectedRegimentAbilityId);
-    if (regiment && regiment.phase === phase) list.push({ ...regiment, sourceType: 'regiment' });
+    if (regiment && regiment.phase === phase && isAbilityAllowedByRound(regiment)) list.push({ ...regiment, sourceType: 'regiment' });
 
     // Selected Enhancement
     const enhancement = faction.enhancements.find(e => e.id === gameState.selectedEnhancementId);
-    if (enhancement && enhancement.phase === phase) list.push({ ...enhancement, sourceType: 'enhancement' });
+    if (enhancement && enhancement.phase === phase && isAbilityAllowedByRound(enhancement)) list.push({ ...enhancement, sourceType: 'enhancement' });
 
     return list;
   };
@@ -983,7 +1024,7 @@ export default function TrackerPage() {
     const list: Ability[] = [];
     
     const isMatched = (a: Ability) => {
-      return a.phase === 'passive' && (!a.passiveAppliedPhase || a.passiveAppliedPhase === (phase as GamePhase));
+      return a.phase === 'passive' && (!a.passiveAppliedPhase || a.passiveAppliedPhase === (phase as GamePhase)) && isAbilityAllowedByRound(a);
     };
 
     // Faction-wide passives
@@ -1181,10 +1222,10 @@ export default function TrackerPage() {
           <div className="flex justify-between items-center">
             <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-1.5 text-amber-400">
               <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" /> 
-              My Active Strategy (Combat Phase)
+              Abilities (Round {gameState.round})
             </CardTitle>
             <Badge variant="outline" className="uppercase text-[9px] border-amber-500/30 bg-amber-500/10 text-amber-400 font-bold px-2 py-0.5">
-              ACTIVE STRATEGY
+              ACTIVE ABILITIES
             </Badge>
           </div>
           <CardDescription className="text-xxs text-gray-400 mt-0.5">
@@ -1404,290 +1445,376 @@ export default function TrackerPage() {
   };
 
   const renderCombatUnitActivations = () => {
+    // Helper to render an individual unit combat card
+    const renderUnitCombatCard = (u: UnitState, uRules: Unit) => {
+      // Collect active modifiers and buffs for this unit
+      const activeBuffs: { id?: string; label: string; modifier: number; stat?: string }[] = [];
+
+      if (gameState.appliedModifiers) {
+        gameState.appliedModifiers.forEach(mod => {
+          if (mod.unitId === u.id) {
+            activeBuffs.push({
+              id: mod.id,
+              label: mod.label,
+              modifier: mod.modifier,
+              stat: mod.stat
+            });
+          }
+        });
+      }
+
+      // Check selected general enhancement or other traits that apply dynamically
+      if (gameState.selectedEnhancementId === 'markOfKhorne' && uRules.isHero && u.charged) {
+        activeBuffs.push({
+          label: 'Mark of Khorne (+1 Rend on Charge)',
+          modifier: 1
+        });
+      }
+
+      // Faction trait / regiment abilities that are active
+      if (gameState.selectedBattleTraitId && gameState.selectedBattleTraitId !== '') {
+        const trait = faction.battleTraits.find(t => t.id === gameState.selectedBattleTraitId);
+        if (trait && trait.effect && (trait.effect.toLowerCase().includes('melee') || trait.effect.toLowerCase().includes('combat'))) {
+          if (!trait.effect.toLowerCase().includes('hero') || uRules.isHero) {
+            activeBuffs.push({
+              label: `${trait.name} (Active Battle Trait)`,
+              modifier: 0,
+            });
+          }
+        }
+      }
+
+      return (
+        <div key={u.id} className={`p-4 rounded-xl border transition-all flex flex-col gap-3
+          ${u.fought 
+            ? 'bg-[#181d29]/20 border-transparent opacity-40 saturate-0' 
+            : 'bg-[#1c2230] border-[#2c3548] hover:border-amber-500/40'}`}>
+          
+          <div className="flex justify-between items-start gap-2 border-b border-[#2c3548]/40 pb-2">
+            <div>
+              <h5 className="text-xs font-black text-white flex items-center gap-1.5 flex-wrap">
+                {uRules.name}
+                {uRules.isHero && (
+                  <>
+                    <Badge className="bg-amber-500/20 text-amber-400 text-[8px] font-bold border border-amber-500/20">HERO / GENERAL</Badge>
+                    {(() => {
+                      const cb = getCastingRollBonus();
+                      if (cb) {
+                        return (
+                          <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[8px] font-black uppercase tracking-wider select-none flex items-center gap-1">
+                            🔮 +{cb.value} CASTING ROLL
+                          </Badge>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </>
+                )}
+              </h5>
+              <div className="text-xxs text-amber-500 font-semibold flex items-center gap-2 flex-wrap mt-0.5">
+                <span className="flex items-center gap-1">Save: {renderStatWithModifier(uRules.save, 'save', u.id, '+')}</span>
+                {(uRules.ward > 0 || getActiveModifiers('ward', u.id).length > 0 || uRules.id === 'vanariBladelords' || (uRules.isHero && gameState?.units?.some(unit => unit.unitId === 'vanariBladelords' && !unit.isSlain))) && (
+                  <span className="flex items-center gap-1">| Ward: {renderStatWithModifier(uRules.ward || 0, 'ward', u.id)}</span>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => toggleUnitStateFlag(u.id, 'fought')}
+              className={`px-3 py-1 rounded text-xxs font-black uppercase transition-all shrink-0
+                ${u.fought 
+                  ? 'bg-[#151923] text-gray-500 border border-transparent' 
+                  : 'bg-rose-600 text-white hover:bg-rose-700 shadow-md'}`}
+            >
+              {u.fought ? 'Activated' : 'Fight'}
+            </button>
+          </div>
+
+          {/* Health and Models Tracker panel inside active card */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-[#151923]/60 p-2 rounded-xl border border-[#222834]">
+            <div className="flex justify-between items-center gap-2 flex-grow">
+              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Models</span>
+              <div className="flex items-center bg-[#1c2230] rounded border border-[#2c3548] overflow-hidden">
+                <button
+                  onClick={() => adjustModelsById(u.id, -1)}
+                  className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-red-400 font-extrabold text-xs transition-all"
+                >
+                  -
+                </button>
+                <span className="px-3 font-black text-white text-xs min-w-[2.5rem] text-center">
+                  {u.modelsCount ?? uRules.models ?? 1} / {u.maxModels ?? uRules.models ?? 1}
+                </span>
+                <button
+                  onClick={() => adjustModelsById(u.id, 1)}
+                  className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-emerald-400 font-extrabold text-xs transition-all"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            <div className="hidden sm:block h-6 w-px bg-[#2c3548]/40" />
+
+            <div className="flex justify-between items-center gap-2 flex-grow">
+              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Model HP</span>
+              <div className="flex items-center bg-[#1c2230] rounded border border-[#2c3548] overflow-hidden">
+                <button
+                  onClick={() => adjustWoundsById(u.id, -1)}
+                  className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-red-400 font-extrabold text-xs transition-all"
+                >
+                  -
+                </button>
+                <span className="px-3 font-black text-white text-xs min-w-[3.5rem] text-center">
+                  {uRules.health - (u.currentWounds || 0)} / {uRules.health} HP
+                </span>
+                <button
+                  onClick={() => adjustWoundsById(u.id, 1)}
+                  className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-emerald-400 font-extrabold text-xs transition-all"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Combat Activation Sequence Speed Selector */}
+          <div className="flex items-center justify-between gap-2 p-1.5 bg-[#151923]/60 rounded-xl border border-[#222834]/80 text-xxs">
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wide px-1 flex items-center gap-1">
+              <span>⏱️</span>
+              <span>Order</span>
+            </span>
+            <div className="flex items-center bg-[#1c2230] p-0.5 rounded border border-[#2c3548] overflow-hidden text-[9px] font-black uppercase shrink-0">
+              <button 
+                onClick={() => setUnitCombatOrder(u.id, 'first')}
+                className={`px-2 py-0.5 rounded-sm transition-all flex items-center gap-1 ${getUnitCombatOrder(u, uRules) === 'first' ? 'bg-amber-500/25 text-amber-400 border border-amber-500/20 font-black' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                ⚡ First
+              </button>
+              <button 
+                onClick={() => setUnitCombatOrder(u.id, 'normal')}
+                className={`px-2 py-0.5 rounded-sm transition-all flex items-center gap-1 ${getUnitCombatOrder(u, uRules) === 'normal' ? 'bg-[#2c3548] text-gray-300 font-black' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                ⚔️ Normal
+              </button>
+              <button 
+                onClick={() => setUnitCombatOrder(u.id, 'last')}
+                className={`px-2 py-0.5 rounded-sm transition-all flex items-center gap-1 ${getUnitCombatOrder(u, uRules) === 'last' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/15 font-black' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                🛡️ Last
+              </button>
+            </div>
+          </div>
+
+          {/* ACTIVE APPLIED BUFFS SUMMARY - STUNNING VERTICAL LINE-BY-LINE COMPONENT */}
+          {activeBuffs.length > 0 ? (
+            <div className="p-2 bg-[#151923]/40 border border-[#2c3548]/30 rounded-lg space-y-1.5">
+              <span className="text-[9px] text-amber-500/80 font-black uppercase tracking-widest block mb-1">✨ Active Buffs & Applied Modifiers:</span>
+              <div className="flex flex-col gap-1">
+                {activeBuffs.map((buff, bIdx) => (
+                  <div 
+                    key={bIdx} 
+                    className="text-[10px] font-semibold text-amber-400 px-2.5 py-1.5 flex items-center justify-between bg-amber-500/5 border border-amber-500/15 rounded-md hover:bg-amber-500/10 transition-all"
+                  >
+                    <span className="truncate pr-2">{buff.label}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {buff.modifier !== 0 && (
+                        <Badge className="bg-amber-500/15 text-amber-300 font-extrabold text-[9px] px-1.5 py-0 border-none">
+                          {buff.modifier > 0 ? `+${buff.modifier}` : buff.modifier} {buff.stat ? (buff.stat === 'hit' ? 'to Hit' : buff.stat === 'wound' ? 'to Wound' : buff.stat.charAt(0).toUpperCase() + buff.stat.slice(1)) : ''}
+                        </Badge>
+                      )}
+                      {buff.id && (
+                        <button 
+                          onClick={() => removeBuff(buff.id!)} 
+                          className="text-gray-500 hover:text-red-400 p-0.5 rounded transition-all focus:outline-none font-bold text-xs"
+                          title="Delete Buff"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="p-2 bg-[#151923]/20 border border-[#2c3548]/10 rounded-lg text-left">
+              <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wide">No active modifiers applied to this unit.</span>
+            </div>
+          )}
+
+          {/* Weapons stats */}
+          <div className="mt-1 space-y-3">
+            {uRules.weapons.filter(w => w.range === 'Melee').map((w, wIdx) => (
+              <div key={wIdx} className="p-3 bg-[#151923]/80 border border-[#2c3548]/50 rounded-xl space-y-2">
+                <div className="text-xs font-black text-white pb-1 border-b border-[#2c3548]/20 flex items-center justify-between">
+                  <span>{w.name}</span>
+                  <Badge variant="outline" className="text-[9px] font-bold text-amber-500 border-amber-500/20 bg-amber-500/5 px-2 py-0">Melee</Badge>
+                </div>
+                
+                <div className="grid grid-cols-6 gap-2 text-xs font-semibold">
+                  {/* Attacks stat */}
+                  <div className="col-span-2 flex justify-between items-center bg-emerald-950/30 border border-emerald-500/20 rounded px-2 py-1 text-emerald-400">
+                    <span className="text-gray-400 font-bold text-[9px] uppercase">Attacks</span>
+                    <span className="font-black text-xs text-white">{renderStatWithModifier(w.attacks, 'attacks', u.id, '', w.name)}</span>
+                  </div>
+
+                  {/* Hit stat */}
+                  <div className="col-span-2 flex justify-between items-center bg-amber-950/30 border border-amber-500/20 rounded px-2 py-1 text-amber-400">
+                    <span className="text-gray-400 font-bold text-[9px] uppercase">Hit</span>
+                    <span className="font-black text-xs text-white">{renderStatWithModifier(w.hit, 'hit', u.id, '+')}</span>
+                  </div>
+
+                  {/* Wound stat */}
+                  <div className="col-span-2 flex justify-between items-center bg-orange-950/30 border border-orange-500/20 rounded px-2 py-1 text-orange-400">
+                    <span className="text-gray-400 font-bold text-[9px] uppercase">Wound</span>
+                    <span className="font-black text-xs text-white">{renderStatWithModifier(w.wound, 'wound', u.id, '+')}</span>
+                  </div>
+
+                  {/* Rend stat */}
+                  <div className="col-span-3 flex justify-between items-center bg-blue-950/30 border border-blue-500/20 rounded px-2 py-1 text-blue-400">
+                    <span className="text-gray-400 font-bold text-[9px] uppercase">Rend</span>
+                    <span className="font-black text-xs text-white">-{renderStatWithModifier(w.rend, 'rend', u.id, '', w.name)}</span>
+                  </div>
+
+                  {/* Damage stat */}
+                  <div className="col-span-3 flex justify-between items-center bg-rose-950/30 border border-rose-500/20 rounded px-2 py-1 text-rose-400">
+                    <span className="text-gray-400 font-bold text-[9px] uppercase">Damage</span>
+                    <span className="font-black text-xs text-white">{renderStatWithModifier(w.damage, 'damage', u.id, '', w.name)}</span>
+                  </div>
+
+                  {/* Ability box */}
+                  {w.abilities && (
+                    <div className="col-span-6 flex flex-col bg-indigo-950/30 border border-indigo-500/20 rounded p-1.5 text-left text-indigo-300">
+                      <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Ability:</span>
+                      <span className="text-xxs font-medium text-indigo-200 mt-0.5">{w.abilities}</span>
+                    </div>
+                  )}
+
+                  {/* Dynamic Dice Math calculation */}
+                  {(() => {
+                    const currentModels = u.modelsCount !== undefined ? u.modelsCount : (uRules.models || 1);
+                    const attacksMods = getActiveModifiers('attacks', u.id, w.name);
+                    const totalAttacksMod = attacksMods.reduce((acc, m) => acc + m.modifier, 0);
+                    
+                    const overrideVal = getBattleDamagedOverride(u.id, 'attacks', w.name);
+                    const baseAttacks = overrideVal !== null ? overrideVal : (parseInt(String(w.attacks), 10) || 0);
+                    const effectiveAttacks = overrideVal !== null ? overrideVal : calculateStatValue(baseAttacks, 'attacks', totalAttacksMod).modifiedNum;
+                    const totalDice = currentModels * effectiveAttacks;
+                    return (
+                      <div className="col-span-6 flex items-center justify-between text-[11px] bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-2.5 mt-1 select-none">
+                        <span className="text-gray-400 font-extrabold uppercase tracking-widest text-[9px]">🎲 Dice Math:</span>
+                        <span className="font-extrabold text-emerald-400 flex items-center gap-1">
+                          <span>{totalDice} Dice</span>
+                          <span className="text-gray-500 font-semibold">({currentModels} models × {effectiveAttacks} attacks)</span>
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Unit Passives inside the unit box */}
+          {(() => {
+            const unitPassives = getUnitPassiveAbilitiesForPhase(uRules, 'combat');
+            if (unitPassives.length === 0) return null;
+            return (
+              <div className="mt-2.5 p-3 bg-emerald-950/15 border border-emerald-500/20 rounded-xl space-y-2 text-left">
+                <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-widest flex items-center gap-1.5">
+                  <Sparkles className="h-3 w-3 text-emerald-400 animate-pulse" /> Unit Passives (Combat)
+                </span>
+                <div className="space-y-2">
+                  {unitPassives.map((ab) => (
+                    <div key={ab.id} className="border-t border-emerald-500/10 pt-1.5 first:border-t-0 first:pt-0">
+                      <h5 className="text-xxs font-black text-white">{ab.name}</h5>
+                      <p className="text-[10px] text-gray-300 mt-0.5 whitespace-pre-line leading-normal">{ab.effect}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      );
+    };
+
+    // Filter and map all active units
+    const activeUnits = gameState.units.filter(u => !u.isSlain).map(u => {
+      const uRules = faction.units.find(rules => rules.id === u.unitId);
+      return { u, uRules };
+    }).filter(item => !!item.uRules) as { u: UnitState; uRules: Unit }[];
+
+    // Group units by their combat speed
+    const firstGroup = activeUnits.filter(item => getUnitCombatOrder(item.u, item.uRules) === 'first');
+    const normalGroup = activeUnits.filter(item => getUnitCombatOrder(item.u, item.uRules) === 'normal');
+    const lastGroup = activeUnits.filter(item => getUnitCombatOrder(item.u, item.uRules) === 'last');
+
+    const totalCount = activeUnits.length;
+    if (totalCount === 0) return null;
+
     return (
-      <Card className="border-[#222834] bg-[#151923] text-white">
+      <Card className="border-[#222834] bg-[#151923] text-white shadow-xl">
         <CardHeader className="border-b border-[#222834] py-3.5">
           <div className="flex justify-between items-center">
             <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-1.5 text-rose-400">
               <Swords className="h-4.5 w-4.5 text-rose-400" /> My Melee Combat Activations
             </CardTitle>
             <Badge variant="outline" className="uppercase text-[9px] border-rose-500/30 bg-rose-500/10 text-rose-400 font-bold px-2 py-0.5">
-              UNIT STATS & FIGHTS
+              ACTIVATIONS PROTOCOL
             </Badge>
           </div>
-          <CardDescription className="text-xxs text-gray-400 mt-0.5">
-            Resolve melee attacks for your active units. Track health, models, and toggle "Fight" upon activation.
+          <CardDescription className="text-xxs text-gray-400 mt-0.5 leading-relaxed">
+            Resolve melee attacks sequentially based on combat speed groups. Toggle "Fight" on a unit after resolving its attacks.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {gameState.units.filter(u => !u.isSlain).map((u) => {
-              const uRules = faction.units.find(rules => rules.id === u.unitId);
-              if (!uRules) return null;
-
-              // Collect active modifiers and buffs for this unit
-              const activeBuffs: { id?: string; label: string; modifier: number; stat?: string }[] = [];
-
-              if (gameState.appliedModifiers) {
-                gameState.appliedModifiers.forEach(mod => {
-                  if (mod.unitId === u.id) {
-                    activeBuffs.push({
-                      id: mod.id,
-                      label: mod.label,
-                      modifier: mod.modifier,
-                      stat: mod.stat
-                    });
-                  }
-                });
-              }
-
-              // Check selected general enhancement or other traits that apply dynamically
-              if (gameState.selectedEnhancementId === 'markOfKhorne' && uRules.isHero && u.charged) {
-                activeBuffs.push({
-                  label: 'Mark of Khorne (+1 Rend on Charge)',
-                  modifier: 1
-                });
-              }
-
-              // Faction trait / regiment abilities that are active
-              if (gameState.selectedBattleTraitId && gameState.selectedBattleTraitId !== '') {
-                const trait = faction.battleTraits.find(t => t.id === gameState.selectedBattleTraitId);
-                if (trait && trait.effect && (trait.effect.toLowerCase().includes('melee') || trait.effect.toLowerCase().includes('combat'))) {
-                  if (!trait.effect.toLowerCase().includes('hero') || uRules.isHero) {
-                    activeBuffs.push({
-                      label: `${trait.name} (Active Battle Trait)`,
-                      modifier: 0,
-                    });
-                  }
-                }
-              }
-
-              return (
-                <div key={u.id} className={`p-4 rounded-xl border transition-all flex flex-col gap-3
-                  ${u.fought 
-                    ? 'bg-[#181d29]/20 border-transparent opacity-40 saturate-0' 
-                    : 'bg-[#1c2230] border-[#2c3548] hover:border-amber-500/40'}`}>
-                  
-                  <div className="flex justify-between items-start gap-2 border-b border-[#2c3548]/40 pb-2">
-                    <div>
-                      <h5 className="text-xs font-black text-white flex items-center gap-1.5">
-                        {uRules.name}
-                        {uRules.isHero && (
-                          <>
-                            <Badge className="bg-amber-500/20 text-amber-400 text-[8px] font-bold border border-amber-500/20">HERO / GENERAL</Badge>
-                            {(() => {
-                              const cb = getCastingRollBonus();
-                              if (cb) {
-                                return (
-                                  <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[8px] font-black uppercase tracking-wider select-none flex items-center gap-1">
-                                    🔮 +{cb.value} CASTING ROLL
-                                  </Badge>
-                                );
-                              }
-                              return null;
-                            })()}
-                          </>
-                        )}
-                      </h5>
-                      <div className="text-xxs text-amber-500 font-semibold flex items-center gap-2 flex-wrap mt-0.5">
-                        <span className="flex items-center gap-1">Save: {renderStatWithModifier(uRules.save, 'save', u.id, '+')}</span>
-                        {(uRules.ward > 0 || getActiveModifiers('ward', u.id).length > 0 || uRules.id === 'vanariBladelords' || (uRules.isHero && gameState?.units?.some(unit => unit.unitId === 'vanariBladelords' && !unit.isSlain))) && (
-                          <span className="flex items-center gap-1">| Ward: {renderStatWithModifier(uRules.ward || 0, 'ward', u.id)}</span>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => toggleUnitStateFlag(u.id, 'fought')}
-                      className={`px-3 py-1 rounded text-xxs font-black uppercase transition-all
-                        ${u.fought 
-                          ? 'bg-[#151923] text-gray-500 border border-transparent' 
-                          : 'bg-rose-600 text-white hover:bg-rose-700 shadow-md'}`}
-                    >
-                      {u.fought ? 'Activated' : 'Fight'}
-                    </button>
-                  </div>
-
-                  {/* Health and Models Tracker panel inside active card */}
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-[#151923]/60 p-2 rounded-xl border border-[#222834]">
-                    <div className="flex justify-between items-center gap-2 flex-grow">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Models</span>
-                      <div className="flex items-center bg-[#1c2230] rounded border border-[#2c3548] overflow-hidden">
-                        <button
-                          onClick={() => adjustModelsById(u.id, -1)}
-                          className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-red-400 font-extrabold text-xs transition-all"
-                        >
-                          -
-                        </button>
-                        <span className="px-3 font-black text-white text-xs min-w-[2.5rem] text-center">
-                          {u.modelsCount ?? uRules.models ?? 1} / {u.maxModels ?? uRules.models ?? 1}
-                        </span>
-                        <button
-                          onClick={() => adjustModelsById(u.id, 1)}
-                          className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-emerald-400 font-extrabold text-xs transition-all"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="hidden sm:block h-6 w-px bg-[#2c3548]/40" />
-
-                    <div className="flex justify-between items-center gap-2 flex-grow">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Model HP</span>
-                      <div className="flex items-center bg-[#1c2230] rounded border border-[#2c3548] overflow-hidden">
-                        <button
-                          onClick={() => adjustWoundsById(u.id, -1)}
-                          className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-red-400 font-extrabold text-xs transition-all"
-                        >
-                          -
-                        </button>
-                        <span className="px-3 font-black text-white text-xs min-w-[3.5rem] text-center">
-                          {uRules.health - (u.currentWounds || 0)} / {uRules.health} HP
-                        </span>
-                        <button
-                          onClick={() => adjustWoundsById(u.id, 1)}
-                          className="px-2.5 py-0.5 hover:bg-[#2c3548] text-gray-400 hover:text-emerald-400 font-extrabold text-xs transition-all"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ACTIVE APPLIED BUFFS SUMMARY - STUNNING VERTICAL LINE-BY-LINE COMPONENT */}
-                  {activeBuffs.length > 0 ? (
-                    <div className="p-2 bg-[#151923]/40 border border-[#2c3548]/30 rounded-lg space-y-1.5">
-                      <span className="text-[9px] text-amber-500/80 font-black uppercase tracking-widest block mb-1">✨ Active Buffs & Applied Modifiers:</span>
-                      <div className="flex flex-col gap-1">
-                        {activeBuffs.map((buff, bIdx) => (
-                          <div 
-                            key={bIdx} 
-                            className="text-[10px] font-semibold text-amber-400 px-2.5 py-1.5 flex items-center justify-between bg-amber-500/5 border border-amber-500/15 rounded-md hover:bg-amber-500/10 transition-all"
-                          >
-                            <span className="truncate pr-2">{buff.label}</span>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {buff.modifier !== 0 && (
-                                <Badge className="bg-amber-500/15 text-amber-300 font-extrabold text-[9px] px-1.5 py-0 border-none">
-                                  {buff.modifier > 0 ? `+${buff.modifier}` : buff.modifier} {buff.stat ? (buff.stat === 'hit' ? 'to Hit' : buff.stat === 'wound' ? 'to Wound' : buff.stat.charAt(0).toUpperCase() + buff.stat.slice(1)) : ''}
-                                </Badge>
-                              )}
-                              {buff.id && (
-                                <button 
-                                  onClick={() => removeBuff(buff.id!)} 
-                                  className="text-gray-500 hover:text-red-400 p-0.5 rounded transition-all focus:outline-none font-bold text-xs"
-                                  title="Delete Buff"
-                                >
-                                  ✕
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-2 bg-[#151923]/20 border border-[#2c3548]/10 rounded-lg text-left">
-                      <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wide">No active modifiers applied to this unit.</span>
-                    </div>
-                  )}
-
-                  {/* Weapons stats */}
-                  <div className="mt-1 space-y-3">
-                    {uRules.weapons.filter(w => w.range === 'Melee').map((w, wIdx) => (
-                      <div key={wIdx} className="p-3 bg-[#151923]/80 border border-[#2c3548]/50 rounded-xl space-y-2">
-                        <div className="text-xs font-black text-white pb-1 border-b border-[#2c3548]/20 flex items-center justify-between">
-                          <span>{w.name}</span>
-                          <Badge variant="outline" className="text-[9px] font-bold text-amber-500 border-amber-500/20 bg-amber-500/5 px-2 py-0">Melee</Badge>
-                        </div>
-                        
-                        <div className="grid grid-cols-6 gap-2 text-xs font-semibold">
-                          {/* Attacks stat */}
-                          <div className="col-span-2 flex justify-between items-center bg-emerald-950/30 border border-emerald-500/20 rounded px-2 py-1 text-emerald-400">
-                            <span className="text-gray-400 font-bold text-[9px] uppercase">Attacks</span>
-                            <span className="font-black text-xs text-white">{renderStatWithModifier(w.attacks, 'attacks', u.id, '', w.name)}</span>
-                          </div>
-
-                          {/* Hit stat */}
-                          <div className="col-span-2 flex justify-between items-center bg-amber-950/30 border border-amber-500/20 rounded px-2 py-1 text-amber-400">
-                            <span className="text-gray-400 font-bold text-[9px] uppercase">Hit</span>
-                            <span className="font-black text-xs text-white">{renderStatWithModifier(w.hit, 'hit', u.id, '+')}</span>
-                          </div>
-
-                          {/* Wound stat */}
-                          <div className="col-span-2 flex justify-between items-center bg-orange-950/30 border border-orange-500/20 rounded px-2 py-1 text-orange-400">
-                            <span className="text-gray-400 font-bold text-[9px] uppercase">Wound</span>
-                            <span className="font-black text-xs text-white">{renderStatWithModifier(w.wound, 'wound', u.id, '+')}</span>
-                          </div>
-
-                          {/* Rend stat */}
-                          <div className="col-span-3 flex justify-between items-center bg-blue-950/30 border border-blue-500/20 rounded px-2 py-1 text-blue-400">
-                            <span className="text-gray-400 font-bold text-[9px] uppercase">Rend</span>
-                            <span className="font-black text-xs text-white">-{renderStatWithModifier(w.rend, 'rend', u.id, '', w.name)}</span>
-                          </div>
-
-                          {/* Damage stat */}
-                          <div className="col-span-3 flex justify-between items-center bg-rose-950/30 border border-rose-500/20 rounded px-2 py-1 text-rose-400">
-                            <span className="text-gray-400 font-bold text-[9px] uppercase">Damage</span>
-                            <span className="font-black text-xs text-white">{renderStatWithModifier(w.damage, 'damage', u.id, '', w.name)}</span>
-                          </div>
-
-                          {/* Ability box */}
-                          {w.abilities && (
-                            <div className="col-span-6 flex flex-col bg-indigo-950/30 border border-indigo-500/20 rounded p-1.5 text-left text-indigo-300">
-                              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Ability:</span>
-                              <span className="text-xxs font-medium text-indigo-200 mt-0.5">{w.abilities}</span>
-                            </div>
-                          )}
-
-                          {/* Dynamic Dice Math calculation */}
-                          {(() => {
-                            const currentModels = u.modelsCount !== undefined ? u.modelsCount : (uRules.models || 1);
-                            const attacksMods = getActiveModifiers('attacks', u.id, w.name);
-                            const totalAttacksMod = attacksMods.reduce((acc, m) => acc + m.modifier, 0);
-                            
-                            const overrideVal = getBattleDamagedOverride(u.id, 'attacks', w.name);
-                            const baseAttacks = overrideVal !== null ? overrideVal : (parseInt(String(w.attacks), 10) || 0);
-                            const effectiveAttacks = overrideVal !== null ? overrideVal : calculateStatValue(baseAttacks, 'attacks', totalAttacksMod).modifiedNum;
-                            const totalDice = currentModels * effectiveAttacks;
-                            return (
-                              <div className="col-span-6 flex items-center justify-between text-[11px] bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-2.5 mt-1 select-none">
-                                <span className="text-gray-400 font-extrabold uppercase tracking-widest text-[9px]">🎲 Dice Math:</span>
-                                <span className="font-extrabold text-emerald-400 flex items-center gap-1">
-                                  <span>{totalDice} Dice</span>
-                                  <span className="text-gray-500 font-semibold">({currentModels} models × {effectiveAttacks} attacks)</span>
-                                </span>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Unit Passives inside the unit box */}
-                  {(() => {
-                    const unitPassives = getUnitPassiveAbilitiesForPhase(uRules, 'combat');
-                    if (unitPassives.length === 0) return null;
-                    return (
-                      <div className="mt-2.5 p-3 bg-emerald-950/15 border border-emerald-500/20 rounded-xl space-y-2 text-left">
-                        <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-widest flex items-center gap-1.5">
-                          <Sparkles className="h-3 w-3 text-emerald-400 animate-pulse" /> Unit Passives (Combat)
-                        </span>
-                        <div className="space-y-2">
-                          {unitPassives.map((ab) => (
-                            <div key={ab.id} className="border-t border-emerald-500/10 pt-1.5 first:border-t-0 first:pt-0">
-                              <h5 className="text-xxs font-black text-white">{ab.name}</h5>
-                              <p className="text-[10px] text-gray-300 mt-0.5 whitespace-pre-line leading-normal">{ab.effect}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })()}
+        <CardContent className="p-4 space-y-6">
+          {/* 1. STRIKE-FIRST GROUP */}
+          {firstGroup.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 border-b border-amber-500/20 pb-2">
+                <span className="text-sm animate-bounce">⚡</span>
+                <div className="flex flex-col">
+                  <h4 className="text-xs font-black text-amber-400 uppercase tracking-wider">⚡ Strike-First Activations</h4>
+                  <span className="text-[9px] text-gray-400 font-semibold leading-none">Units in this group fight first. Starting with the active turn player, alternate activations.</span>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {firstGroup.map(({ u, uRules }) => renderUnitCombatCard(u, uRules))}
+              </div>
+            </div>
+          )}
+
+          {/* 2. NORMAL COMBAT GROUP */}
+          {normalGroup.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 border-b border-[#2c3548]/50 pb-2">
+                <span className="text-sm">⚔️</span>
+                <div className="flex flex-col">
+                  <h4 className="text-xs font-black text-gray-300 uppercase tracking-wider">⚔️ Normal Combat Activations</h4>
+                  <span className="text-[9px] text-gray-400 font-semibold leading-none">Standard combat phase activations. Starting with the active turn player, alternate fighting with these units.</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {normalGroup.map(({ u, uRules }) => renderUnitCombatCard(u, uRules))}
+              </div>
+            </div>
+          )}
+
+          {/* 3. STRIKE-LAST GROUP */}
+          {lastGroup.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 border-b border-rose-500/20 pb-2">
+                <span className="text-sm">🛡️</span>
+                <div className="flex flex-col">
+                  <h4 className="text-xs font-black text-rose-400 uppercase tracking-wider">🛡️ Strike-Last Activations</h4>
+                  <span className="text-[9px] text-gray-400 font-semibold leading-none">Units in this group fight last. After all other groups finish, starting with the active turn player, alternate activations.</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {lastGroup.map(({ u, uRules }) => renderUnitCombatCard(u, uRules))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
@@ -1775,6 +1902,11 @@ export default function TrackerPage() {
   const renderNonCombatActiveStrategy = () => {
     if (gameState.currentPhase === 'combat') return null;
 
+    // During opponent's turn, the Hero, Movement, Shooting, and Charge phase skills should not be available
+    if (gameState.activeTurn === 'opponent' && ['hero', 'movement', 'shooting', 'charge'].includes(gameState.currentPhase)) {
+      return null;
+    }
+
     const factionAbilities = getAbilitiesForPhase(gameState.currentPhase);
     const unitAbilities = gameState.units.filter(u => !u.isSlain).flatMap((u) => {
       const uRules = faction.units.find(rules => rules.id === u.unitId);
@@ -1789,7 +1921,7 @@ export default function TrackerPage() {
         <div className="flex justify-between items-center">
           <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5">
             <Sparkles className="h-4.5 w-4.5 text-amber-500" /> 
-            {gameState.activeTurn === 'me' ? 'My Active Strategy' : 'My Defensive Reactions'} ({phases[currentPhaseIndex].name})
+            Abilities (Round {gameState.round})
           </h3>
           <Badge variant="outline" className={`uppercase text-xxs border-transparent font-bold
             ${gameState.activeTurn === 'me' ? 'bg-amber-500/10 text-amber-500' : 'bg-red-500/10 text-red-400'}`}
@@ -2643,34 +2775,20 @@ export default function TrackerPage() {
               </Card>
             )}
 
-            {/* COMBAT PHASE (DYNAMICALLY ORDERED TIMELINE & SECTIONS) */}
+            {/* COMBAT PHASE (ORDER OF EVENTS PROTOCOL) */}
             {gameState.currentPhase === 'combat' && (
               <div className="space-y-6">
-                {gameState.activeTurn === 'me' ? (
-                  <>
-                    {/* PLAYER ATTACKING ORDER:
-                        1. Active Strategy
-                        2. Unit stats/activations
-                        3. Defensive responses
-                        4. Passive rules */}
-                    {renderCombatActiveStrategy()}
-                    {renderCombatUnitActivations()}
-                    {renderCombatDefensiveResponses()}
-                    {renderCombatPassiveRules()}
-                  </>
-                ) : (
-                  <>
-                    {/* OPPONENT ATTACKING ORDER:
-                        1. Defensive responses (reaction strategy)
-                        2. Unit stats/activations
-                        3. Active strategy (combat phase)
-                        4. Passive rules */}
-                    {renderCombatDefensiveResponses()}
-                    {renderCombatUnitActivations()}
-                    {renderCombatActiveStrategy()}
-                    {renderCombatPassiveRules()}
-                  </>
-                )}
+                {/* 1. Attacker Declares Active Strategy Abilities */}
+                {renderCombatActiveStrategy()}
+                
+                {/* 2. Defender Declares Defensive Responses */}
+                {renderCombatDefensiveResponses()}
+                
+                {/* 3. Melee Combat Activations (Attacks / Back-and-Forth Fights) */}
+                {renderCombatUnitActivations()}
+                
+                {/* 4. Faction Passive Rules */}
+                {renderCombatPassiveRules()}
               </div>
             )}
 

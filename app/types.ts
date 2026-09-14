@@ -82,6 +82,7 @@ export interface UnitState {
   shot: boolean;
   charged: boolean;
   fought: boolean;
+  combatOrder?: 'first' | 'normal' | 'last';
 }
 
 export interface AppliedModifier {
