@@ -89,6 +89,8 @@ export default function TrackerPage() {
     doubleUpDrawOverride: boolean;
   } | null>(null);
 
+  const [deploymentModalOpen, setDeploymentModalOpen] = useState<boolean>(false);
+
   const showToast = (message: string, type: 'error' | 'success' = 'success') => {
     setToast({ message, type });
     setTimeout(() => {
@@ -122,17 +124,24 @@ export default function TrackerPage() {
   // Trigger round start overlay exactly once per round start or on load (whenever currentPhase is 'start' and roundFirstPlayer is not yet chosen)
   useEffect(() => {
     if (gameState && gameState.currentPhase === 'start' && !gameState.roundFirstPlayer) {
-      setRoundInitializingModal({
-        isOpen: true,
-        round: gameState.round,
-        goesFirst: 'me',
-        underdog: gameState.isUnderdog ? 'me' : 'none',
-        doubleUpDrawOverride: false
-      });
+      if (gameState.round === 1 && !gameState.deploymentPhaseComplete) {
+        setRoundInitializingModal(null);
+        setDeploymentModalOpen(true);
+      } else {
+        setDeploymentModalOpen(false);
+        setRoundInitializingModal({
+          isOpen: true,
+          round: gameState.round,
+          goesFirst: 'me',
+          underdog: gameState.isUnderdog ? 'me' : 'none',
+          doubleUpDrawOverride: false
+        });
+      }
     } else {
       setRoundInitializingModal(null);
+      setDeploymentModalOpen(false);
     }
-  }, [gameState?.round, gameState?.currentPhase, gameState?.roundFirstPlayer, gameState?.matchId]);
+  }, [gameState?.round, gameState?.currentPhase, gameState?.roundFirstPlayer, gameState?.deploymentPhaseComplete, gameState?.matchId]);
 
   if (!gameState) {
     return (
@@ -751,6 +760,104 @@ export default function TrackerPage() {
         router.push('/');
       }
     });
+  };
+
+  // Pre-Battle Deployment Phase states
+  const [deploymentRole, setDeploymentRole] = useState<'attacker' | 'defender'>('attacker');
+  const [deploymentRealm, setDeploymentRealm] = useState<'aqshy' | 'ghyran'>('aqshy');
+  const [deploymentMap, setDeploymentMap] = useState<'A' | 'B' | 'C' | 'D'>('A');
+  const [deploymentStepChecked, setDeploymentStepChecked] = useState<{ [step: number]: boolean }>({});
+
+  const toggleDeploymentStep = (stepNum: number) => {
+    setDeploymentStepChecked(prev => ({
+      ...prev,
+      [stepNum]: !prev[stepNum]
+    }));
+  };
+
+  const getDeploymentAbilities = () => {
+    if (!faction) return [];
+    const list: { name: string; source: string; timing: string; effect: string }[] = [];
+
+    // Check battle traits
+    if (faction.battleTraits) {
+      faction.battleTraits.forEach(ab => {
+        const text = `${ab.name} ${ab.effect} ${ab.timing || ''} ${ab.phase || ''}`.toLowerCase();
+        if (text.includes('deployment') || text.includes('pre-battle') || (ab.timing && ab.timing.toLowerCase().includes('deployment'))) {
+          list.push({
+            name: ab.name,
+            source: 'Battle Trait',
+            timing: ab.timing || 'Deployment Phase',
+            effect: ab.effect
+          });
+        }
+      });
+    }
+
+    // Check chosen regiment ability
+    const chosenReg = faction.regimentAbilities?.find(r => r.id === gameState?.selectedRegimentAbilityId);
+    if (chosenReg) {
+      const text = `${chosenReg.name} ${chosenReg.effect} ${chosenReg.timing || ''} ${chosenReg.phase || ''}`.toLowerCase();
+      if (text.includes('deployment') || text.includes('pre-battle') || (chosenReg.timing && chosenReg.timing.toLowerCase().includes('deployment'))) {
+        list.push({
+          name: chosenReg.name,
+          source: 'Regiment Ability',
+          timing: chosenReg.timing || 'Deployment Phase',
+          effect: chosenReg.effect
+        });
+      }
+    }
+
+    // Check chosen enhancement
+    const chosenEnh = faction.enhancements?.find(e => e.id === gameState?.selectedEnhancementId);
+    if (chosenEnh) {
+      const text = `${chosenEnh.name} ${chosenEnh.effect} ${chosenEnh.timing || ''} ${chosenEnh.phase || ''}`.toLowerCase();
+      if (text.includes('deployment') || text.includes('pre-battle') || (chosenEnh.timing && chosenEnh.timing.toLowerCase().includes('deployment'))) {
+        list.push({
+          name: chosenEnh.name,
+          source: 'Enhancement',
+          timing: chosenEnh.timing || 'Deployment Phase',
+          effect: chosenEnh.effect
+        });
+      }
+    }
+
+    // Check all units
+    gameState?.units?.forEach(uState => {
+      const uRules = faction.units?.find(un => un.id === uState.unitId);
+      if (uRules) {
+        uRules.abilities?.forEach(ab => {
+          const text = `${ab.name} ${ab.effect} ${ab.timing || ''} ${ab.phase || ''}`.toLowerCase();
+          if (text.includes('deployment') || text.includes('pre-battle') || (ab.timing && ab.timing.toLowerCase().includes('deployment'))) {
+            if (!list.some(item => item.name === ab.name && item.source === uRules.name)) {
+              list.push({
+                name: ab.name,
+                source: uRules.name,
+                timing: ab.timing || 'Deployment Phase',
+                effect: ab.effect
+              });
+            }
+          }
+        });
+      }
+    });
+
+    return list;
+  };
+
+  const handleCompleteDeployment = () => {
+    if (!gameState) return;
+    const updated = {
+      ...gameState,
+      deploymentPhaseComplete: true,
+      logs: [
+        `🛡️ Pre-Battle Deployment Phase complete! Realm of Battle chosen: ${deploymentRealm.toUpperCase()}. Map chosen: Map ${deploymentMap}. Faction Role: ${deploymentRole.toUpperCase()}.`,
+        ...gameState.logs
+      ]
+    };
+    saveGame(updated);
+    setDeploymentModalOpen(false);
+    showToast('Deployment sequence completed successfully!', 'success');
   };
 
   const handleConfirmRoundInitialization = () => {
@@ -4886,6 +4993,363 @@ export default function TrackerPage() {
                 className="h-11 px-6 bg-gradient-to-r from-[#ca8a04] to-amber-500 hover:scale-103 hover:shadow-lg hover:shadow-amber-500/10 text-white font-extrabold text-xs uppercase rounded-xl transition-all"
               >
                 Let's Begin Turn 1 <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {deploymentModalOpen && (
+        <div className="fixed inset-0 bg-[#080a0f]/95 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
+          <div className="bg-[#11141c] border border-[#2c3548] rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl flex flex-col my-8 animate-scale-in text-left">
+            
+            {/* Header */}
+            <div className="p-6 border-b border-[#222834] bg-[#161a25]/50 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                  <Shield className="h-6 w-6 text-amber-500 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-widest">
+                    Pre-Battle Deployment Phase
+                  </h3>
+                  <p className="text-[10px] text-amber-500 font-bold uppercase tracking-wider mt-0.5">
+                    PRE-BATTLE SEQUENCE & SETUP REFERENCER
+                  </p>
+                </div>
+              </div>
+              <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1 font-black text-xxs tracking-wider">
+                PRE-GAME SETUP
+              </Badge>
+            </div>
+
+            {/* Scrollable Steps Content */}
+            <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh] text-left">
+              
+              {/* Step 1: Roll-off */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-amber-500">1.</span> Physical Roll-Off & Role Selection
+                  </h4>
+                  <input
+                    type="checkbox"
+                    checked={!!deploymentStepChecked[1]}
+                    onChange={() => toggleDeploymentStep(1)}
+                    className="rounded border-[#2c3548] bg-[#1c2230] text-amber-500 focus:ring-0 cursor-pointer h-4 w-4"
+                  />
+                </div>
+                <p className="text-xxs text-gray-400 leading-normal">
+                  Roll off in your physical match. The winner of the roll-off chooses who is the **Attacker** and who is the **Defender**. Indicate your role below:
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setDeploymentRole('attacker')}
+                    className={`p-3.5 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all duration-300
+                      ${deploymentRole === 'attacker'
+                        ? 'bg-amber-500/15 border-amber-500 text-white shadow-lg shadow-amber-500/5'
+                        : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
+                  >
+                    <User className="h-4 w-4" /> ATTACKER
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeploymentRole('defender')}
+                    className={`p-3.5 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all duration-300
+                      ${deploymentRole === 'defender'
+                        ? 'bg-red-500/15 border-red-500 text-white shadow-lg shadow-red-500/5'
+                        : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
+                  >
+                    <Users className="h-4 w-4" /> DEFENDER
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 2: Pick regiment and enhancement */}
+              <div className="space-y-3 border-t border-[#1d222d] pt-5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-amber-500">2.</span> Pick Regiment Ability & Enhancement
+                  </h4>
+                  <input
+                    type="checkbox"
+                    checked={!!deploymentStepChecked[2]}
+                    onChange={() => toggleDeploymentStep(2)}
+                    className="rounded border-[#2c3548] bg-[#1c2230] text-amber-500 focus:ring-0 cursor-pointer h-4 w-4"
+                  />
+                </div>
+                <p className="text-xxs text-gray-400 leading-normal">
+                  The **attacker** picks their regiment ability and their enhancement first. Then the **defender** does the same. Below is your chosen loadout:
+                </p>
+                <div className="p-4 rounded-xl border border-[#222834] bg-[#151923] space-y-3">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">🛡️ Chosen Regiment Ability</span>
+                    {(() => {
+                      const reg = faction?.regimentAbilities?.find(r => r.id === gameState?.selectedRegimentAbilityId);
+                      return reg ? (
+                        <div className="mt-1">
+                          <p className="text-xs font-black text-white">{reg.name}</p>
+                          <p className="text-xxs text-gray-400 leading-normal mt-0.5">{reg.effect}</p>
+                        </div>
+                      ) : (
+                        <p className="text-xxs text-gray-500 mt-1 italic">No regiment ability selected.</p>
+                      );
+                    })()}
+                  </div>
+                  <div className="border-t border-[#1c222e] pt-2.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">⚡ Chosen General Enhancement</span>
+                    {(() => {
+                      const enh = faction?.enhancements?.find(e => e.id === gameState?.selectedEnhancementId);
+                      return enh ? (
+                        <div className="mt-1">
+                          <p className="text-xs font-black text-white">{enh.name}</p>
+                          <p className="text-xxs text-gray-400 leading-normal mt-0.5">{enh.effect}</p>
+                        </div>
+                      ) : (
+                        <p className="text-xxs text-gray-500 mt-1 italic">No enhancement selected.</p>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3: Realm Battlefield selection */}
+              <div className="space-y-3 border-t border-[#1d222d] pt-5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-amber-500">3.</span> Choose Realm Battlefield
+                  </h4>
+                  <input
+                    type="checkbox"
+                    checked={!!deploymentStepChecked[3]}
+                    onChange={() => toggleDeploymentStep(3)}
+                    className="rounded border-[#2c3548] bg-[#1c2230] text-amber-500 focus:ring-0 cursor-pointer h-4 w-4"
+                  />
+                </div>
+                <p className="text-xxs text-gray-400 leading-normal">
+                  The **defender** chooses which side of the realm battlefield the players will fight on: **Aqshy** (Realm of Fire) or **Ghyran** (Realm of Life). Select the battlefield below:
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setDeploymentRealm('aqshy')}
+                    className={`p-3.5 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-1 transition-all duration-300
+                      ${deploymentRealm === 'aqshy'
+                        ? 'bg-orange-500/15 border-orange-500 text-white shadow-lg shadow-orange-500/5'
+                        : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
+                  >
+                    <span className="text-sm">🔥 AQSHY</span>
+                    <span className="text-[9px] text-orange-400/80 uppercase font-bold tracking-widest">REALM OF FIRE</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeploymentRealm('ghyran')}
+                    className={`p-3.5 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-1 transition-all duration-300
+                      ${deploymentRealm === 'ghyran'
+                        ? 'bg-emerald-500/15 border-emerald-500 text-white shadow-lg shadow-emerald-500/5'
+                        : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
+                  >
+                    <span className="text-sm">🍃 GHYRAN</span>
+                    <span className="text-[9px] text-emerald-400/80 uppercase font-bold tracking-widest">REALM OF LIFE</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 4: Pick Deployment Map */}
+              <div className="space-y-3 border-t border-[#1d222d] pt-5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-amber-500">4.</span> Choose Deployment Map & Territories
+                  </h4>
+                  <input
+                    type="checkbox"
+                    checked={!!deploymentStepChecked[4]}
+                    onChange={() => toggleDeploymentStep(4)}
+                    className="rounded border-[#2c3548] bg-[#1c2230] text-amber-500 focus:ring-0 cursor-pointer h-4 w-4"
+                  />
+                </div>
+                <p className="text-xxs text-gray-400 leading-normal">
+                  The **defender** picks 1 of the official deployment maps and chooses which territory belongs to which player. Select your selected map configuration below:
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {(['A', 'B', 'C', 'D'] as const).map(mapId => {
+                    const mapNames = {
+                      A: 'Map A: Spearhead Assault',
+                      B: 'Map B: Vanguard Clash',
+                      C: 'Map C: Symmetrical Flank',
+                      D: 'Map D: Symmetrical Incursion'
+                    };
+                    const mapDesc = {
+                      A: 'Classic frontline clash with splayed side boundaries.',
+                      B: 'Slashed diagonally with tight wedge territories.',
+                      C: 'Wide neutral zone separating horizontal territories.',
+                      D: 'Staggered corner pockets with deep flank access.'
+                    };
+                    return (
+                      <button
+                        key={mapId}
+                        type="button"
+                        onClick={() => setDeploymentMap(mapId)}
+                        className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all duration-300
+                          ${deploymentMap === mapId
+                            ? 'bg-amber-500/15 border-amber-500 text-white shadow-lg shadow-amber-500/5'
+                            : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
+                      >
+                        <span className="text-xs font-black block">{mapNames[mapId]}</span>
+                        <span className="text-[10px] text-gray-400 leading-normal font-medium block">{mapDesc[mapId]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Step 5: Set up Terrain Features */}
+              <div className="space-y-3 border-t border-[#1d222d] pt-5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-amber-500">5.</span> Set Up Terrain Features
+                  </h4>
+                  <input
+                    type="checkbox"
+                    checked={!!deploymentStepChecked[5]}
+                    onChange={() => toggleDeploymentStep(5)}
+                    className="rounded border-[#2c3548] bg-[#1c2230] text-amber-500 focus:ring-0 cursor-pointer h-4 w-4"
+                  />
+                </div>
+                <p className="text-xxs text-gray-400 leading-normal">
+                  The **defender** sets up their terrain features, followed by the **attacker**. Settle physical terrain using the strict placement rules of war:
+                </p>
+                <div className="p-3.5 rounded-xl border border-dashed border-[#2c3548] bg-[#11141c] space-y-2 text-xxs text-gray-300">
+                  <div className="flex items-start gap-2">
+                    <span className="text-amber-500">📍</span>
+                    <p>Must be set up **wholly within friendly territory**.</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-amber-500">📍</span>
+                    <p>Must be set up **more than 6"** from all other terrain features.</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-amber-500">📍</span>
+                    <p>Must be set up **more than 3"** from both long battlefield edges and enemy territory.</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-amber-500">🚫</span>
+                    <p className="text-red-300 font-medium">Terrain features **cannot be set up on top of objectives** (either wholly or partially).</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 6: Deploy Army Units */}
+              <div className="space-y-3 border-t border-[#1d222d] pt-5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-amber-500">6.</span> Deploy Army Roster
+                  </h4>
+                  <input
+                    type="checkbox"
+                    checked={!!deploymentStepChecked[6]}
+                    onChange={() => toggleDeploymentStep(6)}
+                    className="rounded border-[#2c3548] bg-[#1c2230] text-amber-500 focus:ring-0 cursor-pointer h-4 w-4"
+                  />
+                </div>
+                <p className="text-xxs text-gray-400 leading-normal">
+                  The **attacker** sets up all the units in their army first, followed by the **defender**. Units must satisfy the deployment conditions below:
+                </p>
+                <div className="p-3.5 rounded-xl border border-dashed border-[#2c3548] bg-[#11141c] space-y-2 text-xxs text-gray-300">
+                  <div className="flex items-start gap-2">
+                    <span className="text-amber-500">🛡️</span>
+                    <p>Each unit must be set up **wholly within friendly territory**.</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-amber-500">🛡️</span>
+                    <p>Each unit must be set up **more than 6"** from enemy territory.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 7: Implementation of Deployment Phase Skills */}
+              <div className="space-y-3 border-t border-[#1d222d] pt-5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-amber-500">7.</span> Implement Army Deployment Skills
+                  </h4>
+                  <input
+                    type="checkbox"
+                    checked={!!deploymentStepChecked[7]}
+                    onChange={() => toggleDeploymentStep(7)}
+                    className="rounded border-[#2c3548] bg-[#1c2230] text-amber-500 focus:ring-0 cursor-pointer h-4 w-4"
+                  />
+                </div>
+                <p className="text-xxs text-gray-400 leading-normal">
+                  Any faction-specific traits, regiment abilities, enhancements, or unit skills marked as **"Deployment Phase"** or **"Pre-Battle"** must be implemented now:
+                </p>
+                {(() => {
+                  const deploymentAbilities = getDeploymentAbilities();
+                  if (deploymentAbilities.length === 0) {
+                    return (
+                      <div className="p-4 rounded-xl border border-[#222834] bg-zinc-950/20 text-center text-xxs text-gray-500 italic">
+                        No pre-battle or deployment-specific skills found for your active army roster.
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="space-y-3">
+                      {deploymentAbilities.map((ab, idx) => (
+                        <div key={`dep-ab-${idx}`} className="p-4 rounded-xl border border-amber-500/20 bg-amber-950/5 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xxs font-black text-white uppercase tracking-wider">{ab.name}</span>
+                            <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5">
+                              {ab.source}
+                            </Badge>
+                          </div>
+                          <p className="text-[10px] text-amber-300 font-bold uppercase tracking-wider mt-0.5">TIMING: {ab.timing}</p>
+                          <p className="text-xxs text-gray-300 leading-normal mt-1">{ab.effect}</p>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Step 8: Draw Battle Tactics */}
+              <div className="space-y-3 border-t border-[#1d222d] pt-5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-amber-500">8.</span> Draw Battle Tactics Deck
+                  </h4>
+                  <input
+                    type="checkbox"
+                    checked={!!deploymentStepChecked[8]}
+                    onChange={() => toggleDeploymentStep(8)}
+                    className="rounded border-[#2c3548] bg-[#1c2230] text-amber-500 focus:ring-0 cursor-pointer h-4 w-4"
+                  />
+                </div>
+                <p className="text-xxs text-gray-400 leading-normal">
+                  Each player takes their physical Battle Tactic deck, shuffles, and deals themselves **3 starting cards** before beginning the match.
+                </p>
+                <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-950/5 flex items-start gap-3">
+                  <span className="text-lg leading-none mt-0.5">🎴</span>
+                  <div>
+                    <h5 className="text-xxs font-black text-emerald-300 uppercase tracking-widest">Draw 3 Cards</h5>
+                    <p className="text-xxs text-emerald-200 leading-normal mt-0.5">Ensure both you and your opponent have exactly 3 battle tactics in hand. Keep them secret from your foe!</p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-[#222834] bg-[#0c0e16] flex justify-between items-center gap-3">
+              <span className="text-[10px] text-gray-400 font-black uppercase tracking-wider">
+                {Object.values(deploymentStepChecked).filter(Boolean).length} / 8 Steps Completed
+              </span>
+              <Button
+                onClick={handleCompleteDeployment}
+                className="h-11 px-6 bg-gradient-to-r from-[#ca8a04] to-amber-500 hover:scale-103 hover:shadow-lg hover:shadow-amber-500/10 text-white font-extrabold text-xs uppercase rounded-xl transition-all"
+              >
+                Let's Begin Turn 1 Setup <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
 

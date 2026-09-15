@@ -164,6 +164,7 @@ export default function HomePage() {
       victoryPoints: 0,
       usedAbilities: {},
       logs: [`Match initialized! Playing as ${faction.name}.`],
+      deploymentPhaseComplete: false,
     };
 
     localStorage.setItem('active_spearhead_game', JSON.stringify(initialGameState));

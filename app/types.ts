@@ -118,4 +118,5 @@ export interface GameState {
   logs: string[];
   appliedModifiers?: AppliedModifier[];
   luminethFacetSelected?: 'shiningCompany' | 'powerOfHysh' | 'lightningReactions' | null;
+  deploymentPhaseComplete?: boolean;
 }

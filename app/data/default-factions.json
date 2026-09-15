@@ -5957,7 +5957,8 @@
         "phase": "passive",
         "timing": "Passive",
         "once": "none",
-        "isDefense": true
+        "isDefense": true,
+        "passiveAppliedPhase": "combat"
       },
       {
         "id": "curvedShots",
@@ -6049,7 +6050,8 @@
             "phase": "passive",
             "timing": "Passive",
             "once": "none",
-            "isDefense": true
+            "isDefense": true,
+            "passiveAppliedPhase": "combat"
           },
           {
             "id": "hurricaneWinds",
@@ -6145,7 +6147,8 @@
           }
         ]
       }
-    ]
+    ],
+    "isTested": true
   },
   {
     "id": "lumineth-realm-lords-glittering-phalanx",
