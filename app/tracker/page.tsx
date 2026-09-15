@@ -90,6 +90,10 @@ export default function TrackerPage() {
   } | null>(null);
 
   const [deploymentModalOpen, setDeploymentModalOpen] = useState<boolean>(false);
+  const [deploymentRole, setDeploymentRole] = useState<'attacker' | 'defender'>('attacker');
+  const [deploymentRealm, setDeploymentRealm] = useState<'aqshy' | 'ghyran'>('aqshy');
+  const [deploymentMap, setDeploymentMap] = useState<'A' | 'B' | 'C' | 'D'>('A');
+  const [deploymentStepChecked, setDeploymentStepChecked] = useState<{ [step: number]: boolean }>({});
 
   const showToast = (message: string, type: 'error' | 'success' = 'success') => {
     setToast({ message, type });
@@ -762,11 +766,7 @@ export default function TrackerPage() {
     });
   };
 
-  // Pre-Battle Deployment Phase states
-  const [deploymentRole, setDeploymentRole] = useState<'attacker' | 'defender'>('attacker');
-  const [deploymentRealm, setDeploymentRealm] = useState<'aqshy' | 'ghyran'>('aqshy');
-  const [deploymentMap, setDeploymentMap] = useState<'A' | 'B' | 'C' | 'D'>('A');
-  const [deploymentStepChecked, setDeploymentStepChecked] = useState<{ [step: number]: boolean }>({});
+
 
   const toggleDeploymentStep = (stepNum: number) => {
     setDeploymentStepChecked(prev => ({
