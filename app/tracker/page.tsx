@@ -91,8 +91,8 @@ export default function TrackerPage() {
 
   const [deploymentModalOpen, setDeploymentModalOpen] = useState<boolean>(false);
   const [deploymentRole, setDeploymentRole] = useState<'attacker' | 'defender'>('attacker');
-  const [deploymentRealm, setDeploymentRealm] = useState<'aqshy' | 'ghyran'>('aqshy');
-  const [deploymentMap, setDeploymentMap] = useState<'A' | 'B' | 'C' | 'D'>('A');
+  const [deploymentRealm, setDeploymentRealm] = useState<'aqshy' | 'ghyran' | 'ossia' | 'dolorum'>('aqshy');
+  const [deploymentMap, setDeploymentMap] = useState<'horizontal' | 'diagonal'>('horizontal');
   const [deploymentStepChecked, setDeploymentStepChecked] = useState<{ [step: number]: boolean }>({});
 
   const showToast = (message: string, type: 'error' | 'success' = 'success') => {
@@ -136,7 +136,7 @@ export default function TrackerPage() {
         setRoundInitializingModal({
           isOpen: true,
           round: gameState.round,
-          goesFirst: 'me',
+          goesFirst: deploymentRole === 'attacker' ? 'me' : 'opponent',
           underdog: gameState.isUnderdog ? 'me' : 'none',
           doubleUpDrawOverride: false
         });
@@ -145,7 +145,7 @@ export default function TrackerPage() {
       setRoundInitializingModal(null);
       setDeploymentModalOpen(false);
     }
-  }, [gameState?.round, gameState?.currentPhase, gameState?.roundFirstPlayer, gameState?.deploymentPhaseComplete, gameState?.matchId]);
+  }, [gameState?.round, gameState?.currentPhase, gameState?.roundFirstPlayer, gameState?.deploymentPhaseComplete, gameState?.matchId, deploymentRole]);
 
   if (!gameState) {
     return (
@@ -5129,13 +5129,13 @@ export default function TrackerPage() {
                   />
                 </div>
                 <p className="text-xxs text-gray-400 leading-normal">
-                  The **defender** chooses which side of the realm battlefield the players will fight on: **Aqshy** (Realm of Fire) or **Ghyran** (Realm of Life). Select the battlefield below:
+                  The **defender** chooses which side of the realm battlefield the players will fight on. Select the realm battlefield below:
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setDeploymentRealm('aqshy')}
-                    className={`p-3.5 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-1 transition-all duration-300
+                    className={`p-3 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-1 transition-all duration-300
                       ${deploymentRealm === 'aqshy'
                         ? 'bg-orange-500/15 border-orange-500 text-white shadow-lg shadow-orange-500/5'
                         : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
@@ -5146,13 +5146,35 @@ export default function TrackerPage() {
                   <button
                     type="button"
                     onClick={() => setDeploymentRealm('ghyran')}
-                    className={`p-3.5 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-1 transition-all duration-300
+                    className={`p-3 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-1 transition-all duration-300
                       ${deploymentRealm === 'ghyran'
                         ? 'bg-emerald-500/15 border-emerald-500 text-white shadow-lg shadow-emerald-500/5'
                         : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
                   >
                     <span className="text-sm">🍃 GHYRAN</span>
                     <span className="text-[9px] text-emerald-400/80 uppercase font-bold tracking-widest">REALM OF LIFE</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeploymentRealm('ossia')}
+                    className={`p-3 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-1 transition-all duration-300
+                      ${deploymentRealm === 'ossia'
+                        ? 'bg-amber-600/15 border-amber-600 text-white shadow-lg shadow-amber-600/5'
+                        : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
+                  >
+                    <span className="text-sm">🏜️ OSSIA</span>
+                    <span className="text-[9px] text-amber-500/80 uppercase font-bold tracking-widest">LAND OF SAND</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeploymentRealm('dolorum')}
+                    className={`p-3 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-1 transition-all duration-300
+                      ${deploymentRealm === 'dolorum'
+                        ? 'bg-cyan-500/15 border-cyan-500 text-white shadow-lg shadow-cyan-500/5'
+                        : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
+                  >
+                    <span className="text-sm">💀 DOLORUM</span>
+                    <span className="text-[9px] text-cyan-400/80 uppercase font-bold tracking-widest">LAND OF BONE</span>
                   </button>
                 </div>
               </div>
@@ -5171,37 +5193,50 @@ export default function TrackerPage() {
                   />
                 </div>
                 <p className="text-xxs text-gray-400 leading-normal">
-                  The **defender** picks 1 of the official deployment maps and chooses which territory belongs to which player. Select your selected map configuration below:
+                  The **defender** picks 1 of the official deployment maps and chooses which territory belongs to which player. Click to select your active map split below:
                 </p>
-                <div className="grid grid-cols-2 gap-3">
-                  {(['A', 'B', 'C', 'D'] as const).map(mapId => {
-                    const mapNames = {
-                      A: 'Map A: Spearhead Assault',
-                      B: 'Map B: Vanguard Clash',
-                      C: 'Map C: Symmetrical Flank',
-                      D: 'Map D: Symmetrical Incursion'
-                    };
-                    const mapDesc = {
-                      A: 'Classic frontline clash with splayed side boundaries.',
-                      B: 'Slashed diagonally with tight wedge territories.',
-                      C: 'Wide neutral zone separating horizontal territories.',
-                      D: 'Staggered corner pockets with deep flank access.'
-                    };
-                    return (
-                      <button
-                        key={mapId}
-                        type="button"
-                        onClick={() => setDeploymentMap(mapId)}
-                        className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all duration-300
-                          ${deploymentMap === mapId
-                            ? 'bg-amber-500/15 border-amber-500 text-white shadow-lg shadow-amber-500/5'
-                            : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
-                      >
-                        <span className="text-xs font-black block">{mapNames[mapId]}</span>
-                        <span className="text-[10px] text-gray-400 leading-normal font-medium block">{mapDesc[mapId]}</span>
-                      </button>
-                    );
-                  })}
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setDeploymentMap('horizontal')}
+                    className={`p-2 rounded-xl border text-left flex flex-col gap-2 transition-all duration-300 overflow-hidden
+                      ${deploymentMap === 'horizontal'
+                        ? 'bg-amber-500/15 border-amber-500 text-white shadow-lg shadow-amber-500/5'
+                        : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
+                  >
+                    <div className="relative aspect-[4/3] w-full rounded-lg overflow-hidden border border-white/5">
+                      <img
+                        src="/map_horizontal.png"
+                        alt="Horizontal Split Map"
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
+                    <div className="px-1 py-0.5">
+                      <span className="text-xs font-black block text-white">Horizontal Split</span>
+                      <span className="text-[10px] text-gray-400 leading-normal font-medium block mt-0.5">Territories split horizontally by midline.</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDeploymentMap('diagonal')}
+                    className={`p-2 rounded-xl border text-left flex flex-col gap-2 transition-all duration-300 overflow-hidden
+                      ${deploymentMap === 'diagonal'
+                        ? 'bg-amber-500/15 border-amber-500 text-white shadow-lg shadow-amber-500/5'
+                        : 'bg-[#151923] border-[#222834] text-gray-400 hover:text-white hover:bg-[#1a1f2c]'}`}
+                  >
+                    <div className="relative aspect-[4/3] w-full rounded-lg overflow-hidden border border-white/5">
+                      <img
+                        src="/map_diagonal.png"
+                        alt="Diagonal Split Map"
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
+                    <div className="px-1 py-0.5">
+                      <span className="text-xs font-black block text-white">Diagonal Split</span>
+                      <span className="text-[10px] text-gray-400 leading-normal font-medium block mt-0.5">Territories split diagonally by midline.</span>
+                    </div>
+                  </button>
                 </div>
               </div>
 
@@ -5241,7 +5276,7 @@ export default function TrackerPage() {
                 </div>
               </div>
 
-              {/* Step 6: Deploy Army Units */}
+              {/* Step 6: Deploy Army Roster */}
               <div className="space-y-3 border-t border-[#1d222d] pt-5">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
@@ -5313,37 +5348,12 @@ export default function TrackerPage() {
                 })()}
               </div>
 
-              {/* Step 8: Draw Battle Tactics */}
-              <div className="space-y-3 border-t border-[#1d222d] pt-5">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
-                    <span className="text-amber-500">8.</span> Draw Battle Tactics Deck
-                  </h4>
-                  <input
-                    type="checkbox"
-                    checked={!!deploymentStepChecked[8]}
-                    onChange={() => toggleDeploymentStep(8)}
-                    className="rounded border-[#2c3548] bg-[#1c2230] text-amber-500 focus:ring-0 cursor-pointer h-4 w-4"
-                  />
-                </div>
-                <p className="text-xxs text-gray-400 leading-normal">
-                  Each player takes their physical Battle Tactic deck, shuffles, and deals themselves **3 starting cards** before beginning the match.
-                </p>
-                <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-950/5 flex items-start gap-3">
-                  <span className="text-lg leading-none mt-0.5">🎴</span>
-                  <div>
-                    <h5 className="text-xxs font-black text-emerald-300 uppercase tracking-widest">Draw 3 Cards</h5>
-                    <p className="text-xxs text-emerald-200 leading-normal mt-0.5">Ensure both you and your opponent have exactly 3 battle tactics in hand. Keep them secret from your foe!</p>
-                  </div>
-                </div>
-              </div>
-
             </div>
 
             {/* Footer */}
             <div className="p-6 border-t border-[#222834] bg-[#0c0e16] flex justify-between items-center gap-3">
               <span className="text-[10px] text-gray-400 font-black uppercase tracking-wider">
-                {Object.values(deploymentStepChecked).filter(Boolean).length} / 8 Steps Completed
+                {Object.values(deploymentStepChecked).filter(Boolean).length} / 7 Steps Completed
               </span>
               <Button
                 onClick={handleCompleteDeployment}
