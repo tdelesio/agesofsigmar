@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Sparkles, Shield, Sword, ShieldAlert, Play, Plus, 
-  Trash, Swords, User, Users, RefreshCw, AlertCircle
+  Trash, Swords, User, Users, RefreshCw, AlertCircle,
+  Terminal, Database
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -223,6 +224,20 @@ export default function HomePage() {
             )}
           </CardFooter>
         </Card>
+
+        {/* Developer & CMS Tools */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Link href="/admin" className="w-full">
+            <Button variant="outline" className="w-full h-11 border-[#222834] bg-[#151923] hover:bg-[#1c2230] text-gray-300 hover:text-white rounded-xl text-xs font-bold gap-2">
+              <Database className="h-4 w-4 text-purple-400" /> Open CMS Admin Panel
+            </Button>
+          </Link>
+          <Link href="/test-harness" className="w-full">
+            <Button variant="outline" className="w-full h-11 border-[#222834] bg-[#151923] hover:bg-[#1c2230] text-gray-300 hover:text-white rounded-xl text-xs font-bold gap-2">
+              <Terminal className="h-4 w-4 text-amber-500" /> Launch Rules Test Harness
+            </Button>
+          </Link>
+        </div>
 
         {/* Quick Match Setup Form */}
         <Card className="border-[#222834] bg-[#151923] text-white shadow-2xl">
