@@ -771,6 +771,7 @@ export default function AdminPage() {
                               onChange={(e) => updateAbility('battleTraits', index, 'phase', e.target.value)}
                               className="w-full bg-[#151923] border border-[#2c3547] text-xs h-8 rounded px-2 text-white"
                             >
+                              <option value="deployment">Deployment Phase</option>
                               <option value="start">Start of Turn</option>
                               <option value="hero">Hero Phase</option>
                               <option value="movement">Movement Phase</option>
@@ -798,6 +799,7 @@ export default function AdminPage() {
                                 className="w-full bg-[#151923] border border-[#2c3547] text-xs h-8 rounded px-2 text-white"
                               >
                                 <option value="">None (Always Active)</option>
+                                <option value="deployment">Deployment Phase</option>
                                 <option value="start">Start of Turn</option>
                                 <option value="hero">Hero Phase</option>
                                 <option value="movement">Movement Phase</option>
@@ -859,6 +861,7 @@ export default function AdminPage() {
                               onChange={(e) => updateAbility('regimentAbilities', index, 'phase', e.target.value)}
                               className="w-full bg-[#151923] border border-[#2c3547] text-xs h-8 rounded px-2 text-white"
                             >
+                              <option value="deployment">Deployment Phase</option>
                               <option value="start">Start of Turn</option>
                               <option value="hero">Hero Phase</option>
                               <option value="movement">Movement Phase</option>
@@ -886,6 +889,7 @@ export default function AdminPage() {
                                 className="w-full bg-[#151923] border border-[#2c3547] text-xs h-8 rounded px-2 text-white"
                               >
                                 <option value="">None (Always Active)</option>
+                                <option value="deployment">Deployment Phase</option>
                                 <option value="start">Start of Turn</option>
                                 <option value="hero">Hero Phase</option>
                                 <option value="movement">Movement Phase</option>
@@ -947,6 +951,7 @@ export default function AdminPage() {
                               onChange={(e) => updateAbility('enhancements', index, 'phase', e.target.value)}
                               className="w-full bg-[#151923] border border-[#2c3547] text-xs h-8 rounded px-2 text-white"
                             >
+                              <option value="deployment">Deployment Phase</option>
                               <option value="start">Start of Turn</option>
                               <option value="hero">Hero Phase</option>
                               <option value="movement">Movement Phase</option>
@@ -974,6 +979,7 @@ export default function AdminPage() {
                                 className="w-full bg-[#151923] border border-[#2c3547] text-xs h-8 rounded px-2 text-white"
                               >
                                 <option value="">None (Always Active)</option>
+                                <option value="deployment">Deployment Phase</option>
                                 <option value="start">Start of Turn</option>
                                 <option value="hero">Hero Phase</option>
                                 <option value="movement">Movement Phase</option>
@@ -1224,6 +1230,7 @@ export default function AdminPage() {
                                     onChange={(e) => updateUnitAbility(selectedUnitIndex, abilityIdx, 'phase', e.target.value)}
                                     className="w-full bg-[#151923] border border-[#222834] text-xs h-7 rounded px-2 text-white"
                                   >
+                                    <option value="deployment">Deployment Phase</option>
                                     <option value="start">Start of Turn</option>
                                     <option value="hero">Hero Phase</option>
                                     <option value="movement">Movement Phase</option>
@@ -1251,6 +1258,7 @@ export default function AdminPage() {
                                       className="w-full bg-[#151923] border border-[#2c3547] text-xs h-8 rounded px-2 text-white"
                                     >
                                       <option value="">None (Always Active)</option>
+                                      <option value="deployment">Deployment Phase</option>
                                       <option value="start">Start of Turn</option>
                                       <option value="hero">Hero Phase</option>
                                       <option value="movement">Movement Phase</option>

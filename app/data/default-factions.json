@@ -5957,8 +5957,7 @@
         "phase": "passive",
         "timing": "Passive",
         "once": "none",
-        "isDefense": true,
-        "passiveAppliedPhase": "combat"
+        "isDefense": true
       },
       {
         "id": "curvedShots",
@@ -6050,8 +6049,7 @@
             "phase": "passive",
             "timing": "Passive",
             "once": "none",
-            "isDefense": true,
-            "passiveAppliedPhase": "combat"
+            "isDefense": true
           },
           {
             "id": "hurricaneWinds",
@@ -6147,8 +6145,7 @@
           }
         ]
       }
-    ],
-    "isTested": true
+    ]
   },
   {
     "id": "lumineth-realm-lords-glittering-phalanx",
@@ -11222,7 +11219,7 @@
         "id": "theDreadBanner",
         "name": "The Dread Banner",
         "effect": "Declare: Pick a friendly Chaos Warriors or Chaos Knights unit.\n\nEffect: You can immediately roll on the Eye of the Gods table for that unit.",
-        "phase": "start",
+        "phase": "deployment",
         "timing": "Start of the First Battle Round",
         "once": "once-per-battle"
       },
@@ -11230,7 +11227,7 @@
         "id": "fierceConquerors",
         "name": "Fierce Conquerors",
         "effect": "Add 3 to the control scores of friendly Chaos Warriors units.",
-        "phase": "passive",
+        "phase": "end",
         "timing": "Passive",
         "once": "none",
         "passiveAppliedPhase": "end"

@@ -7,168 +7,16 @@ import {
   ArrowLeft, CheckCircle2, AlertCircle, Sparkles, Shield, 
   Activity, Play, Check, FileText, Database, Search, 
   Terminal, RefreshCw, HelpCircle, User, Users,
-  TrendingDown, Trophy, Swords
+  TrendingDown, Trophy, Swords, HelpCircle as HelpIcon,
+  ShieldCheck, AlertTriangle, Eye, Compass, Info, Dice5,
+  Globe, Zap, Hourglass, BarChart3, Target as TargetIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DEFAULT_FACTIONS } from '../data/default-factions';
 import { Faction, Ability, Unit } from '../types';
-
-// Parsing Engine Helper (matches the tracker's exact natural language rules engine parsing)
-interface ParsedRuleResult {
-  allowedStats: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage' | 'charge')[];
-  requiredRoll: string | null;
-  targetingType: 'self' | 'single_friendly' | 'multi_friendly' | 'global_passive' | 'unknown';
-  netEffects: string[];
-  isRelentlessDiscipline: boolean;
-}
-
-function analyzeAbilityRule(ability: Ability): ParsedRuleResult {
-  const effectText = ability.effect || '';
-  const effectLower = effectText.toLowerCase();
-  const nameLower = (ability.name || '').toLowerCase();
-  const abId = ability.id || '';
-
-  let allowedStats: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage' | 'charge')[] = [];
-  let requiredRoll: string | null = null;
-  let targetingType: 'self' | 'single_friendly' | 'multi_friendly' | 'global_passive' | 'unknown' = 'single_friendly';
-  const netEffects: string[] = [];
-
-  const isRelentlessDiscipline = abId.startsWith('relentlessDiscipline') || nameLower.includes('relentless discipline');
-
-  // 1. Parse Stat Modifiers
-  if (isRelentlessDiscipline) {
-    allowedStats = ['move', 'charge', 'wound', 'ward'];
-    netEffects.push("Ossiarch Bonereapers Custom Move Buff: Applies +2\" Move modifier expiring at end of Move phase.");
-    netEffects.push("Defensive Ward Buff: Grants target +1 to ward rolls during Combat/Shooting phases.");
-    targetingType = 'single_friendly';
-  } else {
-    if (
-      effectLower.includes('attacks characteristic') || 
-      effectLower.includes('add 1 to the attacks') || 
-      effectLower.includes('modify attacks') || 
-      effectLower.includes('attack characteristic') ||
-      effectLower.includes('attacks characteristic of')
-    ) {
-      allowedStats.push('attacks');
-      netEffects.push("Modifies weapon attacks characteristic by +1 (expires at end of active phase).");
-    }
-    if (
-      effectLower.includes('save roll') || 
-      effectLower.includes('save characteristic') || 
-      effectLower.includes('add 1 to save') ||
-      effectLower.includes('add 1 to the save')
-    ) {
-      allowedStats.push('save');
-      netEffects.push("Increases save characteristic by +1 (grants defensive cover buff).");
-    }
-    if (
-      effectLower.includes('ward roll') || 
-      effectLower.includes('ward characteristic') || 
-      effectLower.includes('add 1 to ward') ||
-      effectLower.includes('add 1 to the ward')
-    ) {
-      allowedStats.push('ward');
-      netEffects.push("Grants or improves ward save protection by +1 (adds ward protection layers).");
-    }
-    if (
-      effectLower.includes('move') || 
-      effectLower.includes('run') || 
-      effectLower.includes('charge') ||
-      effectLower.includes('movement')
-    ) {
-      allowedStats.push('move');
-      if (nameLower.includes('speed of hysh')) {
-        netEffects.push("Doubles target's movement characteristic for the current phase.");
-      } else {
-        netEffects.push("Modifies unit move characteristic by +1\" (applicable to run/charge/movement).");
-      }
-    }
-    if (
-      effectLower.includes('hit roll') || 
-      effectLower.includes('hit rolls') || 
-      effectLower.includes('add 1 to hit') ||
-      effectLower.includes('add 1 to the hit')
-    ) {
-      allowedStats.push('hit');
-      netEffects.push("Improves weapon hit accuracy rolls by +1 (attacks hit on 1 value lower).");
-    }
-    if (
-      effectLower.includes('wound roll') || 
-      effectLower.includes('wound rolls') || 
-      effectLower.includes('add 1 to wound') ||
-      effectLower.includes('add 1 to the wound')
-    ) {
-      allowedStats.push('wound');
-      netEffects.push("Improves weapon wound strength rolls by +1.");
-    }
-    if (
-      effectLower.includes('rend characteristic') || 
-      effectLower.includes('add 1 to rend') ||
-      effectLower.includes('add 1 to the rend')
-    ) {
-      allowedStats.push('rend');
-      netEffects.push("Improves weapon rend penetrative value by 1.");
-    }
-    if (
-      effectLower.includes('damage characteristic') || 
-      effectLower.includes('add 1 to damage') ||
-      effectLower.includes('add 1 to the damage')
-    ) {
-      allowedStats.push('damage');
-      netEffects.push("Increases weapon damage characteristic by +1.");
-    }
-  }
-
-  // 2. Parse Dice Roll Requirements
-  const rollMatch = effectText.match(/on\s+a\s+(\d+)\+/i);
-  if (rollMatch) {
-    requiredRoll = rollMatch[1] + '+';
-    netEffects.push(`Dice Roll Required: User is prompted with a physical ${requiredRoll} roll-off before any modifiers or buffs take effect.`);
-  }
-
-  // 3. Determine Targeting Rules
-  if (ability.phase === 'passive') {
-    targetingType = 'global_passive';
-    netEffects.push("Passive Ability: Registers as a persistent background aura; does not prompt target unit clicks.");
-  } else if (effectLower.includes('friendly unit') || effectLower.includes('friendly units')) {
-    if (effectLower.includes('each friendly unit') || effectLower.includes('all friendly units')) {
-      targetingType = 'multi_friendly';
-      netEffects.push("Global Targeting: Click triggers application to ALL valid friendly units in the active cohort.");
-    } else {
-      targetingType = 'single_friendly';
-      netEffects.push("Targeted Application: Click prompts a modal to select exactly 1 friendly unit to receive the parsed buffs.");
-    }
-  } else if (effectLower.includes('this unit') || effectLower.includes('self')) {
-    targetingType = 'self';
-    netEffects.push("Self-Targeting: Click applies the parsed modifiers exclusively to the acting parent unit.");
-  } else {
-    // Default to friendly target selection if it has any stats
-    if (allowedStats.length > 0) {
-      targetingType = 'single_friendly';
-      netEffects.push("Default Targeting: Click prompts the user to choose 1 target friendly unit.");
-    } else {
-      targetingType = 'unknown';
-      netEffects.push("Log Only Action: No direct stat modifiers parsed. Triggers a clean game action text log upon click.");
-    }
-  }
-
-  // Once timing conditions
-  if (ability.once === 'once-per-turn') {
-    netEffects.push("Turn Lockout: Registering activation adds ability ID to 'usedAbilities' dictionary, blocking duplicate uses until the turn ends.");
-  } else if (ability.once === 'once-per-battle') {
-    netEffects.push("Battle Lockout: Registering activation flags the ability as exhausted, permanently blocking duplicate uses for the rest of the match.");
-  }
-
-  return {
-    allowedStats,
-    requiredRoll,
-    targetingType,
-    netEffects,
-    isRelentlessDiscipline
-  };
-}
+import { analyzeAbilityRule, ParsedRuleResult } from '@/lib/rules-engine';
 
 const mergeFactions = (defaults: Faction[], custom: Faction[]): Faction[] => {
   const map = new Map<string, Faction>();
@@ -254,7 +102,7 @@ export default function TestHarnessPage() {
   const runSimulation = () => {
     if (!selectedAbilityForSimulation) return;
     const ab = selectedAbilityForSimulation;
-    const rules = analyzeAbilityRule(ab);
+    const rules = analyzeAbilityRule(ab, activeFaction);
 
     const logList: string[] = [];
     const newModifiersList: any[] = [];
@@ -267,6 +115,31 @@ export default function TestHarnessPage() {
       logList.push(`[STATE_GATING] Lock Check: Adds "${ab.id}" to gameState.usedAbilities. This will lock duplicate activations until the end of the turn.`);
     } else if (ab.once === 'once-per-battle') {
       logList.push(`[STATE_GATING] Lock Check: Flags "${ab.id}" as exhausted. This will lock duplicate activations for the remainder of the battle.`);
+    }
+
+    // Customization assertion log
+    if (rules.isCustomHandled) {
+      logList.push(`[SYSTEM_TEST] ⚠️ ASSERT CUSTOMIZATION: This ability is intercept-handled by dedicated custom faction mechanics in the app codebase.`);
+      logList.push(`[SYSTEM_TEST] ℹ️ Custom details: ${rules.customHandlingDetails}`);
+    } else {
+      logList.push(`[SYSTEM_TEST] 📦 ASSERT GLOBAL ENGINE: This ability compiles under standard global business rules logic.`);
+    }
+
+    // Specific User Tests logging:
+    if (rules.isPassive) {
+      logList.push(`[DIAGNOSTIC] Passive rule detected! Evaluates continuously in background during "${ab.phase}" phase.`);
+    }
+    if (rules.heroOrGeneralOnly) {
+      logList.push(`[DIAGNOSTIC] Restriction Gating: Restricts bonus explicitly to Heroes/General unit tags.`);
+    }
+    if (rules.hasSpatialOrConditionalCheck) {
+      logList.push(`[DIAGNOSTIC] Tabletop Conditional Check: Requires distance / status condition validation ("${rules.conditionalCheckDescription}").`);
+    }
+    if (rules.isExternallyTracked) {
+      logList.push(`[DIAGNOSTIC] Externally Tracked Keywords Found: [${rules.externalTrackedKeywords.join(', ')}]. Status tracked outside Next.js standard modifier arrays.`);
+    }
+    if (rules.rollDiceCount) {
+      logList.push(`[DIAGNOSTIC] Dice Roll Challenge: "${rules.rollDiceCheckText}" (triggers user interaction prompts).`);
     }
 
     if (rules.requiredRoll) {
@@ -347,7 +220,7 @@ export default function TestHarnessPage() {
                 <ArrowLeft className="h-4 w-4" />
               </Link>
               <Badge className="bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[10px] font-black tracking-wider uppercase px-2 py-0.5">
-                Rules & Verification Harness
+                Upgraded Diagnostic Harness
               </Badge>
             </div>
             <h1 className="text-xl md:text-2xl font-black text-white tracking-tight uppercase flex items-center gap-2 mt-1">
@@ -355,7 +228,7 @@ export default function TestHarnessPage() {
               Rules Interpretation Engine Test Harness
             </h1>
             <p className="text-xxs md:text-xs text-gray-400 leading-normal max-w-2xl font-medium">
-              Validate and audit the natural language interpretation of army cohort abilities in real time. Choose any preloaded or custom faction to inspect how physical rules are programmatically interpreted into stat modifications, timing logs, and lockout limits.
+              Validate and audit the natural language interpretation of army cohort abilities. Choose any preloaded or custom faction to inspect targeted vs self modes, Hero/General restrictions, passive state effects, distance/conditional checks, physical dice count thresholds, and externally tracked statuses (Strike-Last, Mortal Wounds).
             </p>
           </div>
 
@@ -458,10 +331,10 @@ export default function TestHarnessPage() {
                   <p className="text-xxs text-gray-500 max-w-xs mx-auto font-medium">Try searching for other keywords or select a different timing tab.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {filteredAbilities.map((item, idx) => {
                     const ab = item.ability;
-                    const analysis = analyzeAbilityRule(ab);
+                    const analysis = analyzeAbilityRule(ab, activeFaction);
                     const isSelected = selectedAbilityForSimulation?.id === ab.id;
 
                     return (
@@ -478,6 +351,7 @@ export default function TestHarnessPage() {
                           }
                         }}
                       >
+                        {/* 1. Header (Standard Info) */}
                         <div className="p-4 flex flex-col md:flex-row md:items-start justify-between gap-3 border-b border-[#21262d] bg-[#1d222b]/50">
                           <div className="space-y-1">
                             <div className="flex flex-wrap items-center gap-2">
@@ -498,44 +372,224 @@ export default function TestHarnessPage() {
                                 ⏱️ {ab.phase.toUpperCase()}
                               </span>
                             </div>
-                            <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                            <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5 mt-0.5">
                               {ab.name}
                             </h3>
                           </div>
 
                           <div className="flex flex-wrap items-center gap-1.5">
-                            {analysis.allowedStats.map(stat => (
-                              <Badge key={stat} className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[8px] font-black tracking-wider uppercase px-1.5 py-px">
-                                + {stat.toUpperCase()}
-                              </Badge>
-                            ))}
-                            {analysis.requiredRoll && (
-                              <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[8px] font-black tracking-wider uppercase px-1.5 py-px">
-                                ROLL {analysis.requiredRoll}
-                              </Badge>
-                            )}
                             <Badge className="bg-[#21262d] text-gray-400 text-[8px] font-black tracking-wider uppercase px-1.5 py-px">
                               {ab.once.toUpperCase()}
                             </Badge>
                           </div>
                         </div>
 
-                        <CardContent className="p-4 space-y-3">
-                          <p className="text-[10px] text-gray-300 leading-normal font-medium bg-[#0d1117] p-3 rounded-xl border border-[#21262d]">
-                            {ab.effect || <span className="text-gray-500 italic">No description provided.</span>}
-                          </p>
+                        <CardContent className="p-5 space-y-5">
+                          
+                          {/* 2. Ability Description (Bigger, Highly Readable Font) */}
+                          <div className="space-y-1 text-left">
+                            <h4 className="text-[9px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                              <Info className="h-3 w-3 text-amber-500" /> Ability Rules Text
+                            </h4>
+                            <p className="text-xs md:text-sm font-semibold text-gray-200 leading-relaxed bg-[#0d1117] p-4 rounded-xl border border-[#21262d] whitespace-pre-line">
+                              {ab.effect || <span className="text-gray-500 italic">No description provided.</span>}
+                            </p>
+                          </div>
 
-                          {/* Render Rules interpretation section */}
-                          <div className="space-y-1.5">
+                          {/* 3. Phase & Timing Section */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-left border-t border-[#21262d]/40 pt-4">
+                            <div className="p-3 rounded-xl border border-[#21262d] bg-[#161b22]/40 flex items-center gap-3">
+                              <Hourglass className="h-4.5 w-4.5 text-amber-400 shrink-0" />
+                              <div className="space-y-0.5">
+                                <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider block">Activation Phase</span>
+                                <span className="text-xs font-black text-white uppercase tracking-tight">{analysis.activationPhase}</span>
+                              </div>
+                            </div>
+
+                            <div className="p-3 rounded-xl border border-[#21262d] bg-[#161b22]/40 flex items-center gap-3">
+                              <Zap className="h-4.5 w-4.5 text-purple-400 shrink-0" />
+                              <div className="space-y-0.5">
+                                <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider block">Applied Phase</span>
+                                <span className="text-xs font-black text-purple-300 uppercase tracking-tight">{analysis.appliedPhase}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 4. Target Section (New Section under phases as requested) */}
+                          <div className="p-4 rounded-xl border border-[#21262d] bg-[#0d1117]/30 text-left border-t space-y-2">
+                            <h4 className="text-[9px] font-black uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
+                              <TargetIcon className="h-3.5 w-3.5 shrink-0 text-amber-500 animate-pulse" /> Target Specification
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {analysis.targetSpecifications.map((spec, sIdx) => {
+                                let badgeColor = "bg-blue-500/10 text-blue-400 border border-blue-500/20";
+                                if (spec.startsWith("Self:")) badgeColor = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                                else if (spec.startsWith("Specific Unit(s):")) badgeColor = "bg-purple-500/10 text-purple-400 border border-purple-500/20";
+                                else if (spec.includes("Enemy")) badgeColor = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+                                else if (spec.includes("Hero")) badgeColor = "bg-amber-500/10 text-amber-400 border border-amber-500/20";
+                                else if (spec.includes("Not Hero")) badgeColor = "bg-zinc-500/10 text-zinc-300 border border-zinc-500/20";
+
+                                return (
+                                  <Badge key={sIdx} className={`${badgeColor} text-[10px] font-black tracking-wider uppercase px-2.5 py-1`}>
+                                    {spec}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* 5. Influenced Stats Section (Now with Modifier Value count!) */}
+                          {analysis.statsWithModifiers.length > 0 && (
+                            <div className="space-y-1.5 text-left border-t border-[#21262d]/40 pt-4">
+                              <h4 className="text-[9px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                                <BarChart3 className="h-3 w-3 text-emerald-500" /> Influenced Application Stats
+                              </h4>
+                              <div className="flex flex-wrap gap-1.5">
+                                {analysis.statsWithModifiers.map((item, mIdx) => {
+                                  const isRedBadge = item.mod.startsWith('-');
+                                  return (
+                                    <Badge 
+                                      key={mIdx} 
+                                      className={`text-[10px] font-black tracking-wider uppercase px-2.5 py-1
+                                        ${isRedBadge 
+                                          ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
+                                          : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}
+                                    >
+                                      ★ {item.stat} ({item.mod})
+                                    </Badge>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 6. Ability Diagnostics Checklist (Stripped of targeting filters as requested) */}
+                          <div className="border border-[#21262d] rounded-xl p-4 bg-[#0d1117]/40 space-y-2.5 text-left border-t pt-4">
+                            <h4 className="text-[9px] font-black uppercase tracking-wider text-amber-500 flex items-center gap-1">
+                              <Compass className="h-3 w-3" /> Ability Diagnostics Checklist
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xxs font-semibold">
+                              
+                              {/* Hero/General Restrictions */}
+                              <div className="flex items-center gap-2 p-1.5 rounded-lg border border-[#222834] bg-[#161b22]">
+                                <Badge className={`h-4.5 min-w-4.5 rounded-full flex items-center justify-center p-0 font-bold
+                                  ${analysis.heroOrGeneralOnly ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-gray-800 text-gray-500'}`}>
+                                  {analysis.heroOrGeneralOnly ? '!' : '—'}
+                                </Badge>
+                                <span className={analysis.heroOrGeneralOnly ? 'text-gray-200' : 'text-gray-500'}>Hero / General Only Restriction</span>
+                              </div>
+
+                              {/* Passive State */}
+                              <div className="flex items-center gap-2 p-1.5 rounded-lg border border-[#222834] bg-[#161b22]">
+                                <Badge className={`h-4.5 min-w-4.5 rounded-full flex items-center justify-center p-0 font-bold
+                                  ${analysis.isPassive ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-gray-800 text-gray-500'}`}>
+                                  {analysis.isPassive ? '✓' : '—'}
+                                </Badge>
+                                <span className={analysis.isPassive ? 'text-gray-200' : 'text-gray-500'}>Passive Continuous Aura</span>
+                              </div>
+
+                              {/* Defensive Ability */}
+                              <div className="flex items-center gap-2 p-1.5 rounded-lg border border-[#222834] bg-[#161b22] col-span-1 md:col-span-2">
+                                <Badge className={`h-4.5 min-w-4.5 rounded-full flex items-center justify-center p-0 font-bold
+                                  ${analysis.isDefensive ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' : 'bg-gray-800 text-gray-500'}`}>
+                                  {analysis.isDefensive ? '✓' : '—'}
+                                </Badge>
+                                <span className={analysis.isDefensive ? 'text-teal-300 font-bold' : 'text-gray-500'}>
+                                  {analysis.isDefensive ? '🛡️ Asserted Defensive / Protective Ability' : 'Standard Offensive / Tactical action (non-defensive)'}
+                                </span>
+                              </div>
+
+                              {/* Spatial Check */}
+                              <div className="flex items-center gap-2 p-1.5 rounded-lg border border-[#222834] bg-[#161b22] col-span-1 md:col-span-2">
+                                <Badge className={`h-4.5 min-w-4.5 rounded-full flex items-center justify-center p-0 font-bold
+                                  ${analysis.hasSpatialOrConditionalCheck ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-gray-800 text-gray-500'}`}>
+                                  {analysis.hasSpatialOrConditionalCheck ? '✓' : '—'}
+                                </Badge>
+                                <span className={analysis.hasSpatialOrConditionalCheck ? 'text-gray-200' : 'text-gray-500'}>
+                                  {analysis.hasSpatialOrConditionalCheck 
+                                    ? `Spatial Check: ${analysis.conditionalCheckDescription}` 
+                                    : 'Spatial Check: None'}
+                                </span>
+                              </div>
+
+                              {/* Table Top Effect */}
+                              <div className="flex items-center gap-2 p-1.5 rounded-lg border border-[#222834] bg-[#161b22] col-span-1 md:col-span-2">
+                                <Badge className={`h-4.5 min-w-4.5 rounded-full flex items-center justify-center p-0 font-bold
+                                  ${analysis.isExternallyTracked ? 'bg-pink-500/10 text-pink-400 border border-pink-500/20' : 'bg-gray-800 text-gray-500'}`}>
+                                  {analysis.isExternallyTracked ? '✓' : '—'}
+                                </Badge>
+                                <span className={analysis.isExternallyTracked ? 'text-gray-200' : 'text-gray-500'}>
+                                  {analysis.isExternallyTracked 
+                                    ? `Table Top Effect: [${analysis.externalTrackedKeywords.join(', ')}]` 
+                                    : 'Table Top Effect: None'}
+                                </span>
+                              </div>
+
+                              {/* Roll Dice count check */}
+                              <div className="flex items-center gap-2 p-1.5 rounded-lg border border-[#222834] bg-[#161b22] col-span-1 md:col-span-2">
+                                <Badge className={`h-4.5 min-w-4.5 rounded-full flex items-center justify-center p-0 font-bold
+                                  ${analysis.rollDiceCount ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-gray-800 text-gray-500'}`}>
+                                  {analysis.rollDiceCount ? '✓' : '—'}
+                                </Badge>
+                                <span className={analysis.rollDiceCount ? 'text-gray-200 animate-pulse' : 'text-gray-500'}>
+                                  {analysis.rollDiceCount 
+                                    ? `Dice Check Challenge: ${analysis.rollDiceCheckText}` 
+                                    : 'No dice roll comparisons parsed'}
+                                </span>
+                              </div>
+
+                              {/* Permanent Effect */}
+                              <div className="flex items-center gap-2 p-1.5 rounded-lg border border-[#222834] bg-[#161b22] col-span-1 md:col-span-2">
+                                <Badge className={`h-4.5 min-w-4.5 rounded-full flex items-center justify-center p-0 font-bold
+                                  ${analysis.isPermanent ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'bg-gray-800 text-gray-500'}`}>
+                                  {analysis.isPermanent ? '✓' : '—'}
+                                </Badge>
+                                <span className={analysis.isPermanent ? 'text-gray-200' : 'text-gray-500'}>
+                                  {analysis.isPermanent 
+                                    ? 'Permanent Effect (Stays for rest of the game)' 
+                                    : 'Temporary Effect (Phase or Turn Duration)'}
+                                </span>
+                              </div>
+
+                            </div>
+
+                            {/* Special Faction Rule indication banner */}
+                            {analysis.isSpecialFactionRule ? (
+                              <div className="p-3.5 rounded-xl border border-yellow-500/35 bg-yellow-500/[0.04] text-yellow-300 flex flex-col gap-1.5 text-left text-xxs font-semibold leading-relaxed mt-3">
+                                <div className="flex items-center gap-1.5 uppercase font-black tracking-wider text-yellow-400">
+                                  <Trophy className="h-4 w-4 shrink-0 text-yellow-400 animate-pulse" />
+                                  <span>⭐ Special Faction Rule Asserted</span>
+                                </div>
+                                <p className="text-gray-200 font-medium">
+                                  {analysis.specialFactionRuleExplanation}
+                                </p>
+                              </div>
+                            ) : (
+                              /* Asserted Standard Global Engine Rule Box */
+                              <div className="p-3 rounded-xl border border-[#21262d] bg-[#0d1117]/20 text-gray-400 flex flex-col gap-1.5 text-left text-xxs font-semibold leading-relaxed mt-3">
+                                <div className="flex items-center gap-1.5 uppercase font-black tracking-wider text-gray-400">
+                                  <Globe className="h-3.5 w-3.5 text-gray-400" />
+                                  <span>📦 Asserted Standard Global Engine Rule</span>
+                                </div>
+                                <p className="text-gray-400 font-medium">
+                                  {analysis.customHandlingDetails}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 8. Programmed Net Effect Section (Last) */}
+                          <div className="space-y-1.5 text-left border-t border-[#21262d]/40 pt-4">
                             <h4 className="text-[9px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1">
                               <Terminal className="h-3 w-3 text-amber-500" /> Programmed Net Effect
                             </h4>
-                            <ul className="space-y-1 pl-3.5 list-disc text-xxs text-gray-400 font-medium">
+                            <ul className="space-y-1.5 pl-3.5 list-disc text-xxs text-gray-300 font-medium leading-relaxed">
                               {analysis.netEffects.map((eff, i) => (
                                 <li key={i}>{eff}</li>
                               ))}
                             </ul>
                           </div>
+
                         </CardContent>
                       </Card>
                     );
@@ -575,12 +629,14 @@ export default function TestHarnessPage() {
                     <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.02] space-y-1 text-left">
                       <div className="text-[8px] font-black uppercase tracking-wider text-amber-500">Selected for Audit:</div>
                       <h4 className="text-xs font-black text-white uppercase tracking-wider leading-none">{selectedAbilityForSimulation.name}</h4>
-                      <p className="text-xxs text-gray-400 font-semibold uppercase tracking-wider">{selectedAbilityForSimulation.phase.toUpperCase()  === 'PASSIVE' ? 'PASSIVE' : selectedAbilityForSimulation.phase.toUpperCase() + ' PHASE'} • {selectedAbilityForSimulation.once.toUpperCase()}</p>
+                      <p className="text-xxs text-gray-400 font-semibold uppercase tracking-wider">
+                        {selectedAbilityForSimulation.phase.toUpperCase() === 'PASSIVE' ? 'PASSIVE' : selectedAbilityForSimulation.phase.toUpperCase() + ' PHASE'} • {selectedAbilityForSimulation.once.toUpperCase()}
+                      </p>
                     </div>
 
                     {/* Simulation Settings */}
                     {(() => {
-                      const analysis = analyzeAbilityRule(selectedAbilityForSimulation);
+                      const analysis = analyzeAbilityRule(selectedAbilityForSimulation, activeFaction);
                       if (analysis.targetingType === 'global_passive') {
                         return (
                           <div className="p-3 bg-[#0d1117] rounded-xl border border-[#21262d] text-xxs text-gray-400 font-semibold uppercase tracking-wider text-center">
@@ -640,6 +696,7 @@ export default function TestHarnessPage() {
                         else if (log.startsWith('[APPLIED_MODIFIER]')) colorClass = 'text-emerald-400 font-semibold';
                         else if (log.startsWith('[PROMPT]')) colorClass = 'text-pink-400';
                         else if (log.startsWith('[STATE_GATING]')) colorClass = 'text-orange-400';
+                        else if (log.startsWith('[DIAGNOSTIC]')) colorClass = 'text-cyan-400 font-medium';
                         else if (log.startsWith('[WARNING]')) colorClass = 'text-red-400 font-black';
 
                         return (

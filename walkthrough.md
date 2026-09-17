@@ -48,6 +48,44 @@ We built high-fidelity support for the intricate Ascension mechanics of the **Bl
   - `🤢 Blessing of Nurgle`: Subtracts 1 from wound rolls for attacks targeting this unit.
   - `⚔️ Fury of Khorne`: Adds 1 to the Rend characteristic of melee weapons.
 
+### 2. ⚙️ Additional Layout & Navigational Features
+
+#### A. 🧹 Simplified & Repositioned Passive Spatial Checks
+- **The Issue**: Interactive checkboxes for all spatial check abilities cluttering the applied list at the bottom of unit cards.
+- **The Fix**: 
+  - **Phase-Strict Filtering**: Filtered spatial check checkboxes to **only** display if the ability is a **Passive** ability. Non-passive spatial checks now occur directly during the strategy declaration ("apply") stage rather than once applied.
+  - **Layout Repositioning**: Moved the Passive Spatial Check container up to the top of the unit card—placing it directly under the **Models/Order** panels and right before the **Weapons/Attacks** stats, optimizing in-game readability and ergonomics.
+
+#### B. 🔄 Fully Interactive Combat Sub-Phase Navigation
+- **The Issue**: Transitioning between the three combat sub-phases was only possible by clicking the sequential "Next Phase" button. Additionally, during Sub-Phase 2 (when the opponent is attacking and you are the defender), you could only see a restricted set of defensive abilities rather than selecting any available combat strategies.
+- **The Fix**:
+  - **Clickable Tab Navigation**: Configured the Combat sub-phase step-headers (1. Attacker Declares, 2. Defender Declares, 3. Melee Fights) to be completely clickable. Users can now jump freely to any sub-phase in any order.
+  - **Unified Strategy Cards**: Updated Sub-Phase 2 (Defender Declares) for when the opponent is attacking to show your **entire list of available combat strategies** (identical to how Sub-Phase 1 displays them when you are attacking). You can now trigger any combat buffs, select targets, and apply characteristics modifications dynamically when defending!
+
+---
+
+## 🩸 Daughters of Khaine & Rules Engine Refinement
+
+We have completed targeted improvements to the core text-parsing rules engine and user interface to fully align with the **Daughters of Khaine** faction:
+
+### 1. 🛡️ Robust Proximity Anchor Filtering (General-Proximity Bypass)
+- **The Issue**: Several abilities (such as *Fueled by Revenge* and *Zealous Orator*) mention "your general" as a spatial or distance constraint (e.g., `"friendly Blood Stalkers units while they are wholly within 12\" of your general"`). Because they contained `"your general"`, the rules engine's text parser incorrectly classified their target restriction as `"Hero / General Only"` rather than the actual units being buffed (such as *Blood Stalkers* or *Friendly Units*). This locked the modifiers to the hero and prevented them from applying to unit cards.
+- **The Fix**: Refactored both `evaluateDynamicModifiersForAbility` and `analyzeAbilityRule` inside `lib/rules-engine.ts` to identify general-proximity expressions using a regex. If the word `"general"` is only part of a distance constraint (e.g., `within 12" of your general`), the parser bypasses the general-only restriction and allows the modifier to apply to the actual target unit. This correctly resolves targeting for:
+  - **Fuelled by Revenge**: Correctly targets strictly the *Blood Stalkers* unit.
+  - **Zealous Orator**: Correctly targets a single *Friendly Unit* instead of general-only.
+
+### 2. 🌐 "All Friendly" Plural Target Parsing
+- **The Issue**: *Flask of Shademist* contains the text: `"Until the end of the phase, subtract 1 from hit rolls for attacks that target friendly units while they are wholly within 12" of your general."` Because it contained `"friendly units"`, the parser classified it as targeting a `"single_friendly"` unit.
+- **The Fix**: Added regex and string matching to parse `"friendly units while they are wholly within"` and `"attacks that target friendly units"` as plural target specifications. This correctly updates its targeting type to `'multi_friendly'` (i.e. ALL friendly), so checking its spatial checkbox applies the modifier globally to all eligible friendly units on the tracker.
+
+### 3. 🎯 Generalized Distance Checking (Turned to Crystal)
+- **The Issue**: *Turned to Crystal* says `"Pick an enemy unit within 1\" of this unit"`. It was missing a spatial check on the unit card because the spatial checker only checked for a hardcoded list of inch values (such as `3"`, `6"`, `12"`), skipping `1"`.
+- **The Fix**: Replaced the hardcoded distance lists with a dynamic regular expression: `/within\s+\d+["']/i`. This automatically recognizes any numerical within-inch expression (including `within 1\"`) as a spatial constraint. Consequently, *Turned to Crystal* is now correctly identified as requiring a proximity check prior to activation.
+
+### 4. 💚 Beneficial & Healing Stats Highlighted in Green
+- **The Issue**: Beneficial/defensive stats like *Heal*, *Save*, and *Ward* were rendering as red badges in the test-harness, which incorrectly implied a penalty or negative status.
+- **The Fix**: Modified `app/test-harness/page.tsx` so that only negative modifiers (starting with `-`) trigger the red/penalty style badge. All positive, protective, or beneficial modifiers (such as `Heal`, `Save`, and `Ward`) now render in a vibrant green (`bg-emerald-500/10 text-emerald-400 border-emerald-500/25`) to accurately match their healing and protective nature.
+
 ### 2. Turn-Based Charge Buff Mechanics (`getDynamicChargeModifiers`)
 We engineered a generic natural language rules parser that processes passive abilities for charge-conditional modifications across all factions:
 - Parses strings containing `"charged in the same turn"` or `"has not charged"`.

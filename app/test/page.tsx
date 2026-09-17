@@ -892,6 +892,7 @@ export default function TestPage() {
                                     className="bg-[#0f121a] border border-[#2c3547] text-[9.5px] rounded px-1.5 py-0.5 text-white font-extrabold focus:border-amber-500 focus:outline-none"
                                   >
                                     <option value="">-- Always Active (All Phases) --</option>
+                                    <option value="deployment">Deployment Phase</option>
                                     <option value="start">Start of Turn</option>
                                     <option value="hero">Hero Phase</option>
                                     <option value="movement">Movement Phase</option>

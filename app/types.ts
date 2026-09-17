@@ -1,4 +1,4 @@
-export type GamePhase = 'start' | 'hero' | 'movement' | 'shooting' | 'charge' | 'combat' | 'end';
+export type GamePhase = 'deployment' | 'start' | 'hero' | 'movement' | 'shooting' | 'charge' | 'combat' | 'end';
 
 export interface Weapon {
   name: string;
@@ -93,6 +93,8 @@ export interface AppliedModifier {
   label: string;
   expiresRound: number; // round number when it expires (normally at the end of the round activated in)
   expiresPhase?: GamePhase;
+  sourceAbilityId?: string;
+  sourceAbilityEffect?: string;
 }
 
 export interface GameState {
@@ -119,4 +121,6 @@ export interface GameState {
   appliedModifiers?: AppliedModifier[];
   luminethFacetSelected?: 'shiningCompany' | 'powerOfHysh' | 'lightningReactions' | null;
   deploymentPhaseComplete?: boolean;
+  combatSubPhase?: 'attacker_declare' | 'defender_declare' | 'melee_fight';
+  notes?: string;
 }
