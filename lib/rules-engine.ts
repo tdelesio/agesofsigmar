@@ -214,8 +214,12 @@ export function getActiveModifiers(
     if (trait) processAbility(trait);
   }
 
-  // 2. Regiment Abilities (All are active by default in Spearhead)
-  faction.regimentAbilities.forEach(processAbility);
+  // 2. Regiment Abilities (Only selected active regiment ability in Spearhead)
+  const activeRegimentAbilities = gameState.selectedRegimentAbilityId && gameState.selectedRegimentAbilityId !== 'all'
+    ? faction.regimentAbilities.filter(reg => reg.id === gameState.selectedRegimentAbilityId)
+    : faction.regimentAbilities;
+
+  activeRegimentAbilities.forEach(processAbility);
 
   // 3. Enhancement
   const enhancement = faction.enhancements.find(e => e.id === gameState.selectedEnhancementId);
@@ -388,7 +392,7 @@ export function isTargetingSingularFriendlyUnit(effect: string): boolean {
 export interface ParsedRuleResult {
   allowedStats: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage' | 'charge')[];
   requiredRoll: string | null;
-  targetingType: 'self' | 'single_friendly' | 'multi_friendly' | 'global_passive' | 'unknown';
+  targetingType: 'self' | 'single_friendly' | 'multi_friendly' | 'global_passive' | 'enemy' | 'unknown';
   netEffects: string[];
   isRelentlessDiscipline: boolean;
   
@@ -428,7 +432,7 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
 
   let allowedStats: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage' | 'charge')[] = [];
   let requiredRoll: string | null = null;
-  let targetingType: 'self' | 'single_friendly' | 'multi_friendly' | 'global_passive' | 'unknown' = 'single_friendly';
+  let targetingType: 'self' | 'single_friendly' | 'multi_friendly' | 'global_passive' | 'enemy' | 'unknown' = 'single_friendly';
   const netEffects: string[] = [];
 
   const isRelentlessDiscipline = abId.startsWith('relentlessdiscipline') || nameLower.includes('relentless discipline');
@@ -525,10 +529,25 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
   }
 
   // 3. Determine Targeting Rules
+  const isEnemyTarget = effectLower.includes('enemy unit') || 
+                        effectLower.includes('enemy model') || 
+                        effectLower.includes('enemy units') ||
+                        effectLower.includes('enemy models') ||
+                        effectLower.includes('the quarry') ||
+                        effectLower.includes('enemy general');
+
+  const isFriendlyTarget = effectLower.includes('friendly unit') || 
+                          effectLower.includes('friendly units') ||
+                          effectLower.includes('friendly model') || 
+                          effectLower.includes('friendly models');
+
   if (ability.phase === 'passive') {
     targetingType = 'global_passive';
     netEffects.push("Passive Ability: Registers as a persistent background aura; does not prompt target unit clicks.");
-  } else if (effectLower.includes('friendly unit') || effectLower.includes('friendly units')) {
+  } else if (isEnemyTarget && !isFriendlyTarget) {
+    targetingType = 'enemy';
+    netEffects.push("Enemy Targeting: Click resolves as an enemy-targeted debuff or attack (log only action, no friendly unit selection).");
+  } else if (isFriendlyTarget) {
     if (
       effectLower.includes('each friendly unit') || 
       effectLower.includes('all friendly units') ||
@@ -563,6 +582,13 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     const hasStatKeyword = keywords.some(kw => effectLower.includes(kw));
     if (!hasStatKeyword) return null;
 
+    if (statName === 'Save') {
+      const isRollComparison = effectLower.includes('equals or exceeds') || effectLower.includes('equal to or exceed') || effectLower.includes('equals or exceed');
+      if (isRollComparison) {
+        return null;
+      }
+    }
+
     if (effectLower.includes('double its move') || effectLower.includes('double its movement') || nameLower.includes('speed of hysh')) {
       return "Double";
     }
@@ -592,7 +618,7 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     'Hits': ['hit roll', 'hit rolls', 'add 1 to hit', 'add 1 to the hit', 'unmodified hit'],
     'Wounds': ['wound roll', 'wound rolls', 'add 1 to wound', 'add 1 to the wound', 'unmodified wound'],
     'Save': ['save roll', 'save characteristic', 'add 1 to save', 'add 1 to the save'],
-    'Ward': ['ward roll', 'ward characteristic', 'add 1 to ward', 'add 1 to the ward', 'ward save', 'has a ward'],
+    'Ward': ['ward roll', 'ward characteristic', 'add 1 to ward', 'add 1 to the ward', 'ward save', 'has a ward', 'ward (', 'ward of'],
     'Rend': ['rend characteristic', 'add 1 to rend', 'add 1 to the rend'],
     'Damage': ['damage characteristic', 'add 1 to damage', 'add 1 to the damage'],
     'Movement': ['move characteristic', 'movement characteristic', 'move characteristic of', 'double its move', 'move of', 'movement characteristic of'],
@@ -763,7 +789,7 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     !!ability.timing?.toLowerCase().includes('passive');
 
   const spatialKeywords = [
-    'wholly within', 'while within', ' if ', 'unless', 'provided that', 'more than', 'visible', 'if there are no',
+    'wholly within', 'while within', ' if ', 'unless', 'provided that', 'visible', 'if there are no',
     'range of', 'in combat', 'not in combat', 'contesting', 'do not control', 'target a damaged unit'
   ];
   let hasSpatialOrConditionalCheck = 
@@ -955,6 +981,24 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     if (activeLevel >= 4) { allowedStats.push('wound'); influencedStats.push('Wound'); }
   }
 
+  // 10. Rules Engine Overrides for Heightened Reflexes and Overwhelming Heat
+  let finalIsDefensive = isDefensive;
+  let finalHasSpatialOrConditionalCheck = hasSpatialOrConditionalCheck;
+  let finalConditionalCheckDescription = conditionalCheckDescription;
+
+  if (abId === 'heightenedreflexes' || nameLower.includes('heightened reflexes') || nameLower.includes('heightened reflexs')) {
+    finalHasSpatialOrConditionalCheck = true;
+    finalConditionalCheckDescription = "Requires manual trigger check (Heightened Reflexes sequence).";
+    finalIsDefensive = false;
+  }
+
+  if (abId === 'overwhelmingheat' || nameLower.includes('overwhelming heat')) {
+    finalIsDefensive = false;
+    targetingType = 'enemy';
+    influencedStats = influencedStats.filter(s => s !== 'Save');
+    finalStatsWithModifiers = finalStatsWithModifiers.filter(s => s.stat !== 'Save');
+  }
+
   const isPermanent = 
     effectLower.includes('for the rest of the battle') || 
     effectLower.includes('for the rest of the game') || 
@@ -971,8 +1015,8 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     isRelentlessDiscipline,
     heroOrGeneralOnly,
     isPassive,
-    hasSpatialOrConditionalCheck,
-    conditionalCheckDescription,
+    hasSpatialOrConditionalCheck: finalHasSpatialOrConditionalCheck,
+    conditionalCheckDescription: finalConditionalCheckDescription,
     isExternallyTracked,
     externalTrackedKeywords: uniqueExternalTrackedKeywords,
     rollDiceCount: finalRollDiceCount,
@@ -982,7 +1026,7 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     influencedStats,
     appliedPhase: finalAppliedPhase,
     activationPhase: finalActivationPhase,
-    isDefensive,
+    isDefensive: finalIsDefensive,
     targetSpecifications: finalTargetSpecifications,
     statsWithModifiers: finalStatsWithModifiers,
     isSpecialFactionRule,

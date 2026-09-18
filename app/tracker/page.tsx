@@ -73,7 +73,17 @@ export default function TrackerPage() {
     const analysis = analyzeAbilityRule(ability, faction);
     if (checked) {
       // Apply the buff
-      const allowedStats = analysis.allowedStats.length > 0 ? analysis.allowedStats : ['hit']; // Default hit fallback
+      const isCasting = ability.effect.toLowerCase().includes('casting roll') || ability.effect.toLowerCase().includes('casting rolls');
+      if (isCasting) {
+        let modifierVal = 1;
+        if (ability.effect.toLowerCase().includes('add 2')) {
+          modifierVal = 2;
+        }
+        let labelVal = `${ability.name} (Casting Roll Modifier)`;
+        applyBuff(unitId, 'casting', modifierVal, labelVal, undefined, ability.id, ability.effect);
+      }
+
+      const allowedStats = analysis.allowedStats.length > 0 ? analysis.allowedStats : (isCasting ? [] : ['hit']); // Default hit fallback only if not casting
       allowedStats.forEach(stat => {
         let modifierVal = 1;
         // Check if it's a subtraction / negative stat (e.g. subtracting from hit, save)
@@ -313,23 +323,8 @@ export default function TrackerPage() {
       updated.logs.unshift(`[Round ${updated.round}] 🛡️ Selected Shining Company: Subtract 1 from hit rolls targeting all friendly units!`);
       showToast('Selected Shining Company!', 'success');
     } else if (facetType === 'powerOfHysh') {
-      if (selectedFacetUnitId) {
-        const targetUnit = updated.units.find(u => u.id === selectedFacetUnitId);
-        const uRules = faction.units.find(rules => rules.id === targetUnit?.unitId);
-        if (targetUnit && uRules) {
-          const newMod: AppliedModifier = {
-            id: `powerOfHysh-${targetUnit.id}-${Date.now()}`,
-            unitId: targetUnit.id,
-            stat: 'hit',
-            modifier: 0, // No numeric stat adjustment needed for critical hits, we just display the buff label
-            label: 'Power of Hysh (Facet of War)',
-            expiresRound: updated.round
-          };
-          updated.appliedModifiers = [...(updated.appliedModifiers || []), newMod];
-          updated.logs.unshift(`[Round ${updated.round}] ✨ Selected Power of Hysh on ${uRules.name}: Critical hits on unmodified hit rolls of 5+!`);
-          showToast(`Selected Power of Hysh on ${uRules.name}!`, 'success');
-        }
-      }
+      updated.logs.unshift(`[Round ${updated.round}] ✨ Selected Power of Hysh: This ability can be used in the combat phase!`);
+      showToast('Selected Power of Hysh!', 'success');
     } else if (facetType === 'lightningReactions') {
       updated.logs.unshift(`[Round ${updated.round}] ⚡ Selected Lightning Reactions: You can pick 2 friendly units instead of 1 to Fight!`);
       showToast('Selected Lightning Reactions!', 'success');
@@ -589,12 +584,18 @@ export default function TrackerPage() {
   // Ability Use Tracking
   const toggleAbilityUsed = (abilityId: string, abilityName: string, effect?: string, phase?: GamePhase | 'passive') => {
     if (!gameState || !faction) return;
+    
+    if (abilityId === 'facetsOfWar' || abilityId.endsWith('-facetsOfWar')) {
+      setFacetOfWarModalOpen(true);
+      return;
+    }
+
     const updated = { ...gameState };
     
     // Detect unlimited (once: "none") abilities to prevent permanent lockout
-    let foundAb = faction.battleTraits.find(a => a.id === abilityId || (abilityId.startsWith(a.id) && a.id === 'relentlessDiscipline')) ||
-                  faction.regimentAbilities.find(a => a.id === abilityId) ||
-                  faction.enhancements.find(a => a.id === abilityId);
+    let foundAb = faction.battleTraits.find(a => a.id === abilityId || (abilityId.startsWith(a.id) && a.id === 'relentlessDiscipline') || abilityId.endsWith(`-${a.id}`)) ||
+                  faction.regimentAbilities.find(a => a.id === abilityId || abilityId.endsWith(`-${a.id}`)) ||
+                  faction.enhancements.find(a => a.id === abilityId || abilityId.endsWith(`-${a.id}`));
     
     if (!foundAb) {
       for (const u of faction.units) {
@@ -707,7 +708,7 @@ export default function TrackerPage() {
 
     // Check 2: Dice check roll required BEFORE targeting
     const rollMatch = (effect || '').match(/on\s+a\s+(\d+)\+/i);
-    const isTargetingSingular = analysis ? (analysis.targetingType === 'single_friendly' || analysis.targetingType === 'unknown') : isTargetingSingularFriendlyUnit(effect || '');
+    const isTargetingSingular = analysis ? (analysis.targetingType === 'single_friendly') : isTargetingSingularFriendlyUnit(effect || '');
 
     if (rollMatch && !isTargetingSingular) {
       setRollPrompt({
@@ -894,6 +895,7 @@ export default function TrackerPage() {
         updated.previousRoundFirstPlayer = updated.roundFirstPlayer;
         updated.roundFirstPlayer = undefined; // Reset roundFirstPlayer so start-of-round setup overlay opens for next round
         updated.round += 1;
+        updated.luminethFacetSelected = undefined; // Reset chosen Facet of War for the new round
         updated.logs.unshift(`🌟 --- START OF BATTLE ROUND ${updated.round} --- 🌟`);
 
         // Automatically expire temporary round buffs
@@ -1136,10 +1138,6 @@ export default function TrackerPage() {
 
     saveGame(updated);
     setRoundInitializingModal(null);
-
-    if (updated.factionId === 'lumineth-realm-lords-glittering-phalanx') {
-      setFacetOfWarModalOpen(true);
-    }
   };
 
   // Extract phase-specific abilities for reference
@@ -1167,6 +1165,10 @@ export default function TrackerPage() {
             list.push({ ...t, sourceType: 'trait' });
           }
         } else {
+          // Skip Lumineth Facet of War sub-abilities here; they are custom injected
+          const isLuminethFacet = ['shiningCompany', 'powerOfHysh', 'lightningReactions'].includes(t.id);
+          if (isLuminethFacet) return;
+
           if (t.phase === phase && isAbilityAllowedByRound(t)) {
             list.push({ ...t, sourceType: 'trait' });
           }
@@ -1179,14 +1181,22 @@ export default function TrackerPage() {
           if (['movement', 'charge', 'combat'].includes(phase) && isRelentlessActive) {
             list.push({ ...trait, sourceType: 'trait' });
           }
-        } else if (trait.phase === phase && isAbilityAllowedByRound(trait)) {
-          list.push({ ...trait, sourceType: 'trait' });
+        } else {
+          // Skip Lumineth Facet of War sub-abilities here; they are custom injected
+          const isLuminethFacet = ['shiningCompany', 'powerOfHysh', 'lightningReactions'].includes(trait.id);
+          if (!isLuminethFacet && trait.phase === phase && isAbilityAllowedByRound(trait)) {
+            list.push({ ...trait, sourceType: 'trait' });
+          }
         }
       }
     }
 
-    // Regiment Abilities (All active by default in Spearhead)
-    faction.regimentAbilities.forEach(reg => {
+    // Regiment Abilities (Only active selected one in Spearhead)
+    const activeRegimentAbilities = gameState.selectedRegimentAbilityId && gameState.selectedRegimentAbilityId !== 'all'
+      ? faction.regimentAbilities.filter(reg => reg.id === gameState.selectedRegimentAbilityId)
+      : faction.regimentAbilities;
+
+    activeRegimentAbilities.forEach(reg => {
       if (reg.phase === phase && isAbilityAllowedByRound(reg)) {
         list.push({ ...reg, sourceType: 'regiment' });
       }
@@ -1220,6 +1230,22 @@ export default function TrackerPage() {
       }
     }
 
+    // Custom injector for Lumineth Glittering Phalanx Facets of War in active phases
+    if (gameState.factionId === 'lumineth-realm-lords-glittering-phalanx') {
+      if (gameState.luminethFacetSelected === 'lightningReactions' && phase === 'combat') {
+        const lrTrait = faction.battleTraits.find(t => t.id === 'lightningReactions');
+        if (lrTrait) {
+          list.push({ ...lrTrait, sourceType: 'trait' });
+        }
+      }
+      if (gameState.luminethFacetSelected === 'powerOfHysh' && phase === 'hero') {
+        const pohTrait = faction.battleTraits.find(t => t.id === 'powerOfHysh');
+        if (pohTrait) {
+          list.push({ ...pohTrait, sourceType: 'trait' });
+        }
+      }
+    }
+
     return list;
   };
 
@@ -1233,18 +1259,52 @@ export default function TrackerPage() {
     return libGetBattleDamagedOverride(gameState, faction || null, unitId, statKey, weaponName);
   }
 
+  // Helper to get casting roll adjustments for active strategy cards
+  const getCastingAdjustmentForAbility = (ability: Ability) => {
+    const isCasting = ability.effect.toLowerCase().includes('casting roll') || 
+                      ability.effect.toLowerCase().includes('casting rolls') ||
+                      ability.timing?.toLowerCase().includes('hero phase') ||
+                      ability.phase === 'hero';
+
+    if (!isCasting) return null;
+
+    const bonus = getCastingRollBonus();
+    if (!bonus) return null;
+
+    // Parse required roll (e.g., "7+" or "5+")
+    const match = ability.effect.match(/On\s+a\s+(\d+)\+/i);
+    if (!match) return null;
+
+    const baseThreshold = parseInt(match[1], 10);
+    const modifiedThreshold = Math.max(2, baseThreshold - bonus.value);
+
+    return {
+      bonusValue: bonus.value,
+      bonusSource: bonus.source,
+      baseRoll: `${baseThreshold}+`,
+      modifiedRoll: `${modifiedThreshold}+`
+    };
+  };
+
   // Helper to determine if there is an active +1 (or more) modifier to casting/activation rolls
   function getCastingRollBonus(): { value: number; source: string } | null {
     if (!gameState || !faction) return null;
 
     // 1. Check Regiment Abilities
-    for (const regiment of faction.regimentAbilities) {
+    const activeRegimentAbilities = gameState.selectedRegimentAbilityId && gameState.selectedRegimentAbilityId !== 'all'
+      ? faction.regimentAbilities.filter(reg => reg.id === gameState.selectedRegimentAbilityId)
+      : faction.regimentAbilities;
+
+    for (const regiment of activeRegimentAbilities) {
+      const eff = regiment.effect.toLowerCase();
       if (
-        regiment.effect.toLowerCase().includes('add 1 to casting roll') || 
-        regiment.effect.toLowerCase().includes('add 2 to the casting roll') || 
-        regiment.effect.toLowerCase().includes('add 2 to casting roll')
+        eff.includes('add 1 to casting roll') || 
+        eff.includes('add 1 to casting rolls') || 
+        eff.includes('add 2 to the casting roll') || 
+        eff.includes('add 2 to casting roll') ||
+        eff.includes('add 2 to casting rolls')
       ) {
-        const val = regiment.effect.toLowerCase().includes('add 2') ? 2 : 1;
+        const val = eff.includes('add 2') ? 2 : 1;
         return { value: val, source: `${regiment.name} (Regiment Ability)` };
       }
     }
@@ -1255,29 +1315,37 @@ export default function TrackerPage() {
       : faction.battleTraits.filter(t => t.id === gameState.selectedBattleTraitId);
     
     for (const trait of activeTraits) {
+      const eff = trait.effect.toLowerCase();
       if (
-        trait.effect.toLowerCase().includes('add 1 to casting roll') || 
-        trait.effect.toLowerCase().includes('add 2 to casting roll')
+        eff.includes('add 1 to casting roll') || 
+        eff.includes('add 1 to casting rolls') || 
+        eff.includes('add 2 to casting roll') ||
+        eff.includes('add 2 to casting rolls')
       ) {
-        const val = trait.effect.toLowerCase().includes('add 2') ? 2 : 1;
+        const val = eff.includes('add 2') ? 2 : 1;
         return { value: val, source: `${trait.name} (Battle Trait)` };
       }
     }
 
     // 3. Check selected Enhancement
     const enhancement = faction.enhancements.find(e => e.id === gameState.selectedEnhancementId);
-    if (enhancement && (
-      enhancement.effect.toLowerCase().includes('add 1 to casting roll') || 
-      enhancement.effect.toLowerCase().includes('add 2 to casting roll')
-    )) {
-      const val = enhancement.effect.toLowerCase().includes('add 2') ? 2 : 1;
-      return { value: val, source: `${enhancement.name} (Enhancement)` };
+    if (enhancement) {
+      const eff = enhancement.effect.toLowerCase();
+      if (
+        eff.includes('add 1 to casting roll') || 
+        eff.includes('add 1 to casting rolls') || 
+        eff.includes('add 2 to casting roll') ||
+        eff.includes('add 2 to casting rolls')
+      ) {
+        const val = eff.includes('add 2') ? 2 : 1;
+        return { value: val, source: `${enhancement.name} (Enhancement)` };
+      }
     }
 
     // 4. Check custom applied modifiers
     if (gameState.appliedModifiers) {
       const m = gameState.appliedModifiers.find(mod => 
-        (mod.label.toLowerCase().includes('casting roll') || mod.label.toLowerCase().includes('casting buff')) && 
+        (mod.label.toLowerCase().includes('casting roll') || mod.label.toLowerCase().includes('casting buff') || mod.label.toLowerCase().includes('arcane prowess')) && 
         mod.modifier !== 0
       );
       if (m) {
@@ -1515,18 +1583,30 @@ export default function TrackerPage() {
     // Faction-wide passives
     if (gameState.selectedBattleTraitId === 'all') {
       faction.battleTraits.forEach(t => {
+        // Skip Lumineth Facet of War sub-abilities here; they are custom injected
+        const isLuminethFacet = ['shiningCompany', 'powerOfHysh', 'lightningReactions'].includes(t.id);
+        if (isLuminethFacet) return;
+
         if (isMatched(t)) {
           list.push({ ...t, sourceType: 'trait' });
         }
       });
     } else {
       const trait = faction.battleTraits.find(t => t.id === gameState.selectedBattleTraitId);
-      if (trait && isMatched(trait)) {
-        list.push({ ...trait, sourceType: 'trait' });
+      if (trait) {
+        // Skip Lumineth Facet of War sub-abilities here; they are custom injected
+        const isLuminethFacet = ['shiningCompany', 'powerOfHysh', 'lightningReactions'].includes(trait.id);
+        if (!isLuminethFacet && isMatched(trait)) {
+          list.push({ ...trait, sourceType: 'trait' });
+        }
       }
     }
 
-    faction.regimentAbilities.forEach(reg => {
+    const activeRegimentAbilities = gameState.selectedRegimentAbilityId && gameState.selectedRegimentAbilityId !== 'all'
+      ? faction.regimentAbilities.filter(reg => reg.id === gameState.selectedRegimentAbilityId)
+      : faction.regimentAbilities;
+
+    activeRegimentAbilities.forEach(reg => {
       if (isMatched(reg)) {
         list.push({ ...reg, sourceType: 'regiment' });
       }
@@ -1537,11 +1617,17 @@ export default function TrackerPage() {
       list.push({ ...enhancement, sourceType: 'enhancement' });
     }
 
-    // Custom injector for Lumineth Glittering Phalanx Facets of War: Lightning Reactions
+    // Custom injector for Lumineth Glittering Phalanx Facets of War passives
     if (gameState.factionId === 'lumineth-realm-lords-glittering-phalanx') {
-      if (gameState.luminethFacetSelected === 'lightningReactions' && phase === 'combat') {
+      if (gameState.luminethFacetSelected === 'shiningCompany') {
+        const scTrait = faction.battleTraits.find(t => t.id === 'shiningCompany');
+        if (scTrait && isMatched(scTrait)) {
+          list.push({ ...scTrait, sourceType: 'trait' });
+        }
+      }
+      if (gameState.luminethFacetSelected === 'lightningReactions') {
         const lrTrait = faction.battleTraits.find(t => t.id === 'lightningReactions');
-        if (lrTrait) {
+        if (lrTrait && isMatched(lrTrait)) {
           list.push({ ...lrTrait, sourceType: 'trait' });
         }
       }
@@ -1752,6 +1838,19 @@ export default function TrackerPage() {
               {abilities.map(ability => {
                 const isUsed = !!gameState.usedAbilities[ability.id];
                 const style = getAbilityStyleClasses(ability.sourceType);
+
+                // Find which units this ability is currently applied to
+                const appliedMods = gameState.appliedModifiers?.filter(m => 
+                  m.sourceAbilityId === ability.id || 
+                  (m.sourceAbilityId && (m.sourceAbilityId.endsWith(`-${ability.id}`) || m.sourceAbilityId.startsWith(`${ability.id}-`)))
+                ) || [];
+                const appliedUnitNames = Array.from(new Set(appliedMods.map(m => {
+                  const uState = gameState.units.find(u => u.id === m.unitId);
+                  if (!uState) return '';
+                  const uRules = faction.units.find(ru => ru.id === uState.unitId);
+                  return uRules ? uRules.name : uState.id;
+                }).filter(Boolean)));
+
                 return (
                   <Card 
                     key={ability.id} 
@@ -1779,6 +1878,32 @@ export default function TrackerPage() {
                     </CardHeader>
                     <CardContent className="p-4 pt-1">
                       <p className="text-xxs text-gray-400 leading-normal whitespace-pre-line font-medium">{ability.effect}</p>
+                      
+                      {appliedUnitNames.length > 0 && (
+                        <div className="mt-2.5 pt-2 border-t border-[#2c3548]/30 text-[10px] text-amber-500 font-extrabold flex items-center gap-1 leading-none select-none">
+                          <span>🎯</span> Applied to: <strong className="text-amber-400 font-black">{appliedUnitNames.join(', ')}</strong>
+                        </div>
+                      )}
+
+                      {(() => {
+                        const castAdj = getCastingAdjustmentForAbility(ability);
+                        if (!castAdj) return null;
+                        return (
+                          <div className="mt-3 pt-2.5 border-t border-[#2c3548]/30 space-y-2">
+                            <div className="flex items-center gap-1.5 bg-purple-500/5 border border-purple-500/10 rounded-lg p-2 text-[10px] text-gray-300">
+                              <span className="text-purple-400">🔮</span>
+                              <div>
+                                <p className="font-extrabold text-purple-400 uppercase tracking-wide text-[9px]">
+                                  Casting Roll Success: <span className="line-through text-gray-500 mr-1">{castAdj.baseRoll}</span> {castAdj.modifiedRoll}
+                                </p>
+                                <p className="text-[8px] text-gray-400 mt-0.5 font-medium">
+                                  Reduced from {castAdj.baseRoll} via <strong className="text-purple-400">{castAdj.bonusSource}</strong> (+{castAdj.bonusValue} modifier)
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                       
                       {['relentlessDiscipline', 'relentlessDiscipline-2'].includes(ability.id) && (
                         <div className="mt-3 pt-2.5 border-t border-[#222834] space-y-2 text-[10px] text-gray-300">
@@ -1946,7 +2071,11 @@ export default function TrackerPage() {
       }
     }
 
-    faction.regimentAbilities.forEach(reg => {
+    const activeRegimentAbilities = gameState.selectedRegimentAbilityId && gameState.selectedRegimentAbilityId !== 'all'
+      ? faction.regimentAbilities.filter(reg => reg.id === gameState.selectedRegimentAbilityId)
+      : faction.regimentAbilities;
+
+    activeRegimentAbilities.forEach(reg => {
       if (reg.isDefense && (reg.phase === 'combat' || reg.phase === 'passive')) {
         defAbilities.push({ source: 'Regiment', name: reg.name, timing: reg.timing, effect: reg.effect, id: reg.id, key: reg.id });
       }
@@ -2281,8 +2410,52 @@ export default function TrackerPage() {
               const analysis = analyzeAbilityRule(ab, faction);
               return analysis.hasSpatialOrConditionalCheck;
             });
+
+            // Append regiment abilities and battle traits if they apply to this unit and have spatial/conditional checks OR casting/roll modifiers!
+            const extraAbilities: Ability[] = [];
             
-            if (passiveSpatialAbilities.length === 0) return null;
+            // Faction battle traits
+            const activeTraits = gameState.selectedBattleTraitId === 'all' 
+              ? faction.battleTraits 
+              : faction.battleTraits.filter(t => t.id === gameState.selectedBattleTraitId);
+            activeTraits.forEach(t => {
+              // Skip Lumineth Facets of War unless it is the currently selected facet
+              const isLuminethFacet = ['shiningCompany', 'powerOfHysh', 'lightningReactions'].includes(t.id);
+              if (isLuminethFacet && gameState.luminethFacetSelected !== t.id) {
+                return;
+              }
+
+              if (t.phase === 'passive') {
+                const analysis = analyzeAbilityRule(t, faction);
+                const isHeroOnly = analysis.heroOrGeneralOnly || t.effect.toLowerCase().includes('your general');
+                if (!isHeroOnly || uRules.isHero) {
+                  if (analysis.hasSpatialOrConditionalCheck || t.effect.toLowerCase().includes('casting roll') || t.effect.toLowerCase().includes('casting rolls')) {
+                    extraAbilities.push({ ...t, sourceType: 'trait' });
+                  }
+                }
+              }
+            });
+
+            // Regiment abilities
+            const activeRegimentAbilities = gameState.selectedRegimentAbilityId && gameState.selectedRegimentAbilityId !== 'all'
+              ? faction.regimentAbilities.filter(reg => reg.id === gameState.selectedRegimentAbilityId)
+              : faction.regimentAbilities;
+
+            activeRegimentAbilities.forEach(reg => {
+              if (reg.phase === 'passive') {
+                const analysis = analyzeAbilityRule(reg, faction);
+                const isHeroOnly = analysis.heroOrGeneralOnly || reg.effect.toLowerCase().includes('your general');
+                if (!isHeroOnly || uRules.isHero) {
+                  if (analysis.hasSpatialOrConditionalCheck || reg.effect.toLowerCase().includes('casting roll') || reg.effect.toLowerCase().includes('casting rolls')) {
+                    extraAbilities.push({ ...reg, sourceType: 'regiment' });
+                  }
+                }
+              }
+            });
+
+            const combinedAbilities = [...passiveSpatialAbilities, ...extraAbilities];
+            
+            if (combinedAbilities.length === 0) return null;
             
             return (
               <div className="p-3 bg-purple-500/5 border border-purple-500/15 rounded-xl space-y-2 text-left">
@@ -2290,7 +2463,7 @@ export default function TrackerPage() {
                   🗺️ Passive Spatial Check Modifiers (Toggle to apply):
                 </span>
                 <div className="flex flex-col gap-1.5">
-                  {passiveSpatialAbilities.map(ab => {
+                  {combinedAbilities.map(ab => {
                     const isApplied = gameState.appliedModifiers?.some(m => m.unitId === u.id && m.sourceAbilityId === ab.id);
                     return (
                       <div key={ab.id} className="flex items-start justify-between gap-3 p-2 bg-[#151923]/50 border border-[#222834] rounded-lg">
@@ -2907,6 +3080,36 @@ export default function TrackerPage() {
                     </div>
                   )}
 
+                  {(() => {
+                    const castAdj = getCastingAdjustmentForAbility(ability);
+                    if (!castAdj) return null;
+                    return (
+                      <div className="mt-3 pt-2.5 border-t border-[#2c3548]/30 space-y-2">
+                        <div className="flex items-center gap-1.5 bg-purple-500/5 border border-purple-500/10 rounded-lg p-2 text-[10px] text-gray-300">
+                          <span className="text-purple-400">🔮</span>
+                          <div>
+                            <p className="font-extrabold text-purple-400 uppercase tracking-wide text-[9px]">
+                              Casting Roll Success: <span className="line-through text-gray-500 mr-1">{castAdj.baseRoll}</span> {castAdj.modifiedRoll}
+                            </p>
+                            <p className="text-[8px] text-gray-400 mt-0.5 font-medium">
+                              Reduced from {castAdj.baseRoll} via <strong className="text-purple-400">{castAdj.bonusSource}</strong> (+{castAdj.bonusValue} modifier)
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {(ability.id === 'facetsOfWar' || ability.id.endsWith('-facetsOfWar')) && gameState.luminethFacetSelected && (
+                    <div className="mt-2.5 pt-2 border-t border-[#2c3548]/30 text-[10px] text-amber-500 font-extrabold flex items-center gap-1 leading-none select-none">
+                      <span>⚡</span> Activated Facet: <strong className="text-amber-400 font-black">
+                        {gameState.luminethFacetSelected === 'shiningCompany' ? 'Shining Company' : 
+                         gameState.luminethFacetSelected === 'powerOfHysh' ? 'Power of Hysh' : 
+                         gameState.luminethFacetSelected === 'lightningReactions' ? 'Lightning Reactions' : ''}
+                      </strong>
+                    </div>
+                  )}
+
                   {['relentlessDiscipline', 'relentlessDiscipline-2'].includes(ability.id) && (
                     <div className="mt-3 pt-2.5 border-t border-[#222834] space-y-2 text-[10px] text-gray-300">
                       <div className="flex items-center gap-1.5 bg-amber-500/5 border border-amber-500/10 rounded-lg p-2">
@@ -3242,7 +3445,11 @@ export default function TrackerPage() {
                       }
                     }
 
-                    faction.regimentAbilities.forEach(a => {
+                    const activeRegimentAbilities = gameState.selectedRegimentAbilityId && gameState.selectedRegimentAbilityId !== 'all'
+                      ? faction.regimentAbilities.filter(reg => reg.id === gameState.selectedRegimentAbilityId)
+                      : faction.regimentAbilities;
+
+                    activeRegimentAbilities.forEach(a => {
                       if (a.isDefense) {
                         defAbilities.push({ source: 'Regiment', name: a.name, timing: a.timing, effect: a.effect, id: a.id, key: a.id });
                       }
@@ -4711,9 +4918,9 @@ export default function TrackerPage() {
       )}
 
       {selectUnitToBuffAbility && (() => {
-        let abilityConfig = faction?.battleTraits.find(a => a.id === selectUnitToBuffAbility.abilityId) ||
-                            faction?.regimentAbilities.find(a => a.id === selectUnitToBuffAbility.abilityId) ||
-                            faction?.enhancements.find(a => a.id === selectUnitToBuffAbility.abilityId);
+        let abilityConfig = faction?.battleTraits.find(a => a.id === selectUnitToBuffAbility.abilityId || selectUnitToBuffAbility.abilityId.endsWith(`-${a.id}`)) ||
+                            faction?.regimentAbilities.find(a => a.id === selectUnitToBuffAbility.abilityId || selectUnitToBuffAbility.abilityId.endsWith(`-${a.id}`)) ||
+                            faction?.enhancements.find(a => a.id === selectUnitToBuffAbility.abilityId || selectUnitToBuffAbility.abilityId.endsWith(`-${a.id}`));
         
         if (!abilityConfig && faction) {
           for (const u of faction.units) {
@@ -5364,52 +5571,18 @@ export default function TrackerPage() {
                 </button>
 
                 {/* 2. Power of Hysh */}
-                <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-950/5 flex flex-col gap-3 relative">
-                  <div className="flex gap-3">
-                    <span className="text-xl leading-none shrink-0 self-center">✨</span>
-                    <div className="space-y-1">
-                      <h4 className="text-xs font-black text-white uppercase tracking-wider">Power of Hysh</h4>
-                      <p className="text-[10px] text-gray-300 leading-normal font-medium">
-                        On a 2+, attacks made by the selected unit score critical hits on unmodified hit rolls of 5+. (Requires selecting a target unit).
-                      </p>
-                    </div>
+                <button
+                  onClick={() => handleSelectFacet('powerOfHysh')}
+                  className="w-full text-left p-4 rounded-xl border border-amber-500/30 bg-amber-950/5 hover:bg-amber-950/10 hover:border-amber-400 transition-all flex gap-3 relative"
+                >
+                  <span className="text-xl leading-none shrink-0 self-center">✨</span>
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-black text-white uppercase tracking-wider">Power of Hysh</h4>
+                    <p className="text-[10px] text-gray-300 leading-normal font-medium">
+                      On a 2+, attacks made by the selected unit score critical hits on unmodified hit rolls of 5+. (Activates in Combat Phase).
+                    </p>
                   </div>
-                  
-                  {/* Unit Selector inside the option card */}
-                  <div className="mt-2 pt-2 border-t border-[#2c3548]/30 space-y-2 text-left">
-                    <label className="text-[9px] font-black text-amber-400 uppercase tracking-widest block">
-                      👇 Pick Target Friendly Unit:
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {gameState?.units.filter(u => !u.isSlain).map(u => {
-                        const uRules = faction?.units.find(rules => rules.id === u.unitId);
-                        if (!uRules) return null;
-                        const isSelected = selectedFacetUnitId === u.id;
-                        return (
-                          <button
-                            key={u.id}
-                            type="button"
-                            onClick={() => setSelectedFacetUnitId(u.id)}
-                            className={`p-2 rounded-lg border text-xxs font-bold text-left transition-all flex items-center justify-between
-                              ${isSelected 
-                                ? 'bg-amber-500/20 border-amber-400 text-white' 
-                                : 'bg-[#1c2230] border-[#2c3548] text-gray-300 hover:text-white'}`}
-                          >
-                            <span>{uRules.name}</span>
-                            {isSelected && <Badge className="bg-amber-500/30 text-amber-300 text-[8px]">Selected</Badge>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <Button
-                      onClick={() => handleSelectFacet('powerOfHysh')}
-                      disabled={!selectedFacetUnitId}
-                      className="w-full bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-extrabold text-xs uppercase py-2 rounded-xl transition-all mt-1"
-                    >
-                      Choose Power of Hysh
-                    </Button>
-                  </div>
-                </div>
+                </button>
 
                 {/* 3. Lightning Reactions */}
                 <button
