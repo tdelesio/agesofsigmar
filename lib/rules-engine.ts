@@ -740,9 +740,21 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction): ParsedR
     'wholly within', 'while within', ' if ', 'unless', 'provided that', 'more than', 'visible', 'if there are no',
     'range of', 'in combat', 'not in combat', 'contesting', 'do not control'
   ];
-  const hasSpatialOrConditionalCheck = 
+  let hasSpatialOrConditionalCheck = 
     spatialKeywords.some(keyword => effectLower.includes(keyword)) ||
     /within\s+\d+["']/i.test(effectLower);
+
+  // Exclude abilities whose only conditional/spatial check is a charge condition,
+  // as those are automatically resolved based on the unit's active charge state (uState.charged)
+  const isChargeCondition = effectLower.includes('charged in the same turn') || effectLower.includes('has charged') || effectLower.includes('charged this phase');
+  if (isChargeCondition && hasSpatialOrConditionalCheck) {
+    const hasOtherSpatialCheck = 
+      spatialKeywords.filter(kw => kw !== ' if ').some(keyword => effectLower.includes(keyword)) ||
+      /within\s+\d+["']/i.test(effectLower);
+    if (!hasOtherSpatialCheck) {
+      hasSpatialOrConditionalCheck = false;
+    }
+  }
   
   let conditionalCheckDescription: string | null = null;
   if (hasSpatialOrConditionalCheck) {
