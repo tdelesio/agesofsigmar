@@ -1348,6 +1348,7 @@
       {
         "id": "bloodRites",
         "name": "Blood Rites",
+        "isSpecialized": true,
         "effect": "At the start of each battle round, all friendly units gain the Blood Rites passive ability that corresponds to the current battle round number (units keep all Blood Rites abilities gained in previous battle rounds):\nRound 1 - Quickening Bloodlust: Add 1 to run rolls for this unit.\nRound 2 - Headlong Fury: Add 1 to charge rolls for this unit.\nRound 3 - Zealot's Rage: Add 1 to hit rolls for combat attacks made by this unit.\nRound 4 - Slaughterer's Strength: Add 1 to wound rolls for combat attacks made by this unit.",
         "phase": "start",
         "timing": "Start of Battle Round",
@@ -5957,7 +5958,8 @@
         "phase": "passive",
         "timing": "Passive",
         "once": "none",
-        "isDefense": true
+        "isDefense": true,
+        "passiveAppliedPhase": "combat"
       },
       {
         "id": "curvedShots",
@@ -6049,7 +6051,8 @@
             "phase": "passive",
             "timing": "Passive",
             "once": "none",
-            "isDefense": true
+            "isDefense": true,
+            "passiveAppliedPhase": "combat"
           },
           {
             "id": "hurricaneWinds",
@@ -6145,7 +6148,8 @@
           }
         ]
       }
-    ]
+    ],
+    "isTested": true
   },
   {
     "id": "lumineth-realm-lords-glittering-phalanx",
@@ -11208,10 +11212,12 @@
       {
         "id": "eyeOfTheGods",
         "name": "Eye of the Gods",
+        "isSpecialized": true,
         "effect": "Declare: Pick one of the following friendly units to use this ability:\n• A unit that is contesting an objective not controlled by your opponent and is not in combat.\n• A unit that destroyed an enemy unit this turn.\n\nEffect: Roll once on the Eye of the Gods table for that unit. That unit gains the Eye of the Gods passive ability that corresponds to the roll (the unit keeps all Eye of the Gods abilities gained in previous turns). If the same unit gains the same ability more than once in the battle, the effects are not cumulative.\n\nEye of the Gods Table:\n1: Snubbed by the Gods: No effect.\n2: Ward of Tzeentch: This unit has Ward (6+).\n3: Grace of Slaanesh: Add 1 to run rolls for this unit.\n4: Blessing of Nurgle: Subtract 1 from wound rolls for attacks that target this unit.\n5: Fury of Khorne: Add 1 to the Rend characteristic of this unit's melee weapons.\n6: Champion of Chaos: Pick any ability from the table.",
         "phase": "end",
         "timing": "End of Any Turn",
-        "once": "once-per-turn"
+        "once": "once-per-turn",
+        "passiveAppliedPhase": "end"
       }
     ],
     "regimentAbilities": [
@@ -11227,7 +11233,7 @@
         "id": "fierceConquerors",
         "name": "Fierce Conquerors",
         "effect": "Add 3 to the control scores of friendly Chaos Warriors units.",
-        "phase": "end",
+        "phase": "passive",
         "timing": "Passive",
         "once": "none",
         "passiveAppliedPhase": "end"

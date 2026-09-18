@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DEFAULT_FACTIONS } from '../data/default-factions';
 import { GameState, Faction, Unit, GamePhase, Weapon, Ability, UnitState, AppliedModifier } from '../types';
-import { getActiveModifiers as libGetActiveModifiers, getBattleDamagedOverride as libGetBattleDamagedOverride, calculateStatValue, isTargetingSingularFriendlyUnit, analyzeAbilityRule, ParsedRuleResult } from '@/lib/rules-engine';
+import { getActiveModifiers as libGetActiveModifiers, getBattleDamagedOverride as libGetBattleDamagedOverride, calculateStatValue, isTargetingSingularFriendlyUnit, analyzeAbilityRule, ParsedRuleResult, getActiveBloodRitesRound } from '@/lib/rules-engine';
 
 const shownPromptsCache = new Set<string>();
 
@@ -43,6 +43,7 @@ export default function TrackerPage() {
     unitName: string;
     allowedStats?: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage' | 'charge')[];
     expiresPhase?: GamePhase;
+    expiresTurn?: boolean;
     sourceAbilityName?: string;
     sourceAbilityId?: string;
     sourceAbilityEffect?: string;
@@ -239,9 +240,16 @@ export default function TrackerPage() {
   };
 
   // Turn-based targeted buff helpers
-  const applyBuff = (unitId: string, stat: any, modifier: number, label: string, expiresPhase?: GamePhase, sourceAbilityId?: string, sourceAbilityEffect?: string) => {
+  const applyBuff = (unitId: string, stat: any, modifier: number, label: string, expiresPhase?: GamePhase, sourceAbilityId?: string, sourceAbilityEffect?: string, expiresTurn?: boolean) => {
     if (!gameState) return;
     const updated = { ...gameState };
+    
+    const effectLower = (sourceAbilityEffect || '').toLowerCase();
+    const isTurnLong = effectLower.includes('rest of the turn') || effectLower.includes('rest of this turn') || effectLower.includes('for the rest of the turn') || effectLower.includes('for the rest of this turn') || effectLower.includes('rest of the battle round') || effectLower.includes('rest of this battle round') || effectLower.includes('this turn');
+    
+    const finalExpiresPhase = isTurnLong ? undefined : expiresPhase;
+    const finalExpiresTurn = isTurnLong ? true : expiresTurn;
+
     const newMod: AppliedModifier = {
       id: Math.random().toString(36).substring(2, 9),
       unitId,
@@ -249,12 +257,19 @@ export default function TrackerPage() {
       modifier,
       label,
       expiresRound: gameState.round,
-      expiresPhase,
+      expiresPhase: finalExpiresPhase,
+      expiresTurn: finalExpiresTurn,
       sourceAbilityId,
       sourceAbilityEffect
     };
     updated.appliedModifiers = [...(updated.appliedModifiers || []), newMod];
-    updated.logs.unshift(`[Round ${gameState.round}] ✨ Applied buff [${label}] to unit${expiresPhase ? ` for ${expiresPhase} phase` : ''}.`);
+    
+    if (sourceAbilityId) {
+      if (!updated.usedAbilities) updated.usedAbilities = {};
+      updated.usedAbilities[sourceAbilityId] = true;
+    }
+
+    updated.logs.unshift(`[Round ${gameState.round}] ✨ Applied buff [${label}] to unit${finalExpiresPhase ? ` for ${finalExpiresPhase} phase` : ''}.`);
     saveGame(updated);
     showToast(`Applied ${label}!`, 'success');
   };
@@ -865,6 +880,11 @@ export default function TrackerPage() {
     updated.activeTurn = lastTurn === 'me' ? 'opponent' : 'me';
     updated.currentPhase = 'start'; // back to start
 
+    // Clean up temporary turn-long modifiers at the end of the turn
+    if (updated.appliedModifiers) {
+      updated.appliedModifiers = updated.appliedModifiers.filter(mod => !mod.expiresTurn);
+    }
+
     updated.logs.unshift(`⚔️ Finished turn for ${lastTurn === 'me' ? 'Me' : 'Opponent'}.`);
 
     // Increment round if switching back to the player who had priority (the Turn 2 player finishes their turn)
@@ -977,18 +997,19 @@ export default function TrackerPage() {
       });
     }
 
-    // Check chosen regiment ability
-    const chosenReg = faction.regimentAbilities?.find(r => r.id === gameState?.selectedRegimentAbilityId);
-    if (chosenReg) {
-      const text = `${chosenReg.name} ${chosenReg.effect} ${chosenReg.timing || ''} ${chosenReg.phase || ''}`.toLowerCase();
-      if (text.includes('deployment') || text.includes('pre-battle') || (chosenReg.timing && chosenReg.timing.toLowerCase().includes('deployment'))) {
-        list.push({
-          name: chosenReg.name,
-          source: 'Regiment Ability',
-          timing: chosenReg.timing || 'Deployment Phase',
-          effect: chosenReg.effect
-        });
-      }
+    // Check all regiment abilities
+    if (faction.regimentAbilities) {
+      faction.regimentAbilities.forEach(reg => {
+        const text = `${reg.name} ${reg.effect} ${reg.timing || ''} ${reg.phase || ''}`.toLowerCase();
+        if (text.includes('deployment') || text.includes('pre-battle') || reg.phase === 'deployment' || (reg.timing && reg.timing.toLowerCase().includes('deployment'))) {
+          list.push({
+            name: reg.name,
+            source: 'Regiment Ability',
+            timing: reg.timing || 'Deployment Phase',
+            effect: reg.effect
+          });
+        }
+      });
     }
 
     // Check chosen enhancement
@@ -1076,8 +1097,40 @@ export default function TrackerPage() {
     updated.meDoubleUpped = isMeDoubleUpped;
     updated.opponentDoubleUpped = isOpponentDoubleUpped;
 
-    // Reset used once-per-phase/turn abilities for new round/turn
-    updated.usedAbilities = {};
+    // Reset used once-per-phase/turn abilities for new round/turn (preserving once-per-battle)
+    if (updated.usedAbilities) {
+      Object.keys(updated.usedAbilities).forEach(key => {
+        let isOncePerBattleAbility = false;
+        
+        // 1. Try to find in faction battle traits, regiment abilities, or enhancements
+        let foundAb = faction?.battleTraits.find(a => a.id === key || (key.startsWith(a.id) && a.id === 'relentlessDiscipline')) ||
+                      faction?.regimentAbilities.find(a => a.id === key) ||
+                      faction?.enhancements.find(a => a.id === key);
+        
+        // 2. Try to find in unit abilities
+        if (!foundAb && faction) {
+          for (const u of faction.units) {
+            const matched = u.abilities.find(a => key === a.id || key.endsWith(`-${a.id}`));
+            if (matched) {
+              foundAb = matched;
+              break;
+            }
+          }
+        }
+
+        if (foundAb) {
+          const isOncePerBattleType = foundAb.once === 'once-per-battle';
+          const isTimingOncePerBattle = foundAb.timing && foundAb.timing.toLowerCase().startsWith('once per battle');
+          if (isOncePerBattleType || isTimingOncePerBattle) {
+            isOncePerBattleAbility = true;
+          }
+        }
+
+        if (!isOncePerBattleAbility) {
+          delete updated.usedAbilities[key];
+        }
+      });
+    }
 
     updated.logs.unshift(`⚔️ Round ${updated.round} Initialized! Turn 1 goes to ${selectedGoesFirst === 'me' ? 'Player (Me)' : 'Opponent'}. ${selectedUnderdog === 'me' ? 'Player is Underdog.' : selectedUnderdog === 'opponent' ? 'Opponent is Underdog.' : ''}`);
 
@@ -1132,11 +1185,12 @@ export default function TrackerPage() {
       }
     }
 
-    // Selected Regiment
-    const regiment = faction.regimentAbilities.find(r => r.id === gameState.selectedRegimentAbilityId);
-    if (regiment && regiment.phase === phase && isAbilityAllowedByRound(regiment)) {
-      list.push({ ...regiment, sourceType: 'regiment' });
-    }
+    // Regiment Abilities (All active by default in Spearhead)
+    faction.regimentAbilities.forEach(reg => {
+      if (reg.phase === phase && isAbilityAllowedByRound(reg)) {
+        list.push({ ...reg, sourceType: 'regiment' });
+      }
+    });
 
     // Selected Enhancement
     const enhancement = faction.enhancements.find(e => e.id === gameState.selectedEnhancementId);
@@ -1183,15 +1237,16 @@ export default function TrackerPage() {
   function getCastingRollBonus(): { value: number; source: string } | null {
     if (!gameState || !faction) return null;
 
-    // 1. Check Regiment Ability
-    const regiment = faction.regimentAbilities.find(r => r.id === gameState.selectedRegimentAbilityId);
-    if (regiment && (
-      regiment.effect.toLowerCase().includes('add 1 to casting roll') || 
-      regiment.effect.toLowerCase().includes('add 2 to the casting roll') || 
-      regiment.effect.toLowerCase().includes('add 2 to casting roll')
-    )) {
-      const val = regiment.effect.toLowerCase().includes('add 2') ? 2 : 1;
-      return { value: val, source: `${regiment.name} (Regiment Ability)` };
+    // 1. Check Regiment Abilities
+    for (const regiment of faction.regimentAbilities) {
+      if (
+        regiment.effect.toLowerCase().includes('add 1 to casting roll') || 
+        regiment.effect.toLowerCase().includes('add 2 to the casting roll') || 
+        regiment.effect.toLowerCase().includes('add 2 to casting roll')
+      ) {
+        const val = regiment.effect.toLowerCase().includes('add 2') ? 2 : 1;
+        return { value: val, source: `${regiment.name} (Regiment Ability)` };
+      }
     }
 
     // 2. Check Battle Traits
@@ -1471,10 +1526,11 @@ export default function TrackerPage() {
       }
     }
 
-    const regiment = faction.regimentAbilities.find(r => r.id === gameState.selectedRegimentAbilityId);
-    if (regiment && isMatched(regiment)) {
-      list.push({ ...regiment, sourceType: 'regiment' });
-    }
+    faction.regimentAbilities.forEach(reg => {
+      if (isMatched(reg)) {
+        list.push({ ...reg, sourceType: 'regiment' });
+      }
+    });
 
     const enhancement = faction.enhancements.find(e => e.id === gameState.selectedEnhancementId);
     if (enhancement && isMatched(enhancement)) {
@@ -1487,6 +1543,22 @@ export default function TrackerPage() {
         const lrTrait = faction.battleTraits.find(t => t.id === 'lightningReactions');
         if (lrTrait) {
           list.push({ ...lrTrait, sourceType: 'trait' });
+        }
+      }
+    }
+
+    // Custom injector for Daughters of Khaine: Blood Rites
+    if (gameState.factionId === 'daughters-of-khaine') {
+      const bloodRitesTrait = faction.battleTraits.find(t => t.id === 'bloodRites');
+      if (bloodRitesTrait) {
+        const activeLevel = getActiveBloodRitesRound(gameState);
+        let showInPhase = false;
+        if (phase === 'movement' && activeLevel >= 1) showInPhase = true;
+        if (phase === 'charge' && activeLevel >= 2) showInPhase = true;
+        if (phase === 'combat' && (activeLevel >= 3 || activeLevel >= 4)) showInPhase = true;
+        
+        if (showInPhase) {
+          list.push({ ...bloodRitesTrait, sourceType: 'trait' });
         }
       }
     }
@@ -1874,10 +1946,11 @@ export default function TrackerPage() {
       }
     }
 
-    const regiment = faction.regimentAbilities.find(a => a.id === gameState.selectedRegimentAbilityId);
-    if (regiment && regiment.isDefense && (regiment.phase === 'combat' || regiment.phase === 'passive')) {
-      defAbilities.push({ source: 'Regiment', name: regiment.name, timing: regiment.timing, effect: regiment.effect, id: regiment.id, key: regiment.id });
-    }
+    faction.regimentAbilities.forEach(reg => {
+      if (reg.isDefense && (reg.phase === 'combat' || reg.phase === 'passive')) {
+        defAbilities.push({ source: 'Regiment', name: reg.name, timing: reg.timing, effect: reg.effect, id: reg.id, key: reg.id });
+      }
+    });
 
     const enhancement = faction.enhancements.find(a => a.id === gameState.selectedEnhancementId);
     if (enhancement && enhancement.isDefense && (enhancement.phase === 'combat' || enhancement.phase === 'passive')) {
@@ -2109,7 +2182,12 @@ export default function TrackerPage() {
                   {uRules.abilities.map(ab => (
                     <div key={ab.id} className="border-t border-[#2c3548]/15 pt-1.5 first:border-t-0 first:pt-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <strong className="text-white font-black text-[11px]">{ab.name}</strong>
+                        <strong className="text-white font-black text-[11px]">
+                          {ab.name}
+                          {ab.id === 'skeletonLegion' && gameState?.selectedEnhancementId === 'graveSandShard' && (
+                            <span className="text-[9px] text-emerald-400 font-black ml-1.5">(+1 Legion Rolls)</span>
+                          )}
+                        </strong>
                         <Badge className="bg-[#1c2230] text-gray-400 border border-[#2c3548] text-[7px] px-1 py-0 font-bold uppercase tracking-wider">{ab.phase} • {ab.timing || 'Any Phase'}</Badge>
                       </div>
                       <p className="text-[10px] text-gray-300 mt-0.5 whitespace-pre-line leading-normal italic">"{ab.effect}"</p>
@@ -2311,18 +2389,139 @@ export default function TrackerPage() {
             ))}
           </div>
 
-          {/* Under the Dice Math: Applied / Active Abilities list ONLY */}
+          {/* Under the Dice Math: Applied / Active Abilities list */}
           {(() => {
             // Get all unique sourceAbilityIds of applied modifiers on this unit
             const unitMods = gameState.appliedModifiers?.filter(m => m.unitId === u.id) || [];
-            const uniqueAbilityIds = Array.from(new Set(unitMods.map(m => m.sourceAbilityId).filter(Boolean)));
+            const uniqueAbilityIds = Array.from(new Set(unitMods.map(m => m.sourceAbilityId).filter(Boolean))) as string[];
             
             const allFactionAbilities = (faction?.battleTraits || [])
               .concat((faction?.regimentAbilities as any) || [])
               .concat((faction?.enhancements as any) || [])
               .concat((faction?.units?.flatMap(unitRules => unitRules.abilities) as any) || []);
 
-            if (uniqueAbilityIds.length === 0) {
+            // Collect all dynamic/on-the-fly modifiers for this unit to display their source abilities
+            const dynamicMods: { sourceAbilityId: string; label: string; effect: string; name: string }[] = [];
+            
+            // 1. Check unit-level stats
+            const statsToCheck: ('attacks' | 'hit' | 'wound' | 'rend' | 'damage' | 'save' | 'ward')[] = ['save', 'ward'];
+            statsToCheck.forEach(stat => {
+              const active = getActiveModifiers(stat, u.id);
+              active.forEach(m => {
+                // Skip if this modifier is a manual one (already tracked via appliedModifiers)
+                const isManualMod = unitMods.some(mod => mod.label === m.description);
+                if (isManualMod) return;
+
+                let sourceId = '';
+                let abName = '';
+                let abEffect = '';
+                const descLower = m.description.toLowerCase();
+                
+                const matchedAb = allFactionAbilities.find(a => a && descLower.includes(a.name.toLowerCase()));
+                if (matchedAb) {
+                  sourceId = matchedAb.id;
+                  abName = matchedAb.name;
+                  abEffect = matchedAb.effect;
+                } else if (descLower.includes('zealot') || descLower.includes('blood rite') || descLower.includes('quickening') || descLower.includes('headlong') || descLower.includes('slaughterer')) {
+                  sourceId = 'bloodRites';
+                  abName = "Blood Rites";
+                  abEffect = "At the start of each battle round, all friendly units gain the Blood Rites passive ability that corresponds to the current battle round number.";
+                } else if (descLower.includes('eye of the gods') || descLower.includes('dread banner')) {
+                  sourceId = 'eyeOfTheGods';
+                  abName = "Eye of the Gods";
+                  abEffect = "Roll on the Eye of the Gods table to gain random blessings.";
+                }
+                
+                if (sourceId) {
+                  dynamicMods.push({
+                    sourceAbilityId: sourceId,
+                    name: abName,
+                    effect: abEffect,
+                    label: m.description
+                  });
+                }
+              });
+            });
+
+            // 2. Check weapon-level stats
+            const unitWeapons = uRules?.weapons || [];
+            unitWeapons.forEach(w => {
+              const weaponStats: ('attacks' | 'hit' | 'wound' | 'rend' | 'damage')[] = ['attacks', 'hit', 'wound', 'rend', 'damage'];
+              weaponStats.forEach(stat => {
+                const active = getActiveModifiers(stat, u.id, w.name);
+                active.forEach(m => {
+                  // Skip if this modifier is a manual one (already tracked via appliedModifiers)
+                  const isManualMod = unitMods.some(mod => mod.label === m.description);
+                  if (isManualMod) return;
+
+                  let sourceId = '';
+                  let abName = '';
+                  let abEffect = '';
+                  const descLower = m.description.toLowerCase();
+                  
+                  const matchedAb = allFactionAbilities.find(a => a && descLower.includes(a.name.toLowerCase()));
+                  if (matchedAb) {
+                    sourceId = matchedAb.id;
+                    abName = matchedAb.name;
+                    abEffect = matchedAb.effect;
+                  } else if (descLower.includes('zealot') || descLower.includes('blood rite') || descLower.includes('quickening') || descLower.includes('headlong') || descLower.includes('slaughterer')) {
+                    sourceId = 'bloodRites';
+                    abName = "Blood Rites";
+                    abEffect = "At the start of each battle round, all friendly units gain the Blood Rites passive ability that corresponds to the current battle round number.";
+                  } else if (descLower.includes('eye of the gods') || descLower.includes('dread banner')) {
+                    sourceId = 'eyeOfTheGods';
+                    abName = "Eye of the Gods";
+                    abEffect = "Roll on the Eye of the Gods table to gain random blessings.";
+                  }
+                  
+                  if (sourceId) {
+                    dynamicMods.push({
+                      sourceAbilityId: sourceId,
+                      name: abName,
+                      effect: abEffect,
+                      label: m.description
+                    });
+                  }
+                });
+              });
+            });
+
+            // Combine manual and dynamic ones into a unified display list
+            const listItems: { id: string; name: string; effect: string; statsModified: string; isDynamic?: boolean }[] = [];
+            
+            // Add manually applied ones
+            uniqueAbilityIds.forEach(abId => {
+              const ab = allFactionAbilities.find(a => a && (a.id === abId || abId.endsWith(`-${a.id}`)));
+              if (ab) {
+                const statsModified = unitMods.filter(m => m.sourceAbilityId === abId).map(m => m.label).join(', ');
+                listItems.push({
+                  id: abId,
+                  name: ab.name,
+                  effect: ab.effect,
+                  statsModified: statsModified
+                });
+              }
+            });
+
+            // Add dynamic/on-the-fly ones
+            dynamicMods.forEach(dyn => {
+              const alreadyAdded = listItems.find(item => item.id === dyn.sourceAbilityId);
+              if (!alreadyAdded) {
+                listItems.push({
+                  id: dyn.sourceAbilityId,
+                  name: dyn.name,
+                  effect: dyn.effect,
+                  statsModified: dyn.label,
+                  isDynamic: true
+                });
+              } else {
+                if (!alreadyAdded.statsModified.includes(dyn.label)) {
+                  alreadyAdded.statsModified += `, ${dyn.label}`;
+                }
+              }
+            });
+
+            if (listItems.length === 0) {
               return (
                 <div className="p-2.5 bg-[#151923]/40 border border-[#2c3548]/15 rounded-lg text-left text-xxs">
                   <span className="text-gray-500 font-bold uppercase tracking-wider">✨ Applied Abilities list is empty. Only active abilities are listed here.</span>
@@ -2336,33 +2535,29 @@ export default function TrackerPage() {
                   <Sparkles className="h-3.5 w-3.5 text-emerald-400" /> Applied Active Abilities on Unit:
                 </span>
                 <div className="space-y-2">
-                  {uniqueAbilityIds.map(abId => {
-                    const ab = allFactionAbilities.find(a => a && a.id === abId);
-                    if (!ab) return null;
-                    
+                  {listItems.map(item => {
                     // Check if this card is currently being highlighted / blinking
-                    const isHighlighted = highlightedAbilityId === ab.id;
+                    const isHighlighted = highlightedAbilityId === item.id;
                     const highlightClasses = isHighlighted ? 'animate-blink-gold border-amber-500 ring-2 ring-amber-500 bg-amber-500/25 p-2 rounded-lg' : '';
-                    
-                    // Gather what stats this ability modifies on this unit
-                    const statsModified = unitMods.filter(m => m.sourceAbilityId === ab.id).map(m => m.label).join(', ');
                     
                     return (
                       <div 
-                        key={ab.id} 
+                        key={item.id} 
                         className={`border-t border-emerald-500/10 pt-1.5 first:border-t-0 first:pt-0 transition-all duration-300 ${highlightClasses}`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <h5 className="text-xxs font-black text-white flex items-center gap-1.5">
-                            <span>✨</span> {ab.name}
-                            <Badge className="bg-emerald-500/15 text-emerald-400 text-[8px] font-bold border border-emerald-500/20 py-0">APPLIED</Badge>
+                            <span>✨</span> {item.name}
+                            <Badge className="bg-emerald-500/15 text-emerald-400 text-[8px] font-bold border border-emerald-500/20 py-0">
+                              {item.isDynamic ? 'SPECIAL RULE' : 'ACTIVE'}
+                            </Badge>
                           </h5>
-                          <Badge className="bg-[#151923] text-gray-400 text-[8px] font-semibold border border-[#2c3548] py-0">
-                            {statsModified}
+                          <Badge className="bg-[#151923] text-gray-400 text-[8px] font-semibold border border-[#2c3548] py-0 max-w-[50%] truncate">
+                            {item.statsModified}
                           </Badge>
                         </div>
                         <p className="text-[10px] text-gray-300 mt-1 whitespace-pre-line leading-normal italic">
-                          "{ab.effect}"
+                          "{item.effect}"
                         </p>
                       </div>
                     );
@@ -2665,6 +2860,19 @@ export default function TrackerPage() {
           {factionAbilities.map(ability => {
             const isUsed = !!gameState.usedAbilities[ability.id];
             const style = getAbilityStyleClasses(ability.sourceType);
+            
+            // Find which units this ability is currently applied to
+            const appliedMods = gameState.appliedModifiers?.filter(m => 
+              m.sourceAbilityId === ability.id || 
+              (m.sourceAbilityId && (m.sourceAbilityId.endsWith(`-${ability.id}`) || m.sourceAbilityId.startsWith(`${ability.id}-`)))
+            ) || [];
+            const appliedUnitNames = Array.from(new Set(appliedMods.map(m => {
+              const uState = gameState.units.find(u => u.id === m.unitId);
+              if (!uState) return '';
+              const uRules = faction.units.find(ru => ru.id === uState.unitId);
+              return uRules ? uRules.name : uState.id;
+            }).filter(Boolean)));
+
             return (
               <Card 
                 key={ability.id} 
@@ -2693,6 +2901,12 @@ export default function TrackerPage() {
                 <CardContent className="p-4 pt-1">
                   <p className="text-xxs text-gray-400 leading-normal whitespace-pre-line font-medium">{ability.effect}</p>
                   
+                  {appliedUnitNames.length > 0 && (
+                    <div className="mt-2.5 pt-2 border-t border-[#2c3548]/30 text-[10px] text-amber-500 font-extrabold flex items-center gap-1 leading-none select-none">
+                      <span>🎯</span> Applied to: <strong className="text-amber-400 font-black">{appliedUnitNames.join(', ')}</strong>
+                    </div>
+                  )}
+
                   {['relentlessDiscipline', 'relentlessDiscipline-2'].includes(ability.id) && (
                     <div className="mt-3 pt-2.5 border-t border-[#222834] space-y-2 text-[10px] text-gray-300">
                       <div className="flex items-center gap-1.5 bg-amber-500/5 border border-amber-500/10 rounded-lg p-2">
@@ -2735,6 +2949,20 @@ export default function TrackerPage() {
             const instanceKey = `${ability.unitId}-${ability.id}`;
             const isUsed = !!gameState.usedAbilities[instanceKey];
             const style = getAbilityStyleClasses(ability.sourceType);
+
+            // Find which units this ability is currently applied to
+            const appliedMods = gameState.appliedModifiers?.filter(m => 
+              m.sourceAbilityId === instanceKey || 
+              m.sourceAbilityId === ability.id ||
+              (m.sourceAbilityId && (m.sourceAbilityId.endsWith(`-${ability.id}`) || m.sourceAbilityId.startsWith(`${ability.id}-`)))
+            ) || [];
+            const appliedUnitNames = Array.from(new Set(appliedMods.map(m => {
+              const uState = gameState.units.find(u => u.id === m.unitId);
+              if (!uState) return '';
+              const uRules = faction.units.find(ru => ru.id === uState.unitId);
+              return uRules ? uRules.name : uState.id;
+            }).filter(Boolean)));
+
             return (
               <Card 
                 key={instanceKey} 
@@ -2753,7 +2981,12 @@ export default function TrackerPage() {
                         </Badge>
                         <span className="text-[9px] font-extrabold text-amber-500 uppercase tracking-wider">{ability.unitName}</span>
                       </div>
-                      <CardTitle className="text-xs font-bold text-white mt-0.5">{ability.name}</CardTitle>
+                      <CardTitle className="text-xs font-bold text-white mt-0.5">
+                        {ability.name}
+                        {ability.id === 'skeletonLegion' && gameState?.selectedEnhancementId === 'graveSandShard' && (
+                          <span className="text-[10px] text-emerald-400 font-extrabold ml-1.5">(+1 Legion Rolls)</span>
+                        )}
+                      </CardTitle>
                     </div>
                     {ability.once !== 'none' && (
                       <Badge variant="secondary" className="bg-[#151923] text-amber-400 text-xxs uppercase shrink-0 font-bold">
@@ -2765,6 +2998,12 @@ export default function TrackerPage() {
                 </CardHeader>
                 <CardContent className="p-4 pt-1">
                   <p className="text-xxs text-gray-400 leading-normal whitespace-pre-line font-medium">{ability.effect}</p>
+                  
+                  {appliedUnitNames.length > 0 && (
+                    <div className="mt-2.5 pt-2 border-t border-[#2c3548]/30 text-[10px] text-amber-500 font-extrabold flex items-center gap-1 leading-none select-none">
+                      <span>🎯</span> Applied to: <strong className="text-amber-400 font-black">{appliedUnitNames.join(', ')}</strong>
+                    </div>
+                  )}
                 </CardContent>
                 {isUsed && (
                   <div className="absolute inset-0 bg-[#0d1015]/10 flex items-center justify-center">
@@ -3003,10 +3242,11 @@ export default function TrackerPage() {
                       }
                     }
 
-                    const regiment = faction.regimentAbilities.find(a => a.id === gameState.selectedRegimentAbilityId);
-                    if (regiment && regiment.isDefense) {
-                      defAbilities.push({ source: 'Regiment', name: regiment.name, timing: regiment.timing, effect: regiment.effect, id: regiment.id, key: regiment.id });
-                    }
+                    faction.regimentAbilities.forEach(a => {
+                      if (a.isDefense) {
+                        defAbilities.push({ source: 'Regiment', name: a.name, timing: a.timing, effect: a.effect, id: a.id, key: a.id });
+                      }
+                    });
 
                     const enhancement = faction.enhancements.find(a => a.id === gameState.selectedEnhancementId);
                     if (enhancement && enhancement.isDefense) {
@@ -4658,10 +4898,14 @@ export default function TrackerPage() {
                             setSelectUnitToBuffAbility(null);
                           } else {
                             setSelectUnitToBuffAbility(null);
-                            if (allowed.length === 0) {
+                             if (allowed.length === 0) {
                               if (gameState) {
                                 const updated = { ...gameState };
                                 updated.logs.unshift(`🎯 Selected unit [${uRules.name}] as the target for "${selectUnitToBuffAbility.name}".`);
+                                if (selectUnitToBuffAbility.abilityId) {
+                                  if (!updated.usedAbilities) updated.usedAbilities = {};
+                                  updated.usedAbilities[selectUnitToBuffAbility.abilityId] = true;
+                                }
                                 saveGame(updated);
                               }
                               showToast(`Selected ${uRules.name} for ${selectUnitToBuffAbility.name}!`, 'success');
@@ -4687,14 +4931,23 @@ export default function TrackerPage() {
                               else if (singleStat === 'rend') labelVal = `+1 Rend (${selectUnitToBuffAbility.name})`;
                               else if (singleStat === 'damage') labelVal = `+1 Damage (${selectUnitToBuffAbility.name})`;
                               
-                              applyBuff(u.id, singleStat, modifierVal, labelVal, selectUnitToBuffAbility.phase, selectUnitToBuffAbility.abilityId, selectUnitToBuffAbility.effect);
+                              const effectLowerForTurn = (selectUnitToBuffAbility.effect || '').toLowerCase();
+                              const isTurnLong = effectLowerForTurn.includes('rest of the turn') || effectLowerForTurn.includes('rest of this turn') || effectLowerForTurn.includes('for the rest of the turn') || effectLowerForTurn.includes('for the rest of this turn') || effectLowerForTurn.includes('rest of the battle round') || effectLowerForTurn.includes('rest of this battle round') || effectLowerForTurn.includes('this turn');
+                              const resolvedExpiresPhase = isTurnLong ? undefined : selectUnitToBuffAbility.phase;
+
+                              applyBuff(u.id, singleStat, modifierVal, labelVal, resolvedExpiresPhase, selectUnitToBuffAbility.abilityId, selectUnitToBuffAbility.effect, isTurnLong);
                             } else {
+                              const effectLowerForTurn = (selectUnitToBuffAbility.effect || '').toLowerCase();
+                              const isTurnLong = effectLowerForTurn.includes('rest of the turn') || effectLowerForTurn.includes('rest of this turn') || effectLowerForTurn.includes('for the rest of the turn') || effectLowerForTurn.includes('for the rest of this turn') || effectLowerForTurn.includes('rest of the battle round') || effectLowerForTurn.includes('rest of this battle round') || effectLowerForTurn.includes('this turn');
+                              const resolvedExpiresPhase = isTurnLong ? undefined : selectUnitToBuffAbility.phase;
+
                               setBuffModal({ 
                                 isOpen: true, 
                                 unitId: u.id, 
                                 unitName: uRules.name,
                                 allowedStats: finalAllowed,
-                                expiresPhase: selectUnitToBuffAbility.phase,
+                                expiresPhase: resolvedExpiresPhase,
+                                expiresTurn: isTurnLong,
                                 sourceAbilityName: selectUnitToBuffAbility.name,
                                 sourceAbilityId: selectUnitToBuffAbility.abilityId,
                                 sourceAbilityEffect: selectUnitToBuffAbility.effect
@@ -5416,8 +5669,7 @@ export default function TrackerPage() {
                     const trait = factionTemplate.battleTraits.find(t => t.id === gameState?.selectedBattleTraitId);
                     if (trait) scanAbility(trait);
                   }
-                  const regiment = factionTemplate.regimentAbilities.find(r => r.id === gameState?.selectedRegimentAbilityId);
-                  if (regiment) scanAbility(regiment);
+                   factionTemplate.regimentAbilities.forEach(scanAbility);
                   const enhancement = factionTemplate.enhancements.find(e => e.id === gameState?.selectedEnhancementId);
                   if (enhancement) scanAbility(enhancement);
                 }
@@ -5548,18 +5800,19 @@ export default function TrackerPage() {
                 </p>
                 <div className="p-4 rounded-xl border border-[#222834] bg-[#151923] space-y-3">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">🛡️ Chosen Regiment Ability</span>
-                    {(() => {
-                      const reg = faction?.regimentAbilities?.find(r => r.id === gameState?.selectedRegimentAbilityId);
-                      return reg ? (
-                        <div className="mt-1">
-                          <p className="text-xs font-black text-white">{reg.name}</p>
-                          <p className="text-xxs text-gray-400 leading-normal mt-0.5">{reg.effect}</p>
-                        </div>
-                      ) : (
-                        <p className="text-xxs text-gray-500 mt-1 italic">No regiment ability selected.</p>
-                      );
-                    })()}
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">🛡️ Regiment Abilities (All Active)</span>
+                    {faction?.regimentAbilities && faction.regimentAbilities.length > 0 ? (
+                      <div className="space-y-2 mt-1">
+                        {faction.regimentAbilities.map(reg => (
+                          <div key={reg.id} className="border-b border-[#222834]/40 last:border-0 pb-1.5 last:pb-0">
+                            <p className="text-xs font-black text-white">{reg.name}</p>
+                            <p className="text-xxs text-gray-400 leading-normal mt-0.5">{reg.effect}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xxs text-gray-500 mt-1 italic">No regiment abilities found.</p>
+                    )}
                   </div>
                   <div className="border-t border-[#1c222e] pt-2.5">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">⚡ Chosen General Enhancement</span>

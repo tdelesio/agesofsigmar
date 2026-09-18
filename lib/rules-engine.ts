@@ -1,5 +1,21 @@
 import { GameState, Faction, Ability } from '@/app/types';
 
+// Helper to compute active Blood Rites round level (accounting for Murderous Epiphany early activations)
+export function getActiveBloodRitesRound(gameState: GameState | null): number {
+  if (!gameState) return 1;
+  const currentRound = gameState.round || 1;
+  const isEpiphanyUsed = !!(gameState.usedAbilities && (gameState.usedAbilities['murderousEpiphany'] || gameState.usedAbilities['murderous-epiphany']));
+  
+  if (isEpiphanyUsed) {
+    if (currentRound === 1) return 2;
+    if (currentRound === 2) return 3;
+    if (currentRound === 3) return 3;
+    return Math.max(currentRound, 4); // round 4 and above get round 4 benefits
+  }
+  
+  return currentRound;
+}
+
 // Helper to evaluate dynamic, text-based conditional modifiers for an ability (covers general-restrictions and charge-restrictions)
 export function evaluateDynamicModifiersForAbility(
   ability: any,
@@ -13,8 +29,18 @@ export function evaluateDynamicModifiersForAbility(
 
   const abId = (ability.id || '').toLowerCase();
   const nameLower = (ability.name || '').toLowerCase();
-  if (abId === 'eyeofthegods' || abId === 'eye-of-the-gods' || nameLower.includes('eye of the gods')) {
-    return []; // Return empty; these table descriptions should never be parsed for automatic dynamic modifiers.
+  if (
+    ability.isSpecialized ||
+    abId === 'eyeofthegods' || 
+    abId === 'eye-of-the-gods' || 
+    nameLower.includes('eye of the gods') ||
+    abId === 'bloodrites' || 
+    abId === 'blood-rites' || 
+    nameLower.includes('blood rites') ||
+    abId === 'gravesandshard' ||
+    nameLower.includes('grave-sand shard')
+  ) {
+    return []; // Return empty; specialized abilities should never follow normal dynamic text parsing rules.
   }
 
   const effectLower = (ability.effect || '').toLowerCase();
@@ -149,9 +175,10 @@ export function getActiveModifiers(
           let match = true;
           if (action.condition) {
             if (action.condition.round) {
-              // Blood rites are cumulative (keep all previous rounds)
+              // Blood rites are cumulative (keep all previous rounds) up to active level
               if (ability.id === 'bloodRites') {
-                if (action.condition.round > gameState.round) {
+                const activeLevel = getActiveBloodRitesRound(gameState);
+                if (action.condition.round > activeLevel) {
                   match = false;
                 }
               } else if (action.condition.round !== gameState.round) {
@@ -187,9 +214,8 @@ export function getActiveModifiers(
     if (trait) processAbility(trait);
   }
 
-  // 2. Regiment Ability
-  const regiment = faction.regimentAbilities.find(r => r.id === gameState.selectedRegimentAbilityId);
-  if (regiment) processAbility(regiment);
+  // 2. Regiment Abilities (All are active by default in Spearhead)
+  faction.regimentAbilities.forEach(processAbility);
 
   // 3. Enhancement
   const enhancement = faction.enhancements.find(e => e.id === gameState.selectedEnhancementId);
@@ -394,7 +420,7 @@ export interface ParsedRuleResult {
   isPermanent: boolean;
 }
 
-export function analyzeAbilityRule(ability: Ability, faction?: Faction): ParsedRuleResult {
+export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameState?: GameState | null): ParsedRuleResult {
   const effectText = ability.effect || '';
   const effectLower = effectText.toLowerCase();
   const nameLower = (ability.name || '').toLowerCase();
@@ -531,7 +557,7 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction): ParsedR
 
   // 4. Parse Influenced Stats WITH numerical modifier count
   const statsWithModifiers: { stat: string; mod: string }[] = [];
-  const influencedStats: string[] = [];
+  let influencedStats: string[] = [];
 
   const extractModifierValue = (statName: string, keywords: string[]): string | null => {
     const hasStatKeyword = keywords.some(kw => effectLower.includes(kw));
@@ -738,7 +764,7 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction): ParsedR
 
   const spatialKeywords = [
     'wholly within', 'while within', ' if ', 'unless', 'provided that', 'more than', 'visible', 'if there are no',
-    'range of', 'in combat', 'not in combat', 'contesting', 'do not control'
+    'range of', 'in combat', 'not in combat', 'contesting', 'do not control', 'target a damaged unit'
   ];
   let hasSpatialOrConditionalCheck = 
     spatialKeywords.some(keyword => effectLower.includes(keyword)) ||
@@ -829,12 +855,19 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction): ParsedR
     effectLower.includes('heal d6');
 
   // 8. Special Faction Rule Detection
-  let isSpecialFactionRule = false;
-  let specialFactionRuleExplanation = "Standard Global Business Rules: Evaluated dynamically by the general parser engine.";
+  let isSpecialFactionRule = !!ability.isSpecialized;
+  let specialFactionRuleExplanation = ability.isSpecialized 
+    ? `🌟 SPECIALIZED RULE (${ability.name}): This ability is marked as specialized and bypasses standard automated dynamic text parsing rules.`
+    : "Standard Global Business Rules: Evaluated dynamically by the general parser engine.";
+
+  const isBloodRitesRule = abId === 'bloodrites' || nameLower.includes('blood rites');
 
   if (isRelentlessDiscipline) {
     isSpecialFactionRule = true;
     specialFactionRuleExplanation = "🌟 SPECIAL FACTION RULE (Ossiarch Bonereapers): Relentless Discipline points. Allows duplicate phase uses, custom move modifiers (+2\"), and custom defensive wards (5+) managed via specialized override modules in app/tracker/page.tsx.";
+  } else if (isBloodRitesRule) {
+    isSpecialFactionRule = true;
+    specialFactionRuleExplanation = "🌟 SPECIAL FACTION RULE (Daughters of Khaine): Blood Rites. Adds a new cumulative passive ability per battle round. Toggled early via Murderous Epiphany.";
   } else if (nameLower.includes('eye of the gods') || abId.includes('eye-of-the-gods') || abId.includes('eyeofthegods')) {
     isSpecialFactionRule = true;
     specialFactionRuleExplanation = "🌟 SPECIAL FACTION RULE (Slaves to Darkness): Eye of the Gods Ascension. Spawns custom 2D6 tables to roll and programmatically apply permanent defensive blessings.";
@@ -847,6 +880,9 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction): ParsedR
   } else if (nameLower.includes('speed of hysh')) {
     isSpecialFactionRule = true;
     specialFactionRuleExplanation = "🌟 SPECIAL FACTION RULE (Lumineth Realm-Lords - Custom Spell): Programmatically doubles target move values instead of standard additions.";
+  } else if (nameLower.includes('grave-sand shard') || abId.includes('gravesandshard')) {
+    isSpecialFactionRule = true;
+    specialFactionRuleExplanation = "🌟 SPECIAL FACTION RULE (Soulblight Gravelords): Grave-Sand Shard enhancement. Adds +1 to each Skeleton Legion roll when active.";
   }
 
   let customHandlingDetails = specialFactionRuleExplanation;
@@ -872,9 +908,9 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction): ParsedR
     // Override target to "Friendly Unit" (any friendly) rather than "Self"
     finalTargetSpecifications = ["Friendly Unit"];
     
-    // Override phases to Deployment (both activation and applied)
-    finalActivationPhase = "Deployment";
-    finalAppliedPhase = "Deployment";
+    // Override phases to End of Turn (both activation and applied)
+    finalActivationPhase = "End of Turn";
+    finalAppliedPhase = "End of Turn";
 
     // Set 2D6 dice roll comparison challenge
     finalRollDiceCount = 2;
@@ -896,12 +932,36 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction): ParsedR
     if (!influencedStats.includes('Movement')) influencedStats.push('Movement');
   }
 
+  if (isBloodRitesRule) {
+    const activeLevel = getActiveBloodRitesRound(gameState || null);
+    
+    finalTargetSpecifications = ["All Friendly Units"];
+    finalAppliedPhase = "Start of Battle Round (Permanent)";
+    finalActivationPhase = "Start of Battle Round";
+    
+    const cumulativeStats: { stat: string; mod: string }[] = [];
+    if (activeLevel >= 1) cumulativeStats.push({ stat: 'Run', mod: '+1 (Round 1)' });
+    if (activeLevel >= 2) cumulativeStats.push({ stat: 'Charge', mod: '+1 (Round 2)' });
+    if (activeLevel >= 3) cumulativeStats.push({ stat: 'Hit', mod: '+1 (Round 3)' });
+    if (activeLevel >= 4) cumulativeStats.push({ stat: 'Wound', mod: '+1 (Round 4)' });
+    
+    finalStatsWithModifiers = cumulativeStats;
+    
+    allowedStats = [];
+    influencedStats = [];
+    if (activeLevel >= 1) { allowedStats.push('move'); influencedStats.push('Run'); }
+    if (activeLevel >= 2) { allowedStats.push('charge'); influencedStats.push('Charge'); }
+    if (activeLevel >= 3) { allowedStats.push('hit'); influencedStats.push('Hit'); }
+    if (activeLevel >= 4) { allowedStats.push('wound'); influencedStats.push('Wound'); }
+  }
+
   const isPermanent = 
     effectLower.includes('for the rest of the battle') || 
     effectLower.includes('for the rest of the game') || 
     effectLower.includes('permanent') || 
     effectLower.includes('remainder of the battle') ||
-    isEyeOfTheGodsRule;
+    isEyeOfTheGodsRule ||
+    isBloodRitesRule;
 
   return {
     allowedStats,

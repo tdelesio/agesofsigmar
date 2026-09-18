@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge';
 import { DEFAULT_FACTIONS } from '../data/default-factions';
 import { Faction, Ability, Unit } from '../types';
-import { analyzeAbilityRule, ParsedRuleResult } from '@/lib/rules-engine';
+import { analyzeAbilityRule, ParsedRuleResult, getActiveBloodRitesRound } from '@/lib/rules-engine';
 
 const mergeFactions = (defaults: Faction[], custom: Faction[]): Faction[] => {
   const map = new Map<string, Faction>();
@@ -39,6 +39,8 @@ export default function TestHarnessPage() {
   // Simulation State
   const [selectedAbilityForSimulation, setSelectedAbilityForSimulation] = useState<Ability | null>(null);
   const [selectedSimTargetUnitId, setSelectedAbilityTargetUnitId] = useState<string>('');
+  const [simulatedRound, setSimulatedRound] = useState<number>(1);
+  const [simEpiphanyUsed, setSimEpiphanyUsed] = useState<boolean>(false);
   const [simLog, setSimLog] = useState<string[]>([]);
   const [simActiveModifiers, setSimActiveModifiers] = useState<any[]>([]);
 
@@ -102,13 +104,38 @@ export default function TestHarnessPage() {
   const runSimulation = () => {
     if (!selectedAbilityForSimulation) return;
     const ab = selectedAbilityForSimulation;
-    const rules = analyzeAbilityRule(ab, activeFaction);
+
+    // Construct mock game state for rules engine evaluation
+    const mockGameState = {
+      round: simulatedRound,
+      currentPhase: ab.phase || 'combat',
+      selectedBattleTraitId: 'all',
+      selectedRegimentAbilityId: '',
+      selectedEnhancementId: '',
+      units: activeFaction?.units.map(u => ({ id: u.id, unitId: u.id, isSlain: false, charged: false })) || [],
+      usedAbilities: {
+        murderousEpiphany: simEpiphanyUsed,
+        'murderous-epiphany': simEpiphanyUsed,
+      }
+    } as any;
+
+    const rules = analyzeAbilityRule(ab, activeFaction, mockGameState);
 
     const logList: string[] = [];
     const newModifiersList: any[] = [];
 
     logList.push(`[SYSTEM_TEST] ⚡ Initializing activation simulation for "${ab.name}"...`);
     logList.push(`[SYSTEM_TEST] 🔍 Rules Engine Input Text: "${ab.effect}"`);
+    logList.push(`[DIAGNOSTIC] Simulated State: Round ${simulatedRound} • Current Phase: "${mockGameState.currentPhase.toUpperCase()}"`);
+
+    const isBloodRitesRule = ab.id === 'bloodRites' || (ab.name || '').toLowerCase().includes('blood rites');
+    if (isBloodRitesRule) {
+      const bloodRitesRound = getActiveBloodRitesRound(mockGameState);
+      logList.push(`[DIAGNOSTIC] Daughters of Khaine Blood Rites level resolved: Round ${bloodRitesRound}`);
+      if (simEpiphanyUsed) {
+        logList.push(`[DIAGNOSTIC] Murderous Epiphany has been activated! Gaining Blood Rites one round early.`);
+      }
+    }
 
     // Gating check
     if (ab.once === 'once-per-turn') {
@@ -199,7 +226,7 @@ export default function TestHarnessPage() {
     setSimActiveModifiers(newModifiersList);
   };
 
-  // Run simulation automatically when target unit or ability changes
+  // Run simulation automatically when target unit or ability or round state changes
   useEffect(() => {
     if (selectedAbilityForSimulation) {
       runSimulation();
@@ -207,7 +234,7 @@ export default function TestHarnessPage() {
       setSimLog([]);
       setSimActiveModifiers([]);
     }
-  }, [selectedAbilityForSimulation, selectedSimTargetUnitId]);
+  }, [selectedAbilityForSimulation, selectedSimTargetUnitId, simulatedRound, simEpiphanyUsed]);
 
   return (
     <div className="min-h-screen bg-[#0d1117] text-gray-100 font-sans pb-16">
@@ -247,10 +274,7 @@ export default function TestHarnessPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-8 mt-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Left Side: Faction Selector & Ability List (8 cols) */}
-        <div className="col-span-1 lg:col-span-7 space-y-6">
+      <div className="max-w-4xl mx-auto px-4 md:px-8 mt-6 space-y-6">
           
           {/* Faction Select Header Box */}
           <Card className="border-[#30363d] bg-[#161b22]/90 shadow-xl rounded-2xl overflow-hidden">
@@ -606,122 +630,236 @@ export default function TestHarnessPage() {
               </div>
             </div>
           )}
-        </div>
+      </div>
 
-        {/* Right Side: Mock Activator & Logs Simulator (5 cols) */}
-        <div className="col-span-1 lg:col-span-5 space-y-6 lg:sticky lg:top-6 lg:h-[calc(100vh-130px)] lg:overflow-y-auto">
-          
-          <Card className="border-[#30363d] bg-[#161b22] shadow-xl rounded-2xl h-full flex flex-col overflow-hidden">
-            <CardHeader className="p-5 border-b border-[#21262d] bg-[#1d222b]">
-              <CardTitle className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-2">
-                <Activity className="h-4 w-4 text-emerald-500 animate-pulse" /> SIMULATOR & AUDIT LOGGER
-              </CardTitle>
-              <CardDescription className="text-xxs text-gray-400 font-medium">
-                Simulate triggering an ability inside the game tracker to inspect live state changes and modifier resolutions.
-              </CardDescription>
-            </CardHeader>
-            
-            <CardContent className="p-5 flex-1 flex flex-col gap-5 overflow-y-auto">
-              {selectedAbilityForSimulation ? (
-                <div className="space-y-5 flex-1 flex flex-col justify-between">
-                  <div className="space-y-4">
-                    {/* Selected details */}
-                    <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.02] space-y-1 text-left">
-                      <div className="text-[8px] font-black uppercase tracking-wider text-amber-500">Selected for Audit:</div>
-                      <h4 className="text-xs font-black text-white uppercase tracking-wider leading-none">{selectedAbilityForSimulation.name}</h4>
-                      <p className="text-xxs text-gray-400 font-semibold uppercase tracking-wider">
-                        {selectedAbilityForSimulation.phase.toUpperCase() === 'PASSIVE' ? 'PASSIVE' : selectedAbilityForSimulation.phase.toUpperCase() + ' PHASE'} • {selectedAbilityForSimulation.once.toUpperCase()}
-                      </p>
+      {/* Floating Console Overlay Modal */}
+      {selectedAbilityForSimulation && (() => {
+        const ab = selectedAbilityForSimulation;
+        // Build mock state same as simulation to show dynamic badges and details
+        const mockGameState = {
+          round: simulatedRound,
+          currentPhase: ab.phase || 'combat',
+          selectedBattleTraitId: 'all',
+          selectedRegimentAbilityId: '',
+          selectedEnhancementId: '',
+          units: activeFaction?.units.map(u => ({ id: u.id, unitId: u.id, isSlain: false, charged: false })) || [],
+          usedAbilities: {
+            murderousEpiphany: simEpiphanyUsed,
+            'murderous-epiphany': simEpiphanyUsed,
+          }
+        } as any;
+        const analysis = analyzeAbilityRule(ab, activeFaction, mockGameState);
+
+        return (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 md:p-6 overflow-y-auto">
+            <div 
+              className="bg-[#161b22] border border-[#30363d] rounded-3xl w-full max-w-4xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="p-5 border-b border-[#21262d] bg-[#1d222b] flex items-center justify-between">
+                <div className="space-y-1 text-left">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[8px] font-black uppercase tracking-wider px-2 py-0.5">
+                      Console Audit Overlay
+                    </Badge>
+                    <Badge className="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[8px] font-black uppercase tracking-wider px-2 py-0.5">
+                      ⏱️ {ab.phase.toUpperCase()}
+                    </Badge>
+                  </div>
+                  <h2 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-1.5 mt-1">
+                    <Terminal className="h-5 w-5 text-amber-500" />
+                    {ab.name} Log Console
+                  </h2>
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setSelectedAbilityForSimulation(null)}
+                  className="border-[#30363d] hover:border-gray-500 bg-[#0d1117] text-gray-400 hover:text-white text-xs font-bold px-3 py-1 rounded-xl cursor-pointer"
+                >
+                  Close [ESC]
+                </Button>
+              </div>
+
+              {/* Body (scrollable) */}
+              <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Left Side: Ability Info & Sim Controls */}
+                <div className="space-y-5 text-left">
+                  
+                  {/* Rules Text */}
+                  <div className="space-y-1">
+                    <h4 className="text-[9px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                      <Info className="h-3 w-3 text-amber-500" /> Ability Rules Text
+                    </h4>
+                    <p className="text-xs font-semibold text-gray-200 leading-relaxed bg-[#0d1117] p-4 rounded-xl border border-[#21262d] whitespace-pre-line">
+                      {ab.effect || "No description provided."}
+                    </p>
+                  </div>
+
+                  {/* Dynamic Simulation Controls */}
+                  <div className="p-4 rounded-xl border border-[#21262d] bg-[#0d1117]/30 space-y-4">
+                    <h4 className="text-[9px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                      <Activity className="h-3.5 w-3.5 text-emerald-400 animate-pulse" /> Simulated Game Variables
+                    </h4>
+                    
+                    {/* Simulated Round Selector */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block">
+                        Simulated Battle Round
+                      </label>
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {[1, 2, 3, 4, 5].map(r => (
+                          <button
+                            key={r}
+                            onClick={() => setSimulatedRound(r)}
+                            className={`py-1.5 text-xxs font-black tracking-wider uppercase border rounded-lg transition-all cursor-pointer
+                              ${simulatedRound === r
+                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/40'
+                                : 'bg-[#0d1117] border-[#30363d] text-gray-400 hover:text-white hover:border-gray-500'}`}
+                          >
+                            Round {r}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
-                    {/* Simulation Settings */}
-                    {(() => {
-                      const analysis = analyzeAbilityRule(selectedAbilityForSimulation, activeFaction);
-                      if (analysis.targetingType === 'global_passive') {
-                        return (
-                          <div className="p-3 bg-[#0d1117] rounded-xl border border-[#21262d] text-xxs text-gray-400 font-semibold uppercase tracking-wider text-center">
-                            🌍 Global Passive aura requires no targeting.
+                    {/* Specialized Daughters of Khaine Controls */}
+                    {(activeFaction?.id === 'daughters-of-khaine-heartflayer-troupe' || (ab.name || '').toLowerCase().includes('blood rites') || ab.id === 'bloodRites' || ab.id === 'murderousEpiphany') && (
+                      <div className="space-y-2 p-3.5 rounded-xl border border-purple-500/20 bg-purple-500/[0.02]">
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <span className="text-[10px] font-black text-purple-300 uppercase tracking-wider block">Murderous Epiphany</span>
+                            <span className="text-[9px] text-gray-400 font-semibold leading-normal">
+                              Toggle active to apply Blood Rites 1 round early.
+                            </span>
                           </div>
-                        );
-                      }
-                      return (
-                        <div className="space-y-1.5 text-left">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                            <User className="h-3 w-3 text-emerald-500" /> Choose Target Unit
-                          </label>
-                          <select
-                            value={selectedSimTargetUnitId}
-                            onChange={(e) => setSelectedAbilityTargetUnitId(e.target.value)}
-                            className="w-full bg-[#0d1117] border border-[#30363d] focus:border-amber-500 text-white rounded-xl text-xs py-3 px-3 outline-none cursor-pointer font-bold focus:ring-0"
-                          >
-                            {activeFaction?.units.map(u => (
-                              <option key={u.id} value={u.id}>{u.name}</option>
-                            ))}
-                          </select>
+                          <input
+                            type="checkbox"
+                            checked={simEpiphanyUsed}
+                            onChange={(e) => setSimEpiphanyUsed(e.target.checked)}
+                            className="h-4.5 w-4.5 rounded bg-black border-[#30363d] text-purple-500 focus:ring-0 outline-none cursor-pointer"
+                          />
                         </div>
-                      );
-                    })()}
+                      </div>
+                    )}
 
-                    {/* Live Applied Modifiers list */}
-                    {simActiveModifiers.length > 0 && (
-                      <div className="space-y-2 text-left border-t border-[#21262d] pt-4">
-                        <h4 className="text-[9px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Mock State Changes
-                        </h4>
-                        <div className="space-y-1.5">
-                          {simActiveModifiers.map((mod, i) => (
-                            <div key={i} className="p-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.02] flex items-center justify-between text-xxs font-bold uppercase tracking-wider">
-                              <span className="text-gray-300">{mod.unitName}</span>
-                              <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-black">
-                                {mod.label}
-                              </Badge>
-                            </div>
+                    {/* Target Unit Selector */}
+                    {analysis.targetingType !== 'global_passive' && (
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block">
+                          Choose Target Unit
+                        </label>
+                        <select
+                          value={selectedSimTargetUnitId}
+                          onChange={(e) => setSelectedAbilityTargetUnitId(e.target.value)}
+                          className="w-full bg-[#0d1117] border border-[#30363d] focus:border-amber-500 text-white rounded-xl text-xxs py-2.5 px-3 outline-none cursor-pointer font-bold"
+                        >
+                          {activeFaction?.units.map(u => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
                           ))}
-                        </div>
+                        </select>
                       </div>
                     )}
                   </div>
 
-                  {/* Code Log Console terminal */}
-                  <div className="space-y-2 text-left flex-1 flex flex-col justify-end border-t border-[#21262d] pt-4 min-h-[250px]">
-                    <h4 className="text-[9px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
-                      <Terminal className="h-3.5 w-3.5 text-amber-500" /> Rules Engine Console Output
-                    </h4>
-                    <div className="flex-1 bg-black p-4 rounded-xl border border-[#21262d] font-mono text-[9px] leading-relaxed text-gray-300 space-y-1 overflow-y-auto max-h-[300px]">
-                      {simLog.map((log, i) => {
-                        let colorClass = 'text-gray-400';
-                        if (log.startsWith('[SYSTEM_TEST]')) colorClass = 'text-amber-400 font-bold';
-                        else if (log.startsWith('[TARGET_RESOLVED]')) colorClass = 'text-blue-400';
-                        else if (log.startsWith('[STATE_CHANGE]')) colorClass = 'text-purple-400';
-                        else if (log.startsWith('[APPLIED_MODIFIER]')) colorClass = 'text-emerald-400 font-semibold';
-                        else if (log.startsWith('[PROMPT]')) colorClass = 'text-pink-400';
-                        else if (log.startsWith('[STATE_GATING]')) colorClass = 'text-orange-400';
-                        else if (log.startsWith('[DIAGNOSTIC]')) colorClass = 'text-cyan-400 font-medium';
-                        else if (log.startsWith('[WARNING]')) colorClass = 'text-red-400 font-black';
+                  {/* Target & Stats Display */}
+                  <div className="space-y-3">
+                    {/* Target specification */}
+                    <div className="p-3.5 rounded-xl border border-[#21262d] bg-[#0d1117]/10 flex flex-col gap-1.5">
+                      <span className="text-[9px] font-black text-amber-500 uppercase tracking-wider flex items-center gap-1">
+                        <TargetIcon className="h-3 w-3 shrink-0" /> Target Specification
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {analysis.targetSpecifications.map((spec, sIdx) => (
+                          <Badge key={sIdx} className="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[9px] font-black tracking-wider uppercase px-2 py-0.5">
+                            {spec}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
 
-                        return (
-                          <div key={i} className={colorClass}>
-                            {log}
-                          </div>
-                        );
-                      })}
+                    {/* Stats Influenced */}
+                    {analysis.statsWithModifiers.length > 0 && (
+                      <div className="p-3.5 rounded-xl border border-[#21262d] bg-[#0d1117]/10 flex flex-col gap-1.5">
+                        <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                          <BarChart3 className="h-3 w-3 shrink-0" /> Influenced Application Stats (IAS)
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {analysis.statsWithModifiers.map((item, mIdx) => (
+                            <Badge 
+                              key={mIdx} 
+                              className={`text-[9px] font-black tracking-wider uppercase px-2 py-0.5
+                                ${item.mod.startsWith('-') 
+                                  ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
+                                  : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}
+                            >
+                              ★ {item.stat} ({item.mod})
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Permanent vs Temporary duration */}
+                    <div className="p-3 rounded-lg border border-[#222834] bg-[#161b22] flex items-center gap-2 text-xxs font-bold">
+                      <Badge className={`h-4.5 min-w-4.5 rounded-full flex items-center justify-center p-0 font-bold
+                        ${analysis.isPermanent ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'bg-gray-800 text-gray-500'}`}>
+                        {analysis.isPermanent ? '✓' : '—'}
+                      </Badge>
+                      <span className={analysis.isPermanent ? 'text-gray-200' : 'text-gray-500'}>
+                        {analysis.isPermanent 
+                          ? 'Permanent Effect (Stays for rest of the game)' 
+                          : 'Temporary Effect (Phase or Turn Duration)'}
+                      </span>
                     </div>
                   </div>
+
                 </div>
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center py-24 text-center space-y-4">
-                  <Terminal className="h-10 w-10 text-gray-600" />
-                  <div className="space-y-1">
-                    <p className="text-xxs font-black text-gray-400 uppercase tracking-wider">No active test selected</p>
-                    <p className="text-[10px] text-gray-500 max-w-[250px] font-medium leading-normal mx-auto">Click on any loaded ability card to the left to execute the programmatic parser and audit the net state change output here.</p>
+
+                {/* Right Side: Black Console Terminal */}
+                <div className="flex flex-col h-full min-h-[300px] md:min-h-0">
+                  <h4 className="text-[9px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5 mb-2 text-left">
+                    <Terminal className="h-3.5 w-3.5 text-amber-500" /> Rules Engine Console Output
+                  </h4>
+                  <div className="flex-1 bg-black p-5 rounded-2xl border border-[#21262d] font-mono text-[10px] leading-relaxed text-gray-300 space-y-1.5 overflow-y-auto text-left max-h-[500px]">
+                    {simLog.map((log, i) => {
+                      let colorClass = 'text-gray-400';
+                      if (log.startsWith('[SYSTEM_TEST]')) colorClass = 'text-amber-400 font-bold';
+                      else if (log.startsWith('[TARGET_RESOLVED]')) colorClass = 'text-blue-400';
+                      else if (log.startsWith('[STATE_CHANGE]')) colorClass = 'text-purple-400';
+                      else if (log.startsWith('[APPLIED_MODIFIER]')) colorClass = 'text-emerald-400 font-semibold';
+                      else if (log.startsWith('[PROMPT]')) colorClass = 'text-pink-400';
+                      else if (log.startsWith('[STATE_GATING]')) colorClass = 'text-orange-400';
+                      else if (log.startsWith('[DIAGNOSTIC]')) colorClass = 'text-cyan-400 font-medium';
+                      else if (log.startsWith('[WARNING]')) colorClass = 'text-red-400 font-black';
+
+                      return (
+                        <div key={i} className={colorClass}>
+                          {log}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
 
-      </div>
+              </div>
+              
+              {/* Footer */}
+              <div className="p-4 border-t border-[#21262d] bg-[#1d222b] flex justify-end gap-2.5">
+                <Button 
+                  onClick={() => setSelectedAbilityForSimulation(null)}
+                  className="bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold px-5 h-9 rounded-xl flex items-center gap-2 cursor-pointer"
+                >
+                  DISMISS OVERLAY
+                </Button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
+
     </div>
   );
 }

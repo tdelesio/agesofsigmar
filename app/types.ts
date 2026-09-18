@@ -41,6 +41,7 @@ export interface Ability {
   isDefense?: boolean; // is this a defensive ability
   sourceType?: 'trait' | 'regiment' | 'enhancement' | 'unit'; // where did this ability come from
   ruleDefinition?: RuleDefinition; // declarative rule configurations
+  isSpecialized?: boolean; // is this a specialized ability that should bypass standard dynamic text parsing
 }
 
 export interface Unit {
@@ -93,6 +94,7 @@ export interface AppliedModifier {
   label: string;
   expiresRound: number; // round number when it expires (normally at the end of the round activated in)
   expiresPhase?: GamePhase;
+  expiresTurn?: boolean; // if true, expires at the end of the current active turn
   sourceAbilityId?: string;
   sourceAbilityEffect?: string;
 }
