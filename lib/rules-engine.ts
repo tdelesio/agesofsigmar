@@ -1034,6 +1034,11 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     targetingType = 'single_friendly';
   }
 
+  if (abId === 'guardiansoftheking' || nameLower.includes('guardians of the king')) {
+    finalHasSpatialOrConditionalCheck = true;
+    finalConditionalCheckDescription = "Verify that your general is within this unit's combat range before applying Ward (5+).";
+  }
+
   const isPermanent = 
     effectLower.includes('for the rest of the battle') || 
     effectLower.includes('for the rest of the game') || 
