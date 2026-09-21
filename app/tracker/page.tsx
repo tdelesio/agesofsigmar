@@ -658,7 +658,7 @@ export default function TrackerPage() {
 
     // Check 1: Target SELF
     // Bypass target selection entirely; apply modifiers immediately to all matching unit names on roster.
-    if (analysis && (analysis.targetingType === 'self' || analysis.targetSpecifications.some(s => s.startsWith('Self')))) {
+    if (analysis && (analysis.targetingType === 'self' || analysis.targetSpecifications.some(s => s.startsWith('Self'))) && analysis.allowedStats.length <= 1) {
       let parentUnitRules = faction.units.find(u => u.abilities.some(a => a.id === foundAb?.id));
       if (!parentUnitRules && foundAb) {
         parentUnitRules = faction.units.find(u => u.id === foundAb?.id.split('-')[0]);
@@ -708,7 +708,9 @@ export default function TrackerPage() {
 
     // Check 2: Dice check roll required BEFORE targeting
     const rollMatch = (effect || '').match(/on\s+a\s+(\d+)\+/i);
-    const isTargetingSingular = analysis ? (analysis.targetingType === 'single_friendly') : isTargetingSingularFriendlyUnit(effect || '');
+    const isTargetingSingular = analysis
+      ? (analysis.targetingType === 'single_friendly' || (analysis.targetingType === 'self' && analysis.allowedStats.length > 1))
+      : isTargetingSingularFriendlyUnit(effect || '');
 
     if (rollMatch && !isTargetingSingular) {
       setRollPrompt({
@@ -4963,6 +4965,19 @@ export default function TrackerPage() {
               filteredUnits = filteredUnits.filter(u => {
                 const r = faction?.units.find(rules => rules.id === u.unitId);
                 return r && allowedNames.some(allowedName => r.name.toLowerCase().includes(allowedName) || allowedName.includes(r.name.toLowerCase()));
+              });
+            }
+          }
+
+          // Check 4: Self specification filter
+          const selfSpec = abAnalysis.targetSpecifications.find(s => s.startsWith("Self:"));
+          if (selfSpec) {
+            const matchBrackets = selfSpec.match(/\[(.*?)\]/);
+            if (matchBrackets && matchBrackets[1]) {
+              const selfNames = matchBrackets[1].split(',').map(name => name.trim().toLowerCase());
+              filteredUnits = filteredUnits.filter(u => {
+                const r = faction?.units.find(rules => rules.id === u.unitId);
+                return r && selfNames.some(selfName => r.name.toLowerCase().includes(selfName) || selfName.includes(r.name.toLowerCase()));
               });
             }
           }
