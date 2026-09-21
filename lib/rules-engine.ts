@@ -1003,6 +1003,37 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     finalStatsWithModifiers = finalStatsWithModifiers.filter(s => s.stat !== 'Save');
   }
 
+  if (abId === 'overwhelminghordes' || nameLower.includes('overwhelming hordes')) {
+    finalHasSpatialOrConditionalCheck = true;
+    finalConditionalCheckDescription = "Verify that the defending target unit has fewer models than the attacking unit before applying +1 to wound rolls.";
+  }
+
+  if (abId === 'deathmarch' || nameLower.includes('deathmarch')) {
+    allowedStats = ['move'];
+    influencedStats = ['Movement', 'Control'];
+    finalStatsWithModifiers = [
+      { stat: 'Movement', mod: '+1"' },
+      { stat: 'Control', mod: '+3' }
+    ];
+  }
+
+  if (abId === 'stolenanimus' || nameLower.includes('stolen animus')) {
+    allowedStats = [];
+    influencedStats = ['Heal'];
+    finalStatsWithModifiers = [
+      { stat: 'Heal', mod: '2' }
+    ];
+  }
+
+  if (abId === 'propelledbyhate' || nameLower.includes('propelled by hate')) {
+    allowedStats = [];
+    influencedStats = ['Charge'];
+    finalStatsWithModifiers = [
+      { stat: 'Charge', mod: 'Reroll' }
+    ];
+    targetingType = 'single_friendly';
+  }
+
   const isPermanent = 
     effectLower.includes('for the rest of the battle') || 
     effectLower.includes('for the rest of the game') || 
