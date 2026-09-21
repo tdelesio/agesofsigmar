@@ -147,6 +147,10 @@ export function getDynamicChargeModifiers(
     if (analysis.hasSpatialOrConditionalCheck) {
       return;
     }
+    // Skip active phase-based abilities (e.g. combat phase choices), as they are manually triggered and tracked.
+    if (ability.phase && ability.phase !== 'passive') {
+      return;
+    }
     const dMods = evaluateDynamicModifiersForAbility(ability, uState, uRules, stat, weaponName);
     mods.push(...dMods);
   });
