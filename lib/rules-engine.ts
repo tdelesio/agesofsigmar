@@ -246,6 +246,20 @@ export function getActiveModifiers(
         });
       }
     });
+
+    // Custom multi-stat coupling: If Deathmarch (+1 Move) is active on this unit, also apply +3 Control!
+    if (stat === 'control' || stat === 'Control') {
+      const hasDeathmarch = gameState.appliedModifiers.some(mod => 
+        mod.unitId === unitId && 
+        (mod.sourceAbilityId === 'deathmarch' || mod.label.toLowerCase().includes('deathmarch'))
+      );
+      if (hasDeathmarch) {
+        modifiers.push({
+          modifier: 3,
+          description: 'Deathmarch (Control Bonus)'
+        });
+      }
+    }
   }
 
   // 5. Dynamic charge-conditional passive abilities
@@ -1037,6 +1051,10 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
   if (abId === 'guardiansoftheking' || nameLower.includes('guardians of the king')) {
     finalHasSpatialOrConditionalCheck = true;
     finalConditionalCheckDescription = "Verify that your general is within this unit's combat range before applying Ward (5+).";
+  }
+
+  if (abId === 'kingofshamblingbones' || nameLower.includes('king of shambling bones')) {
+    finalTargetSpecifications = ["Specific Unit(s): [Deathrattle Skeletons, Barrow Guard, Barrow Knights]"];
   }
 
   const isPermanent = 

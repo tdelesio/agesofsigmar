@@ -4164,6 +4164,32 @@ export default function TrackerPage() {
                     </ul>
                   </div>
 
+                  {/* Active Unit Control Scores Summary */}
+                  <div className="p-4 bg-[#0d1017]/80 rounded-xl border border-[#222834] space-y-3">
+                    <h5 className="text-xs font-black text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="h-4 w-4 text-purple-400" /> Active Unit Control Scores:
+                    </h5>
+                    <p className="text-[10px] text-gray-400 leading-relaxed font-medium">
+                      These are the current control scores for your active units, including any active modifiers (e.g. Deathmarch). Use these values to calculate objective contest resolution.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                      {gameState.units.filter(u => !u.isSlain).map(u => {
+                        const uRules = faction.units.find(rules => rules.id === u.unitId);
+                        if (!uRules) return null;
+                        const baseControl = uRules.control ?? 1;
+                        return (
+                          <div key={u.id} className="flex justify-between items-center p-2.5 rounded-lg bg-[#1c2230] border border-[#2c3548]">
+                            <span className="text-xs font-extrabold text-gray-200">{uRules.name}</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xxs text-gray-400 mr-1">Control:</span>
+                              {renderStatWithModifier(baseControl, 'control', u.id)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Active VP Scoring Selector */}
                   <div className="flex flex-col items-center justify-center space-y-3 bg-[#1c2230] p-4 rounded-xl border border-[#2c3548]">
                     <div className="text-center">
