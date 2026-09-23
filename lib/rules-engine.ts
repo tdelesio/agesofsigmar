@@ -394,9 +394,9 @@ export function isTargetingSingularFriendlyUnit(effect: string): boolean {
     effectLower.includes('target a friendly unit') ||
     effectLower.includes('target 1 friendly unit') ||
     effectLower.includes('pick a visible friendly unit') ||
-    /pick\s+(a|1|visible|friendly)\s+friendly\s+unit/i.test(effectLower) ||
-    /select\s+(a|1)\s+friendly\s+unit/i.test(effectLower) ||
-    /choose\s+(a|1)\s+friendly\s+unit/i.test(effectLower);
+    /pick\s+(a|1|visible|friendly)\s+friendly\s+(?:[a-zA-Z-]+\s+){0,3}unit/i.test(effectLower) ||
+    /select\s+(a|1)\s+friendly\s+(?:[a-zA-Z-]+\s+){0,3}unit/i.test(effectLower) ||
+    /choose\s+(a|1)\s+friendly\s+(?:[a-zA-Z-]+\s+){0,3}unit/i.test(effectLower);
 
   const containsPluralExclusions = 
     effectLower.includes('all friendly units') || 
@@ -549,20 +549,34 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
   // 3. Determine Targeting Rules
   const isEnemyTarget = effectLower.includes('enemy unit') || 
                         effectLower.includes('enemy model') || 
-                        effectLower.includes('enemy units') ||
-                        effectLower.includes('enemy models') ||
-                        effectLower.includes('the quarry') ||
-                        effectLower.includes('enemy general');
+                        effectLower.includes('enemy units') || 
+                        effectLower.includes('enemy models') || 
+                        effectLower.includes('the quarry') || 
+                        effectLower.includes('enemy general') ||
+                        /enemy\s+(?:[a-zA-Z-]+\s+){0,3}unit/i.test(effectLower) ||
+                        /enemy\s+(?:[a-zA-Z-]+\s+){0,3}units/i.test(effectLower) ||
+                        /enemy\s+(?:[a-zA-Z-]+\s+){0,3}model/i.test(effectLower) ||
+                        /enemy\s+(?:[a-zA-Z-]+\s+){0,3}models/i.test(effectLower);
 
   const isFriendlyTarget = effectLower.includes('friendly unit') || 
-                          effectLower.includes('friendly units') ||
+                          effectLower.includes('friendly units') || 
                           effectLower.includes('friendly model') || 
-                          effectLower.includes('friendly models');
+                          effectLower.includes('friendly models') ||
+                          /friendly\s+(?:[a-zA-Z-]+\s+){0,3}unit/i.test(effectLower) ||
+                          /friendly\s+(?:[a-zA-Z-]+\s+){0,3}units/i.test(effectLower) ||
+                          /friendly\s+(?:[a-zA-Z-]+\s+){0,3}model/i.test(effectLower) ||
+                          /friendly\s+(?:[a-zA-Z-]+\s+){0,3}models/i.test(effectLower);
+
+  const declaresEnemyUnit = /declare:\s*pick\s+an?\s+enemy\s+unit/i.test(effectLower) || 
+                            /declare:\s*pick\s+visible\s+enemy/i.test(effectLower) ||
+                            /declare:\s*pick\s+\d+\s+enemy\s+unit/i.test(effectLower) ||
+                            /pick\s+an?\s+enemy\s+unit\s+to\s+be\s+the\s+target/i.test(effectLower) ||
+                            /pick\s+an?\s+enemy\s+unit\s+in\s+combat/i.test(effectLower);
 
   if (ability.phase === 'passive') {
     targetingType = 'global_passive';
     netEffects.push("Passive Ability: Registers as a persistent background aura; does not prompt target unit clicks.");
-  } else if (isEnemyTarget && !isFriendlyTarget) {
+  } else if (declaresEnemyUnit || (isEnemyTarget && !isFriendlyTarget)) {
     targetingType = 'enemy';
     netEffects.push("Enemy Targeting: Click resolves as an enemy-targeted debuff or attack (log only action, no friendly unit selection).");
   } else if (isFriendlyTarget) {
@@ -1054,7 +1068,12 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
   }
 
   if (abId === 'kingofshamblingbones' || nameLower.includes('king of shambling bones')) {
-    finalTargetSpecifications = ["Specific Unit(s): [Deathrattle Skeletons, Barrow Guard, Barrow Knights]"];
+    finalTargetSpecifications = ["Specific Unit(s): [Deathrattle Skeletons, Barrow Guard, Black Knights, Barrow Knights]"];
+  }
+
+  if (abId === 'auraofantiquity' || nameLower.includes('aura of antiquity')) {
+    targetingType = 'enemy';
+    finalTargetSpecifications = ["Enemy Unit"];
   }
 
   const isPermanent = 

@@ -1,9 +1,12 @@
 import { describe, test, expect } from 'vitest';
+import fs from 'fs';
+import path from 'path';
 import { 
   calculateStatValue, 
   getBattleDamagedOverride, 
   isTargetingSingularFriendlyUnit,
-  getActiveModifiers
+  getActiveModifiers,
+  analyzeAbilityRule
 } from './rules-engine';
 import { GameState, Faction } from '@/app/types';
 
@@ -246,6 +249,14 @@ describe('AoS Companion Rules Engine', () => {
 
     test('Singular phrases: "select 1 friendly unit" matches singular', () => {
       expect(isTargetingSingularFriendlyUnit('You can select 1 friendly unit to receive this benefit.')).toBe(true);
+    });
+
+    test('Singular subtype phrases: "Pick a friendly Deathrattle unit" matches singular targeting', () => {
+      expect(isTargetingSingularFriendlyUnit('Pick a friendly Deathrattle unit wholly within 12".')).toBe(true);
+    });
+
+    test('Singular subtype phrases: "Select 1 friendly Soulblight Gravelords unit" matches singular targeting', () => {
+      expect(isTargetingSingularFriendlyUnit('Select 1 friendly Soulblight Gravelords unit to receive +1 to hit.')).toBe(true);
     });
 
     test('Plural global abilities: "All friendly units" does NOT match singular targeting', () => {
@@ -611,6 +622,44 @@ describe('AoS Companion Rules Engine', () => {
       };
       const modsKnightsCharged = getActiveModifiers(stateKnightsCharged, mockFaction, 'rend', 'chaos_knights_1', 'Cursed Lances');
       expect(modsKnightsCharged.length).toBe(0); // Only applies to general!
+    });
+  });
+
+  describe('Faction Diagnostics: Rules & Targeting Safety Scan', () => {
+    test('Verify all abilities in default-factions.json parse without crashes and flag target classification risks', () => {
+      const filePath = path.resolve(__dirname, '../app/data/default-factions.json');
+      const fileContent = fs.readFileSync(filePath, 'utf-8');
+      const data = JSON.parse(fileContent);
+      const factions = data.factions || data;
+
+      expect(factions.length).toBeGreaterThan(0);
+
+      factions.forEach((faction: any) => {
+        const checkAbility = (ab: any, source: string) => {
+          let analysis;
+          try {
+            analysis = analyzeAbilityRule(ab, faction);
+          } catch (err: any) {
+            throw new Error(`CRASH on faction "${faction.name}" ability "${ab.name}" (${source}): ${err.message}`);
+          }
+
+          expect(analysis).toBeDefined();
+          expect(Array.isArray(analysis.targetSpecifications)).toBe(true);
+
+          // Check for dual-keyword classification risks
+          const hasRoll = ab.effect.toLowerCase().includes('roll a dice') || /on\s+a\s+(\d+)\+/i.test(ab.effect);
+          if (hasRoll && analysis.targetingType === 'single_friendly' && !ab.effect.toLowerCase().includes('friendly')) {
+            console.warn(`[DIAGNOSTIC WARNING] Potential Hostile-to-Friendly Collision: Faction "${faction.name}" ability "${ab.name}" (${source}) has a roll check but is classified as friendly targeting!`);
+          }
+        };
+
+        faction.battleTraits.forEach((t: any) => checkAbility(t, 'battleTrait'));
+        faction.regimentAbilities.forEach((r: any) => checkAbility(r, 'regimentAbility'));
+        faction.enhancements.forEach((e: any) => checkAbility(e, 'enhancement'));
+        faction.units.forEach((u: any) => {
+          u.abilities.forEach((a: any) => checkAbility(a, `unit:${u.name}`));
+        });
+      });
     });
   });
 

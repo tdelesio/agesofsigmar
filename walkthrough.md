@@ -25,8 +25,19 @@ In accordance with official Age of Sigmar 4.0 sequencing, we unified the Combat 
 ### 3. 🚫 Phase Filtering on Opponent Turn
 During the opponent's turn, standard active abilities for the **Hero**, **Movement**, **Shooting**, and **Charge** phases are completely locked and hidden from view. This prevents players from mistakenly triggering active friendly tactics when it is not their active turn, ensuring complete match purity.
 
-### 4. ⏳ Dread Descent Battle Round restriction
-The Ossiarch Bonereapers battle trait **Dread Descent** is locked out and filtered out of all available active strategy and passive listings during **Battle Round 1**. It becomes automatically available starting from Battle Round 2 onwards, perfectly matching the official rules criteria.
+### 4. ⏳ Round-based Faction Lockouts (Summoned Units & Reinforcements)
+- We expanded battle round restriction rules to dynamically hide or reveal deployment-specific battle traits depending on the current Battle Round:
+  - **Dread Descent** (Ossiarch Bonereapers): Restricted to **Round 2+** (hidden in Round 1).
+  - **The Rising Dead** (Soulblight Gravelords - Tomb Host): Restricted to **Round 3+** (hidden in Rounds 1 & 2).
+  - **Death's Descent - Swoop Down** (Soulblight Gravelords - Bloodcrave Hunt): Restricted to **Round 3+** (hidden in Rounds 1 & 2).
+- **Special Troop Deployment Notice Integration**:
+  - Implemented `renderSpecialDeploymentNotice(ability)` which intercepts these three late-arrival abilities and injects an elegant, highly visible animated amber notification box (`🚨 Special Deployment Ready`) inside the card content layout in both combat and non-combat phases.
+  - Clearly states the exact unit getting deployed:
+    - **Dread Descent** ➡️ Deploys: `Morghast Archai` 💀
+    - **The Rising Dead** ➡️ Deploys: `Deathrattle Skeletons (Unit 2)` 🧟
+    - **Death's Descent - Swoop Down** ➡️ Deploys: `Vargheists` 🦇
+
+---
 
 ### 🏷️ Abilities Relocation and Consistent Naming
 We renamed the main active strategy block to `Abilities (Round X)` and elevated it to render above `My Melee Combat Activations` in the combat timeline, creating a highly cohesive and uniform tactical cockpit across all non-combat and combat phases.

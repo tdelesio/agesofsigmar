@@ -50,6 +50,7 @@ export default function TrackerPage() {
   } | null>(null);
 
   const [selectUnitToBuffAbility, setSelectUnitToBuffAbility] = useState<{
+    id?: string;
     abilityId: string;
     name: string;
     effect: string;
@@ -592,14 +593,13 @@ export default function TrackerPage() {
 
     const updated = { ...gameState };
     
-    // Detect unlimited (once: "none") abilities to prevent permanent lockout
-    let foundAb = faction.battleTraits.find(a => a.id === abilityId || (abilityId.startsWith(a.id) && a.id === 'relentlessDiscipline') || abilityId.endsWith(`-${a.id}`)) ||
-                  faction.regimentAbilities.find(a => a.id === abilityId || abilityId.endsWith(`-${a.id}`)) ||
-                  faction.enhancements.find(a => a.id === abilityId || abilityId.endsWith(`-${a.id}`));
+    let foundAb = faction.battleTraits.find(a => a.id.toLowerCase() === abilityId.toLowerCase() || (abilityId.toLowerCase().startsWith(a.id.toLowerCase()) && a.id.toLowerCase() === 'relentlessdiscipline') || abilityId.toLowerCase().endsWith(`-${a.id.toLowerCase()}`)) ||
+                  faction.regimentAbilities.find(a => a.id.toLowerCase() === abilityId.toLowerCase() || abilityId.toLowerCase().endsWith(`-${a.id.toLowerCase()}`)) ||
+                  faction.enhancements.find(a => a.id.toLowerCase() === abilityId.toLowerCase() || abilityId.toLowerCase().endsWith(`-${a.id.toLowerCase()}`));
     
     if (!foundAb) {
       for (const u of faction.units) {
-        const matched = u.abilities.find(a => abilityId === a.id || abilityId.endsWith(`-${a.id}`));
+        const matched = u.abilities.find(a => abilityId.toLowerCase() === a.id.toLowerCase() || abilityId.toLowerCase().endsWith(`-${a.id.toLowerCase()}`));
         if (matched) {
           foundAb = matched;
           break;
@@ -730,6 +730,7 @@ export default function TrackerPage() {
       const isPhaseLong = (effect || '').toLowerCase().includes('this phase') || (effect || '').toLowerCase().includes('the rest of the phase') || (effect || '').toLowerCase().includes('for the rest of this phase') || isHeightened;
       
       setSelectUnitToBuffAbility({ 
+        id: abilityId,
         abilityId,
         name: abilityName, 
         effect: effect || '', 
@@ -1145,11 +1146,102 @@ export default function TrackerPage() {
   // Extract phase-specific abilities for reference
   const isAbilityAllowedByRound = (ab: Ability): boolean => {
     if (!gameState) return true;
-    if ((ab.id === 'dreadDescent' || ab.name.toLowerCase() === 'dread descent') && gameState.round === 1) {
+    
+    const abIdLower = ab.id.toLowerCase();
+    const abNameLower = ab.name.toLowerCase();
+
+    // Dread Descent: Round 2 onwards (locked out in Round 1)
+    if ((abIdLower === 'dreaddescent' || abNameLower === 'dread descent') && gameState.round < 2) {
       return false;
     }
+
+    // The Rising Dead: Round 3 onwards (locked out in Round 1 and 2)
+    if ((abIdLower === 'therisingdead' || abNameLower === 'the rising dead') && gameState.round < 3) {
+      return false;
+    }
+
+    // Swoop Down: Round 3 onwards (locked out in Round 1 and 2)
+    if ((abIdLower === 'deathsdescentswoopdown' || abIdLower === 'swoopdown' || abNameLower.includes('swoop down')) && gameState.round < 3) {
+      return false;
+    }
+
     return true;
   };
+
+  const renderAbilityTargetAndRollBadges = (ability: Ability) => {
+    if (!faction) return null;
+    const analysis = analyzeAbilityRule(ability, faction);
+    return (
+      <>
+        {analysis.targetSpecifications.map((spec, sIdx) => {
+          let badgeColor = "bg-blue-500/10 text-blue-400 border border-blue-500/20";
+          if (spec.startsWith("Self")) badgeColor = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+          else if (spec.startsWith("Specific Unit")) badgeColor = "bg-purple-500/10 text-purple-400 border border-purple-500/20";
+          else if (spec.includes("Enemy")) badgeColor = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+          else if (spec.includes("Hero")) badgeColor = "bg-amber-500/10 text-amber-400 border border-amber-500/20";
+          else if (spec.includes("Not Hero")) badgeColor = "bg-zinc-500/10 text-zinc-300 border border-zinc-500/20";
+
+          return (
+            <Badge key={sIdx} variant="outline" className={`${badgeColor} text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded border-dashed`}>
+              🎯 {spec}
+            </Badge>
+          );
+        })}
+        {analysis.requiredRoll && (
+          <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded border-dashed">
+            🎲 Roll: {analysis.requiredRoll}
+          </Badge>
+        )}
+        {analysis.isDefensive && (
+          <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded border-dashed">
+            🛡️ Defensive
+          </Badge>
+        )}
+        {analysis.hasSpatialOrConditionalCheck && (
+          <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded border-dashed">
+            📏 Spatial Check
+          </Badge>
+        )}
+        {analysis.isExternallyTracked && (
+          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded border-dashed">
+            ♟️ Table Top Effect
+          </Badge>
+        )}
+        {analysis.isPermanent && (
+          <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded border-dashed">
+            ♾️ Permanent Effect
+          </Badge>
+        )}
+      </>
+    );
+  };
+
+  const renderSpecialDeploymentNotice = (ability: Ability) => {
+    const abIdLower = ability.id.toLowerCase();
+    const abNameLower = ability.name.toLowerCase();
+    let deploymentInfo = null;
+
+    if (abIdLower === 'dreaddescent' || abNameLower === 'dread descent') {
+      deploymentInfo = { unit: "Morghast Archai", icon: "💀" };
+    } else if (abIdLower === 'therisingdead' || abNameLower === 'the rising dead') {
+      deploymentInfo = { unit: "Deathrattle Skeletons (Unit 2)", icon: "🧟" };
+    } else if (abIdLower === 'deathsdescentswoopdown' || abNameLower.includes('swoop down')) {
+      deploymentInfo = { unit: "Vargheists", icon: "🦇" };
+    }
+
+    if (!deploymentInfo) return null;
+
+    return (
+      <div className="mt-2.5 p-2 bg-amber-500/10 border border-dashed border-amber-500/30 rounded-lg flex items-center gap-2 animate-pulse">
+        <span className="text-sm">{deploymentInfo.icon}</span>
+        <div>
+          <p className="text-[10px] font-black text-amber-400 uppercase tracking-wide">🚨 Special Deployment Ready</p>
+          <p className="text-[9px] text-gray-300 font-bold mt-0.5 leading-tight">Deploys Unit: <strong className="text-white underline font-black">{deploymentInfo.unit}</strong></p>
+        </div>
+      </div>
+    );
+  };
+
 
   const getAbilitiesForPhase = (phase: string): Ability[] => {
     const list: Ability[] = [];
@@ -1864,10 +1956,13 @@ export default function TrackerPage() {
                   >
                     <CardHeader className="p-4 pb-1">
                       <div className="flex justify-between items-start gap-2">
-                        <div>
-                          <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded mb-1 border ${style.badgeBg}`}>
-                            {style.label}
-                          </Badge>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded border ${style.badgeBg}`}>
+                              {style.label}
+                            </Badge>
+                            {renderAbilityTargetAndRollBadges(ability)}
+                          </div>
                           <CardTitle className="text-xs font-bold text-white">{ability.name}</CardTitle>
                         </div>
                         {ability.once !== 'none' && (
@@ -1880,6 +1975,7 @@ export default function TrackerPage() {
                     </CardHeader>
                     <CardContent className="p-4 pt-1">
                       <p className="text-xxs text-gray-400 leading-normal whitespace-pre-line font-medium">{ability.effect}</p>
+                      {renderSpecialDeploymentNotice(ability)}
                       
                       {appliedUnitNames.length > 0 && (
                         <div className="mt-2.5 pt-2 border-t border-[#2c3548]/30 text-[10px] text-amber-500 font-extrabold flex items-center gap-1 leading-none select-none">
@@ -1965,6 +2061,7 @@ export default function TrackerPage() {
                               {style.label}
                             </Badge>
                             <span className="text-[9px] font-extrabold text-amber-500 uppercase tracking-wider">{ability.unitName}</span>
+                            {renderAbilityTargetAndRollBadges(ability)}
                           </div>
                           <CardTitle className="text-xs font-bold text-white mt-0.5">{ability.name}</CardTitle>
                         </div>
@@ -2863,9 +2960,12 @@ export default function TrackerPage() {
                   <CardHeader className="p-4 pb-1">
                     <div className="flex justify-between items-start gap-2">
                       <div>
-                        <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded mb-1 border ${style.badgeBg}`}>
-                          {style.label}
-                        </Badge>
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                          <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded border ${style.badgeBg}`}>
+                            {style.label}
+                          </Badge>
+                          {renderAbilityTargetAndRollBadges(ability)}
+                        </div>
                         <CardTitle className="text-xs font-bold text-white">{ability.name}</CardTitle>
                       </div>
                       <Badge variant="outline" className="border-cyan-500/40 text-cyan-300 text-[9px] uppercase shrink-0">
@@ -2888,7 +2988,10 @@ export default function TrackerPage() {
                   <CardHeader className="p-4 pb-1">
                     <div className="flex justify-between items-start gap-2">
                       <div>
-                        <span className="text-[9px] font-extrabold text-cyan-400 uppercase tracking-wider block">{ability.unitName}</span>
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                          <span className="text-[9px] font-extrabold text-cyan-400 uppercase tracking-wider">{ability.unitName}</span>
+                          {renderAbilityTargetAndRollBadges(ability)}
+                        </div>
                         <CardTitle className="text-xs font-bold text-white mt-0.5">{ability.name}</CardTitle>
                       </div>
                       <Badge variant="outline" className="border-cyan-500/30 text-cyan-400 text-[9px] uppercase shrink-0">
@@ -3060,9 +3163,12 @@ export default function TrackerPage() {
                 <CardHeader className="p-4 pb-1">
                   <div className="flex justify-between items-start gap-2">
                     <div>
-                      <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded mb-1 border ${style.badgeBg}`}>
-                        {style.label}
-                      </Badge>
+                      <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                        <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded border ${style.badgeBg}`}>
+                          {style.label}
+                        </Badge>
+                        {renderAbilityTargetAndRollBadges(ability)}
+                      </div>
                       <CardTitle className="text-xs font-bold text-white">{ability.name}</CardTitle>
                     </div>
                     {ability.once !== 'none' && (
@@ -3075,6 +3181,7 @@ export default function TrackerPage() {
                 </CardHeader>
                 <CardContent className="p-4 pt-1">
                   <p className="text-xxs text-gray-400 leading-normal whitespace-pre-line font-medium">{ability.effect}</p>
+                  {renderSpecialDeploymentNotice(ability)}
                   
                   {appliedUnitNames.length > 0 && (
                     <div className="mt-2.5 pt-2 border-t border-[#2c3548]/30 text-[10px] text-amber-500 font-extrabold flex items-center gap-1 leading-none select-none">
@@ -3185,6 +3292,7 @@ export default function TrackerPage() {
                           {style.label}
                         </Badge>
                         <span className="text-[9px] font-extrabold text-amber-500 uppercase tracking-wider">{ability.unitName}</span>
+                        {renderAbilityTargetAndRollBadges(ability)}
                       </div>
                       <CardTitle className="text-xs font-bold text-white mt-0.5">
                         {ability.name}
@@ -4108,6 +4216,14 @@ export default function TrackerPage() {
                 {gameState.combatSubPhase === 'melee_fight' && (
                   <>
                     {renderCombatUnitActivations()}
+                    
+                    <div className="pt-4 border-t border-[#222834]/40">
+                      <h4 className="text-xs font-extrabold text-amber-500 uppercase tracking-wider mb-3">
+                        ⚡ General Combat Phase Strategy Abilities
+                      </h4>
+                      {renderCombatActiveStrategy()}
+                    </div>
+
                     {renderCombatPassiveRules()}
                   </>
                 )}
@@ -4254,9 +4370,12 @@ export default function TrackerPage() {
                         <CardHeader className="p-4 pb-1">
                           <div className="flex justify-between items-start gap-2">
                             <div>
-                              <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded mb-1 border ${style.badgeBg}`}>
-                                {style.label}
-                              </Badge>
+                              <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-wider py-0 px-1.5 rounded border ${style.badgeBg}`}>
+                                  {style.label}
+                                </Badge>
+                                {renderAbilityTargetAndRollBadges(ability)}
+                              </div>
                               <CardTitle className="text-xs font-bold text-white">{ability.name}</CardTitle>
                             </div>
                             <Badge variant="outline" className="border-cyan-500/40 text-cyan-300 text-[9px] uppercase shrink-0">
@@ -4288,6 +4407,7 @@ export default function TrackerPage() {
                                     {style.label}
                                   </Badge>
                                   <span className="text-xxs font-black text-cyan-400 uppercase tracking-wider">{uRules.name}</span>
+                                  {renderAbilityTargetAndRollBadges(ability)}
                                 </div>
                                 <CardTitle className="text-xs font-bold text-white mt-0.5">{ability.name}</CardTitle>
                               </div>
@@ -4946,13 +5066,13 @@ export default function TrackerPage() {
       )}
 
       {selectUnitToBuffAbility && (() => {
-        let abilityConfig = faction?.battleTraits.find(a => a.id === selectUnitToBuffAbility.abilityId || selectUnitToBuffAbility.abilityId.endsWith(`-${a.id}`)) ||
-                            faction?.regimentAbilities.find(a => a.id === selectUnitToBuffAbility.abilityId || selectUnitToBuffAbility.abilityId.endsWith(`-${a.id}`)) ||
-                            faction?.enhancements.find(a => a.id === selectUnitToBuffAbility.abilityId || selectUnitToBuffAbility.abilityId.endsWith(`-${a.id}`));
+        let abilityConfig = faction?.battleTraits.find(a => a.id.toLowerCase() === selectUnitToBuffAbility.abilityId.toLowerCase() || selectUnitToBuffAbility.abilityId.toLowerCase().endsWith(`-${a.id.toLowerCase()}`)) ||
+                            faction?.regimentAbilities.find(a => a.id.toLowerCase() === selectUnitToBuffAbility.abilityId.toLowerCase() || selectUnitToBuffAbility.abilityId.toLowerCase().endsWith(`-${a.id.toLowerCase()}`)) ||
+                            faction?.enhancements.find(a => a.id.toLowerCase() === selectUnitToBuffAbility.abilityId.toLowerCase() || selectUnitToBuffAbility.abilityId.toLowerCase().endsWith(`-${a.id.toLowerCase()}`));
         
         if (!abilityConfig && faction) {
           for (const u of faction.units) {
-            const matched = u.abilities.find(a => selectUnitToBuffAbility.abilityId === a.id || selectUnitToBuffAbility.abilityId.endsWith(`-${a.id}`));
+            const matched = u.abilities.find(a => selectUnitToBuffAbility.abilityId.toLowerCase() === a.id.toLowerCase() || selectUnitToBuffAbility.abilityId.toLowerCase().endsWith(`-${a.id.toLowerCase()}`));
             if (matched) {
               abilityConfig = matched;
               break;
