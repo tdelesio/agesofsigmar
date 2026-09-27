@@ -16,7 +16,7 @@ export type AbilityLimit = 'once-per-turn' | 'once-per-battle' | 'none';
 export interface RuleAction {
   type: 'modify_stat' | 'apply_passive' | 'spawn_prompt' | 'heal';
   target: 'all_friendly' | 'selected_unit' | 'self';
-  stat?: 'run' | 'charge' | 'hit' | 'wound' | 'rend' | 'save' | 'ward' | 'attacks' | 'damage';
+  stat?: 'run' | 'charge' | 'hit' | 'wound' | 'rend' | 'save' | 'ward' | 'attacks' | 'damage' | 'control' | 'weapon_ability';
   modifier?: number;
   description: string;
   condition?: {
@@ -56,6 +56,8 @@ export interface Unit {
   isHero: boolean;
   weapons: Weapon[];
   abilities: Ability[];
+  notes?: string; // Optional unit composition / equipment notes
+  isReinforcement?: boolean; // Unit has the Reinforcements keyword / icon and can be replaced when destroyed
 }
 
 export interface Faction {
@@ -76,6 +78,7 @@ export interface UnitState {
   isSlain: boolean;
   modelsCount?: number; // current number of models
   maxModels?: number; // max models
+  reinforcedOnce?: boolean; // tracks if Call for Reinforcements was already used for this unit
   // State for the active turn
   moved: boolean;
   ran: boolean;
@@ -89,7 +92,7 @@ export interface UnitState {
 export interface AppliedModifier {
   id: string; // unique ID for tracking/removal
   unitId: string; // UnitState.id of target
-  stat: 'attacks' | 'hit' | 'wound' | 'rend' | 'damage' | 'save' | 'ward' | 'move' | 'charge' | 'run';
+  stat: 'attacks' | 'hit' | 'wound' | 'rend' | 'damage' | 'save' | 'ward' | 'move' | 'charge' | 'run' | 'control' | 'weapon_ability';
   modifier: number;
   label: string;
   expiresRound: number; // round number when it expires (normally at the end of the round activated in)
@@ -97,6 +100,10 @@ export interface AppliedModifier {
   expiresTurn?: boolean; // if true, expires at the end of the current active turn
   sourceAbilityId?: string;
   sourceAbilityEffect?: string;
+  weaponName?: string; // specific weapon name e.g. "Warpforged Halberd" or "Ratling Pistol"
+  weaponType?: 'melee' | 'ranged' | 'all'; // weapon category scoping
+  grantedAbility?: string; // e.g. "Crit (Mortal)"
+  setOverrideValue?: number | string; // e.g. 3 or "2D6"
 }
 
 export interface GameState {

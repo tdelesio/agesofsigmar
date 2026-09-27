@@ -1092,6 +1092,18 @@ export default function AdminPage() {
                                 Is Hero general / leader?
                               </label>
                             </div>
+                            <div className="flex items-center gap-2 pt-6">
+                              <input 
+                                type="checkbox" 
+                                id={`isReinforcement-${selectedUnitIndex}`}
+                                checked={editorFaction.units[selectedUnitIndex].isReinforcement || false}
+                                onChange={(e) => updateUnitField(selectedUnitIndex, 'isReinforcement', e.target.checked)}
+                                className="h-4 w-4 rounded border-gray-300 text-rose-600 focus:ring-rose-500"
+                              />
+                              <label htmlFor={`isReinforcement-${selectedUnitIndex}`} className="text-xs text-gray-300 font-bold cursor-pointer flex items-center gap-1">
+                                🔄 Reinforcements?
+                              </label>
+                            </div>
                           </div>
 
                           {/* Stat Grid */}
@@ -1141,6 +1153,23 @@ export default function AdminPage() {
                                 className="bg-transparent border-none text-center font-black text-amber-500 p-0 text-sm focus-visible:ring-0 h-8" 
                               />
                             </div>
+                          </div>
+
+                          {/* Unit Composition / Equipment Notes */}
+                          <div className="pt-3">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">
+                              Unit Composition / Equipment Notes (Optional)
+                            </label>
+                            <Input 
+                              type="text" 
+                              placeholder="e.g. This unit has 2 Rat Ogors armed with Claws... and 1 Rat Ogor armed with Warpfire Gun..."
+                              value={editorFaction.units[selectedUnitIndex].notes || ''} 
+                              onChange={(e) => updateUnitField(selectedUnitIndex, 'notes', e.target.value)} 
+                              className="bg-[#0f121a] border-[#222834] text-xs h-9 text-sky-300 font-medium focus-visible:ring-1 focus-visible:ring-sky-500/30" 
+                            />
+                            <p className="text-[9px] text-gray-500 mt-1">
+                              Displayed in the Combat and Shooting phases above weapon profiles for mixed-equipment units.
+                            </p>
                           </div>
                         </CardContent>
                       </Card>

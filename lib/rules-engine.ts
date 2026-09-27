@@ -1,4 +1,4 @@
-import { GameState, Faction, Ability } from '@/app/types';
+import { GameState, Faction, Ability, Unit } from '@/app/types';
 
 // Helper to compute active Blood Rites round level (accounting for Murderous Epiphany early activations)
 export function getActiveBloodRitesRound(gameState: GameState | null): number {
@@ -58,7 +58,15 @@ export function evaluateDynamicModifiersForAbility(
     }
   }
 
-  // 2. Check if it's a charge-conditional rule
+  // 2. Check if it's a damaged-conditional rule (e.g. Cornered Rat: "While this unit is damaged")
+  const isDamagedCondition = effectLower.includes('while this unit is damaged') || effectLower.includes('is damaged');
+  if (isDamagedCondition) {
+    if (!uState || (uState.currentWounds || 0) <= 0) {
+      return []; // Unit is not damaged, condition not met
+    }
+  }
+
+  // 3. Check if it's a charge-conditional rule
   const hasChargeCondition = effectLower.includes('charged in the same turn') || effectLower.includes('has charged') || effectLower.includes('charged this phase');
   
   if (hasChargeCondition) {
@@ -73,56 +81,96 @@ export function evaluateDynamicModifiersForAbility(
     if (!conditionMet) return [];
   }
 
-  // 3. Now check if it modifies this stat
+  // Helper for weapon matching
+  let specificWeaponInRules: any = null;
+  if (uRules && uRules.weapons) {
+    specificWeaponInRules = uRules.weapons.find((w: any) => w.name && effectLower.includes(w.name.toLowerCase()));
+  }
+
+  const isMeleeWeaponTerm = effectLower.includes('melee weapons') || effectLower.includes('melee weapon');
+  const isRangedWeaponTerm = effectLower.includes('ranged weapons') || effectLower.includes('ranged weapon') || effectLower.includes('shooting weapons');
+
+  const checkWeaponMatch = (wName?: string): boolean => {
+    if (specificWeaponInRules) {
+      return !!wName && wName.toLowerCase() === specificWeaponInRules.name.toLowerCase();
+    }
+    if (!wName) return true;
+    if (isMeleeWeaponTerm && uRules && uRules.weapons) {
+      const matchW = uRules.weapons.find((w: any) => w.name.toLowerCase() === wName.toLowerCase());
+      return matchW ? matchW.range === 'Melee' : true;
+    }
+    if (isRangedWeaponTerm && uRules && uRules.weapons) {
+      const matchW = uRules.weapons.find((w: any) => w.name.toLowerCase() === wName.toLowerCase());
+      return matchW ? matchW.range !== 'Melee' : true;
+    }
+    return true;
+  };
+
+  const parseNumModifier = (text: string, defaultVal: number = 1): number => {
+    if (text.includes('add 3') || text.includes('+3') || text.includes('by 3')) return 3;
+    if (text.includes('add 2') || text.includes('+2') || text.includes('by 2')) return 2;
+    if (text.includes('subtract 3') || text.includes('-3')) return -3;
+    if (text.includes('subtract 2') || text.includes('-2')) return -2;
+    if (text.includes('subtract 1') || text.includes('-1') || text.includes('subtract')) return -1;
+    if (text.includes('add 1') || text.includes('+1') || text.includes('by 1')) return 1;
+    return defaultVal;
+  };
+
+  const getConditionLabel = (): string => {
+    if (isDamagedCondition) return 'Damaged';
+    if (hasChargeCondition) return 'Charged';
+    return 'Passive';
+  };
+
+  // 4. Now check if it modifies this stat
   if (stat === 'rend') {
-    if (effectLower.includes('add 1 to the rend characteristic') || effectLower.includes('add 1 to rend') || effectLower.includes('add 1 to the rend')) {
-      let weaponMatch = true;
-      if (weaponName) {
-        const isMeleeWeaponTerm = effectLower.includes('melee weapons');
-        const isSpecificWeaponMentioned = effectLower.includes(weaponName.toLowerCase());
-        weaponMatch = isMeleeWeaponTerm || isSpecificWeaponMentioned || isGeneralAbility;
-      }
-      if (weaponMatch) {
+    if (effectLower.includes('rend characteristic') || effectLower.includes('to rend') || effectLower.includes('to the rend')) {
+      if (checkWeaponMatch(weaponName)) {
         mods.push({
-          modifier: 1,
-          description: `${ability.name} (${hasChargeCondition ? 'Charged' : 'Passive'})`
+          modifier: parseNumModifier(effectLower, 1),
+          description: `${ability.name} (${getConditionLabel()})`
         });
       }
     }
   } else if (stat === 'attacks') {
-    if (effectLower.includes('add 1 to the attacks characteristic') || effectLower.includes('add 1 to attacks') || effectLower.includes('add 1 to the attacks')) {
-      let weaponMatch = true;
-      if (weaponName) {
-        const isMeleeWeaponTerm = effectLower.includes('melee weapons');
-        const isSpecificWeaponMentioned = effectLower.includes(weaponName.toLowerCase());
-        weaponMatch = isMeleeWeaponTerm || isSpecificWeaponMentioned || isGeneralAbility;
-      }
-      if (weaponMatch) {
+    if (effectLower.includes('attacks characteristic') || effectLower.includes('attacks') || effectLower.includes('attack characteristic')) {
+      if (checkWeaponMatch(weaponName)) {
         mods.push({
-          modifier: 1,
-          description: `${ability.name} (${hasChargeCondition ? 'Charged' : 'Passive'})`
+          modifier: parseNumModifier(effectLower, 1),
+          description: `${ability.name} (${getConditionLabel()})`
         });
       }
     }
   } else if (stat === 'wound') {
-    if (effectLower.includes('add 1 to wound rolls') || effectLower.includes('add 1 to the wound rolls')) {
-      mods.push({
-        modifier: 1,
-        description: `${ability.name} (${hasChargeCondition ? 'Charged' : 'Passive'})`
-      });
+    if (effectLower.includes('add 1 to wound rolls') || effectLower.includes('add 1 to the wound rolls') || effectLower.includes('wound rolls')) {
+      if (checkWeaponMatch(weaponName)) {
+        mods.push({
+          modifier: parseNumModifier(effectLower, 1),
+          description: `${ability.name} (${getConditionLabel()})`
+        });
+      }
     }
   } else if (stat === 'hit') {
-    if (effectLower.includes('add 1 to hit rolls') || effectLower.includes('add 1 to the hit rolls')) {
-      mods.push({
-        modifier: 1,
-        description: `${ability.name} (${hasChargeCondition ? 'Charged' : 'Passive'})`
-      });
+    if (effectLower.includes('add 1 to hit rolls') || effectLower.includes('add 1 to the hit rolls') || effectLower.includes('hit rolls')) {
+      if (checkWeaponMatch(weaponName)) {
+        mods.push({
+          modifier: parseNumModifier(effectLower, 1),
+          description: `${ability.name} (${getConditionLabel()})`
+        });
+      }
     }
   } else if (stat === 'save') {
-    if (effectLower.includes('add 1 to save rolls') || effectLower.includes('add 1 to the save rolls')) {
+    if (effectLower.includes('add 1 to save rolls') || effectLower.includes('add 1 to the save rolls') || effectLower.includes('save rolls')) {
       mods.push({
-        modifier: 1,
-        description: `${ability.name} (${hasChargeCondition ? 'Charged' : 'Passive'})`
+        modifier: parseNumModifier(effectLower, 1),
+        description: `${ability.name} (${getConditionLabel()})`
+      });
+    }
+  } else if (stat === 'ward') {
+    if (effectLower.includes('add 1 to ward rolls') || effectLower.includes('add 1 to the ward rolls') || effectLower.includes('ward rolls')) {
+      mods.push({
+        modifier: parseNumModifier(effectLower, 1),
+        description: `${ability.name} (${getConditionLabel()})`
       });
     }
   }
@@ -240,6 +288,23 @@ export function getActiveModifiers(
         if (stat === 'hit' && mod.label.includes('Shining Company')) {
           return;
         }
+
+        // Weapon Scoping check
+        if (mod.weaponName) {
+          if (!weaponName || !weaponName.toLowerCase().includes(mod.weaponName.toLowerCase())) {
+            return;
+          }
+        }
+
+        if (mod.weaponType && uRules && weaponName) {
+          const wObj = uRules.weapons.find((w: any) => w.name && w.name.toLowerCase() === weaponName.toLowerCase());
+          if (wObj) {
+            const isMelee = wObj.range === 'Melee';
+            if (mod.weaponType === 'melee' && !isMelee) return;
+            if (mod.weaponType === 'ranged' && isMelee) return;
+          }
+        }
+
         modifiers.push({
           modifier: mod.modifier,
           description: mod.label
@@ -394,6 +459,8 @@ export function isTargetingSingularFriendlyUnit(effect: string): boolean {
     effectLower.includes('target a friendly unit') ||
     effectLower.includes('target 1 friendly unit') ||
     effectLower.includes('pick a visible friendly unit') ||
+    effectLower.includes('pick a ranged weapon') ||
+    effectLower.includes('a friendly unit is armed with') ||
     /pick\s+(a|1|visible|friendly)\s+friendly\s+(?:[a-zA-Z-]+\s+){0,3}unit/i.test(effectLower) ||
     /select\s+(a|1)\s+friendly\s+(?:[a-zA-Z-]+\s+){0,3}unit/i.test(effectLower) ||
     /choose\s+(a|1)\s+friendly\s+(?:[a-zA-Z-]+\s+){0,3}unit/i.test(effectLower);
@@ -406,9 +473,312 @@ export function isTargetingSingularFriendlyUnit(effect: string): boolean {
   return matchesSingular && !containsPluralExclusions;
 }
 
+// Detects if an ability is weapon-scoped (e.g. "Warpforged Halberd", "Warplock Musket", "melee weapons", "ranged weapons")
+export function detectWeaponScope(
+  effectLower: string,
+  parentUnit?: Unit | null,
+  faction?: Faction | null,
+  effectRaw?: string
+): { scope: string | null; scopeType: 'specific' | 'melee' | 'ranged' | 'all' } {
+  // 1. Check parent unit weapons first
+  if (parentUnit && parentUnit.weapons) {
+    for (const w of parentUnit.weapons) {
+      if (w.name && w.name.length >= 3 && effectLower.includes(w.name.toLowerCase())) {
+        return { scope: w.name, scopeType: 'specific' };
+      }
+    }
+  }
+
+  // 2. Check all faction units weapons
+  if (faction && faction.units) {
+    for (const u of faction.units) {
+      for (const w of u.weapons) {
+        if (w.name && w.name.length >= 4 && effectLower.includes(w.name.toLowerCase())) {
+          return { scope: w.name, scopeType: 'specific' };
+        }
+      }
+    }
+  }
+
+  // 3. Category matching
+  if (effectLower.includes('melee weapon') || effectLower.includes('melee weapons')) {
+    return { scope: 'Melee Weapons', scopeType: 'melee' };
+  }
+  if (
+    effectLower.includes('ranged weapon') || 
+    effectLower.includes('ranged weapons') || 
+    effectLower.includes('shooting weapon') || 
+    effectLower.includes('shooting weapons')
+  ) {
+    return { scope: 'Ranged Weapons', scopeType: 'ranged' };
+  }
+
+  // 4. Regex match for "of its <Weapon Name>" or "of their <Weapon Name>" in text
+  const matchOfIts = (effectRaw || effectLower).match(/(?:characteristic of (?:its|their)|attacks of (?:its|their)|damage of (?:its|their)|rend of (?:its|their)|of (?:its|their)|armed with (?:a|an)?)\s+([A-Z][A-Za-z0-9' -]+?)(?:\s+this phase|\s+instead|\s+attack|\.|\,|$)/i);
+  if (matchOfIts && matchOfIts[1]) {
+    const rawName = matchOfIts[1].trim();
+    if (!['melee weapons', 'ranged weapons', 'shooting weapons', 'friendly unit'].includes(rawName.toLowerCase()) && rawName.length >= 3) {
+      return { scope: rawName, scopeType: 'specific' };
+    }
+  }
+
+  return { scope: null, scopeType: 'all' };
+}
+
+// Detects if an ability grants or enhances a weapon ability (e.g. "Crit (Mortal)", "Shoot in Combat")
+export function detectWeaponAbilityGrant(effectText: string): { grantedAbility: string; weaponScope: string | null } | null {
+  const effectLower = (effectText || '').toLowerCase();
+  
+  const knownWeaponAbilities: { key: string; name: string }[] = [
+    { key: 'crit (mortal)', name: 'Crit (Mortal)' },
+    { key: 'crit (2 hits)', name: 'Crit (2 Hits)' },
+    { key: 'crit (auto-wound)', name: 'Crit (Auto-wound)' },
+    { key: 'shoot in combat', name: 'Shoot in Combat' },
+    { key: 'companion', name: 'Companion' },
+    { key: 'anti-charge (+1 rend)', name: 'Anti-charge (+1 Rend)' },
+    { key: 'anti-charge', name: 'Anti-charge' },
+    { key: 'anti-infantry (+1 rend)', name: 'Anti-infantry (+1 Rend)' },
+    { key: 'anti-infantry', name: 'Anti-infantry' },
+    { key: 'anti-cavalry (+1 rend)', name: 'Anti-cavalry (+1 Rend)' },
+    { key: 'anti-cavalry', name: 'Anti-cavalry' },
+    { key: 'anti-monster (+1 rend)', name: 'Anti-monster (+1 Rend)' },
+    { key: 'anti-monster', name: 'Anti-monster' },
+  ];
+
+  for (const item of knownWeaponAbilities) {
+    if (
+      effectLower.includes(`has ${item.key}`) || 
+      effectLower.includes(`have ${item.key}`) || 
+      effectLower.includes(`gain ${item.key}`) || 
+      effectLower.includes(`gains ${item.key}`) ||
+      effectLower.includes(`weapon has ${item.key}`) || 
+      effectLower.includes(`weapons have ${item.key}`) || 
+      effectLower.includes(`that weapon has ${item.key}`)
+    ) {
+      let scope: string | null = null;
+      if (effectLower.includes('ranged weapon') || effectLower.includes('ranged weapons')) scope = 'Ranged Weapons';
+      else if (effectLower.includes('melee weapon') || effectLower.includes('melee weapons')) scope = 'Melee Weapons';
+      return { grantedAbility: item.name, weaponScope: scope };
+    }
+  }
+
+  // Critical hit multiple hits pattern (e.g. "scores D6 hits instead of 1", "scores 2 hits instead of 1")
+  const critHitsMatch = effectLower.match(/critical\s+hit,\s*(?:that\s+attack\s+)?scores\s+([a-z0-9]+)\s+hits\s+instead\s+of\s+1/i);
+  if (critHitsMatch) {
+    const count = critHitsMatch[1].toUpperCase();
+    let scope: string | null = null;
+    const weaponMatch = effectLower.match(/(?:attack\s+made\s+with\s+(?:this\s+unit['’]s\s+)?|with\s+)([a-zA-Z\s'-]+?)(?:\s+scores|\s+weapons|\s+has|\s+is)/i);
+    if (weaponMatch && weaponMatch[1]) {
+      scope = weaponMatch[1].trim();
+    }
+    return { grantedAbility: `Crit (${count} Hits)`, weaponScope: scope };
+  }
+
+  // Critical hit mortal damage pattern
+  if (effectLower.includes('scores a critical hit') && (effectLower.includes('mortal damage') || effectLower.includes('mortal wounds'))) {
+    let scope: string | null = null;
+    const weaponMatch = effectLower.match(/(?:attack\s+made\s+with\s+(?:this\s+unit['’]s\s+)?|with\s+)([a-zA-Z\s'-]+?)(?:\s+scores|\s+weapons|\s+has|\s+is)/i);
+    if (weaponMatch && weaponMatch[1]) {
+      scope = weaponMatch[1].trim();
+    }
+    return { grantedAbility: 'Crit (Mortal)', weaponScope: scope };
+  }
+
+  // Critical hit auto-wound pattern
+  if (effectLower.includes('scores a critical hit') && effectLower.includes('automatically wound')) {
+    let scope: string | null = null;
+    const weaponMatch = effectLower.match(/(?:attack\s+made\s+with\s+(?:this\s+unit['’]s\s+)?|with\s+)([a-zA-Z\s'-]+?)(?:\s+scores|\s+weapons|\s+has|\s+is)/i);
+    if (weaponMatch && weaponMatch[1]) {
+      scope = weaponMatch[1].trim();
+    }
+    return { grantedAbility: 'Crit (Auto-wound)', weaponScope: scope };
+  }
+
+  // Regex fallback: "weapon has X", "weapons have X", "that weapon has X"
+  const regexMatch = effectLower.match(/(?:weapon\s+has|weapons\s+have|that\s+weapon\s+has)\s+([a-z0-9\s()+,-]+?)(?:\s+this\s+phase|\s+until|\s+for|\s+while|\.|\n|$)/i);
+  if (regexMatch && regexMatch[1] && !regexMatch[1].includes('instead') && regexMatch[1].trim().length < 30) {
+    const raw = regexMatch[1].trim();
+    const formatted = raw.charAt(0).toUpperCase() + raw.slice(1);
+    let scope: string | null = null;
+    if (effectLower.includes('ranged weapon') || effectLower.includes('ranged weapons')) scope = 'Ranged Weapons';
+    else if (effectLower.includes('melee weapon') || effectLower.includes('melee weapons')) scope = 'Melee Weapons';
+    return { grantedAbility: formatted, weaponScope: scope };
+  }
+
+  return null;
+}
+
+export interface AbilityChangeDetail {
+  targetAbility: string;
+  targetUnit?: string;
+  changeText: string;
+  fromValue?: string;
+  toValue?: string;
+}
+
+// Detects if an ability modifies or enhances another ability (e.g. Endless Swarm of Rats modifying Seething Swarm)
+export function detectAbilityChange(effectText: string): AbilityChangeDetail | null {
+  const effect = effectText || '';
+
+  // 1. Specific model return pattern:
+  // "When a friendly Clanrats unit uses its 'Seething Swarm' ability, you can return D6 slain models to that unit instead of D3."
+  const modelReturnMatch = effect.match(
+    /when\s+(?:a\s+friendly\s+([A-Za-z -]+?)\s+unit|this\s+unit|your\s+general)\s+uses\s+(?:its|their|the)\s+['"‘“]([^'"’”]+)['"’”]\s+ability,\s*(?:you\s+can\s+)?return\s+([A-Za-z0-9]+)\s+slain\s+models(?:\s+to\s+that\s+unit)?\s+instead\s+of\s+([A-Za-z0-9]+)/i
+  );
+  if (modelReturnMatch) {
+    const targetUnit = modelReturnMatch[1] ? modelReturnMatch[1].trim() : undefined;
+    const targetAbility = modelReturnMatch[2].trim();
+    const toVal = modelReturnMatch[3].trim();
+    const fromVal = modelReturnMatch[4].trim();
+    return {
+      targetAbility,
+      targetUnit,
+      changeText: `${toVal} slain models instead of ${fromVal}`,
+      fromValue: fromVal,
+      toValue: toVal
+    };
+  }
+
+  // 2. Generic "uses ... ability ... instead of ..." pattern:
+  const genericMatch = effect.match(
+    /(?:when|the\s+next\s+time)\s+(?:a\s+friendly\s+([A-Za-z -]+?)\s+unit|this\s+unit|your\s+general)\s+uses\s+(?:its|their|the)\s+['"‘“]([^'"’”]+)['"’”]\s+ability,\s*(?:you\s+can\s+)?(.+?)\s+instead\s+of\s+([^.]+)/i
+  );
+  if (genericMatch) {
+    const targetUnit = genericMatch[1] ? genericMatch[1].trim() : undefined;
+    const targetAbility = genericMatch[2].trim();
+    const toText = genericMatch[3].trim();
+    const fromText = genericMatch[4].trim();
+    return {
+      targetAbility,
+      targetUnit,
+      changeText: `${toText} instead of ${fromText}`,
+      fromValue: fromText,
+      toValue: toText
+    };
+  }
+
+  // 3. Simple fallback if quotes surround ability name and "instead of" exists
+  const fallbackMatch = effect.match(/['"‘“]([^'"’”]+)['"’”]\s+ability.+?(?:instead\s+of\s+([^.]+))/i);
+  if (fallbackMatch) {
+    return {
+      targetAbility: fallbackMatch[1].trim(),
+      changeText: `instead of ${fallbackMatch[2].trim()}`
+    };
+  }
+
+  return null;
+}
+
+// Helper to determine if an ability is active/available in a given player turn ('me' vs 'opponent')
+export function isAbilityActiveInTurn(ability: Ability, turn: 'me' | 'opponent', currentPhase?: string): boolean {
+  const timingLower = (ability.timing || '').toLowerCase();
+  
+  // If timing explicitly mentions "Enemy" or reaction to opponent
+  if (timingLower.includes('enemy') || timingLower.includes('reaction: opponent')) {
+    return turn === 'opponent';
+  }
+  
+  // If timing explicitly mentions "Your" or reaction to you
+  if (timingLower.includes('your') || timingLower.includes('reaction: you')) {
+    return turn === 'me';
+  }
+  
+  // If timing explicitly mentions "Any" (e.g. "Any Combat Phase", "Any Charge Phase", "End of Any Turn")
+  if (timingLower.includes('any')) {
+    return true;
+  }
+  
+  // Phase-specific defaults when timing doesn't explicitly state enemy/your/any:
+  const phase = ability.phase;
+  if (phase === 'combat') {
+    // In AoS, both players fight during the combat phase
+    return true;
+  }
+  if (phase === 'end' || phase === 'passive') {
+    return true;
+  }
+  
+  // For standard non-combat active phases (hero, movement, shooting, charge) without "Enemy" or "Any":
+  // Defaults to player's turn ("me")
+  return turn === 'me';
+}
+
+// Helper to look up active modifications that enhance or change a specific ability
+export function getActiveAbilityModifications(
+  gameState: GameState | null,
+  faction: Faction | null,
+  abilityName: string,
+  unitName?: string
+): { sourceAbilityName: string; changeText: string; fromValue?: string; toValue?: string; detail: AbilityChangeDetail }[] {
+  if (!gameState || !faction) return [];
+
+  const results: { sourceAbilityName: string; changeText: string; fromValue?: string; toValue?: string; detail: AbilityChangeDetail }[] = [];
+  const targetAbilityLower = abilityName.toLowerCase();
+  const unitNameLower = (unitName || '').toLowerCase();
+
+  // Collect candidate active abilities from traits, regiment abilities, and enhancements
+  const activeAbilities: Ability[] = [];
+
+  // 1. Battle traits
+  if (gameState.selectedBattleTraitId === 'all') {
+    activeAbilities.push(...(faction.battleTraits || []));
+  } else if (gameState.selectedBattleTraitId) {
+    const trait = (faction.battleTraits || []).find(t => t.id === gameState.selectedBattleTraitId);
+    if (trait) activeAbilities.push(trait);
+  }
+
+  // 2. Regiment abilities
+  if (gameState.selectedRegimentAbilityId === 'all') {
+    activeAbilities.push(...(faction.regimentAbilities || []));
+  } else if (gameState.selectedRegimentAbilityId) {
+    const reg = (faction.regimentAbilities || []).find(r => r.id === gameState.selectedRegimentAbilityId);
+    if (reg) activeAbilities.push(reg);
+  }
+
+  // 3. Enhancements
+  if (gameState.selectedEnhancementId) {
+    const enh = (faction.enhancements || []).find(e => e.id === gameState.selectedEnhancementId);
+    if (enh) activeAbilities.push(enh);
+  }
+
+  for (const ab of activeAbilities) {
+    const detail = detectAbilityChange(ab.effect);
+    if (detail && detail.targetAbility.toLowerCase() === targetAbilityLower) {
+      if (detail.targetUnit && unitNameLower && !unitNameLower.includes(detail.targetUnit.toLowerCase())) {
+        // Target unit constraint specified and doesn't match
+        continue;
+      }
+      results.push({
+        sourceAbilityName: ab.name,
+        changeText: detail.changeText,
+        fromValue: detail.fromValue,
+        toValue: detail.toValue,
+        detail
+      });
+    }
+  }
+
+  return results;
+}
+
+// Strips proximity / spatial condition clauses so reference units are not misclassified as targets
+export function stripProximityClauses(text: string): string {
+  if (!text) return '';
+  return text
+    // "while they are within 1" of any friendly Clanrats units"
+    // "while within 3" of any friendly ..."
+    // "while wholly within 12" of your general"
+    // "within 1" of any friendly Clanrats units"
+    // "wholly within 12" of your general"
+    // "within 6" of this unit"
+    .replace(/(?:while\s+(?:they\s+are\s+|this\s+unit\s+is\s+|your\s+general\s+is\s+)?(?:wholly\s+)?within|(?:wholly\s+)?within)\s+\d+["']?\s+(?:of|from)\s+(?:any\s+)?(?:friendly\s+|enemy\s+)?([a-zA-Z\s'-]+?)(?:\s+units?|\s+models?|\.|\,|$|\s+while)/gi, ' ')
+    // "within this unit's combat range" or "within your general's combat range"
+    .replace(/(?:within|wholly within)\s+(?:this\s+unit['’]s|your\s+general['’]s|[a-zA-Z\s'-]+?['’]s)\s+combat\s+range/gi, ' ');
+}
+
 // Shared Diagnostics Interface with Faction Customization assertions, Targeting & Stats
 export interface ParsedRuleResult {
-  allowedStats: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage' | 'charge')[];
+  allowedStats: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage' | 'charge' | 'control' | 'weapon_ability')[];
   requiredRoll: string | null;
   targetingType: 'self' | 'single_friendly' | 'multi_friendly' | 'global_passive' | 'enemy' | 'unknown';
   netEffects: string[];
@@ -434,12 +804,32 @@ export interface ParsedRuleResult {
   activationPhase: string;
   isDefensive: boolean;
 
+  // Turn and Timing features
+  activationTurn?: 'me' | 'opponent' | 'any';
+  timingDetail?: string;
+
   // New features requested
   targetSpecifications: string[];
-  statsWithModifiers: { stat: string; mod: string }[];
+  statsWithModifiers: { stat: string; mod: string; weaponScope?: string }[];
   isSpecialFactionRule: boolean;
   specialFactionRuleExplanation: string;
   isPermanent: boolean;
+
+  // Test Harness and Execution Flow integration
+  isTargetSelectableFromRoster: boolean;
+  targetSelectableReason: string;
+  isBuffSelectable: boolean;
+  buffSelectionOptions: string[];
+  isTabletopEffect: boolean;
+  tabletopEffectDetails: string | null;
+
+  // Weapon-specific features requested
+  requiresRangedWeapon?: boolean;
+  weaponScope?: string | null;
+  grantedWeaponAbilities?: string[];
+
+  // Ability modifying another ability
+  abilityChanges?: AbilityChangeDetail[];
 }
 
 export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameState?: GameState | null): ParsedRuleResult {
@@ -448,7 +838,15 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
   const nameLower = (ability.name || '').toLowerCase();
   const abId = (ability.id || '').toLowerCase();
 
-  let allowedStats: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage' | 'charge')[] = [];
+  let parentUnit: Unit | null = null;
+  if (faction && faction.units) {
+    parentUnit = faction.units.find(u => u.abilities.some(a => a.id === ability.id)) || null;
+  }
+
+  const weaponScopeResult = detectWeaponScope(effectLower, parentUnit, faction, effectText);
+  const weaponAbilityGrant = detectWeaponAbilityGrant(effectText);
+
+  let allowedStats: ('attacks' | 'save' | 'ward' | 'move' | 'hit' | 'wound' | 'rend' | 'damage' | 'charge' | 'control' | 'weapon_ability')[] = [];
   let requiredRoll: string | null = null;
   let targetingType: 'self' | 'single_friendly' | 'multi_friendly' | 'global_passive' | 'enemy' | 'unknown' = 'single_friendly';
   const netEffects: string[] = [];
@@ -462,6 +860,11 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     netEffects.push("Defensive Ward Buff: Grants target +1 to ward rolls during Combat/Shooting phases.");
     targetingType = 'single_friendly';
   } else {
+    if (weaponAbilityGrant) {
+      allowedStats.push('weapon_ability');
+      netEffects.push(`Weapon Ability Granted: Adds ${weaponAbilityGrant.grantedAbility} to ${weaponAbilityGrant.weaponScope || weaponScopeResult.scope || 'weapons'}.`);
+    }
+
     if (
       effectLower.includes('attacks characteristic') || 
       effectLower.includes('add 1 to the attacks') || 
@@ -470,7 +873,11 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
       effectLower.includes('attacks characteristic of')
     ) {
       allowedStats.push('attacks');
-      netEffects.push("Modifies weapon attacks characteristic by +1 (expires at end of active phase).");
+      if (effectLower.includes('2d6 instead of d6') || effectLower.includes('attacks characteristic of 2d6')) {
+        netEffects.push("Weapon Upgrade: Changes Attacks characteristic from D6 to 2D6.");
+      } else {
+        netEffects.push("Modifies weapon attacks characteristic (expires at end of active phase).");
+      }
     }
     if (
       effectLower.includes('save roll') || 
@@ -512,11 +919,14 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
       allowedStats.push('hit');
       netEffects.push("Improves weapon hit accuracy rolls by +1 (attacks hit on 1 value lower).");
     }
+    const strippedProceduralWounds = effectLower
+      .replace(/\(?\s*make\s+(?:a\s+)?wound\s+rolls?\s+(?:for\s+each\s+hit|for\s+each)?\s*\)?/gi, ' ')
+      .replace(/\(?\s*make\s+(?:a\s+)?wound\s+rolls?\s*\)?/gi, ' ');
     if (
-      effectLower.includes('wound roll') || 
-      effectLower.includes('wound rolls') || 
-      effectLower.includes('add 1 to wound') || 
-      effectLower.includes('add 1 to the wound')
+      strippedProceduralWounds.includes('wound roll') || 
+      strippedProceduralWounds.includes('wound rolls') || 
+      strippedProceduralWounds.includes('add 1 to wound') || 
+      strippedProceduralWounds.includes('add 1 to the wound')
     ) {
       allowedStats.push('wound');
       netEffects.push("Improves weapon wound strength rolls by +1.");
@@ -532,10 +942,22 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     if (
       effectLower.includes('damage characteristic') || 
       effectLower.includes('add 1 to damage') || 
-      effectLower.includes('add 1 to the damage')
+      effectLower.includes('add 1 to the damage') ||
+      effectLower.includes('damage characteristic to') ||
+      effectLower.includes('damage characteristic of')
     ) {
       allowedStats.push('damage');
-      netEffects.push("Increases weapon damage characteristic by +1.");
+      netEffects.push("Modifies weapon damage characteristic.");
+    }
+    if (
+      effectLower.includes('control score') || 
+      effectLower.includes('control scores') || 
+      effectLower.includes('control characteristic') ||
+      effectLower.includes('objective control') ||
+      effectLower.includes('add the roll to the target\'s control')
+    ) {
+      allowedStats.push('control');
+      netEffects.push("Modifies target unit's control score for contesting objectives.");
     }
   }
 
@@ -567,8 +989,8 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
                           /friendly\s+(?:[a-zA-Z-]+\s+){0,3}model/i.test(effectLower) ||
                           /friendly\s+(?:[a-zA-Z-]+\s+){0,3}models/i.test(effectLower);
 
-  const declaresEnemyUnit = /declare:\s*pick\s+an?\s+enemy\s+unit/i.test(effectLower) || 
-                            /declare:\s*pick\s+visible\s+enemy/i.test(effectLower) ||
+  const declaresEnemyUnit = /(?:declare:\s*)?(?:pick|select|choose|target)\s+(?:an?|1|any)?\s*(?:visible\s+)?enemy\s+(?:unit|model)/i.test(effectLower) || 
+                            /declare:\s*pick\s+(?:an?|1|any)?\s*(?:visible\s+)?enemy/i.test(effectLower) ||
                             /declare:\s*pick\s+\d+\s+enemy\s+unit/i.test(effectLower) ||
                             /pick\s+an?\s+enemy\s+unit\s+to\s+be\s+the\s+target/i.test(effectLower) ||
                             /pick\s+an?\s+enemy\s+unit\s+in\s+combat/i.test(effectLower);
@@ -607,7 +1029,7 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
   }
 
   // 4. Parse Influenced Stats WITH numerical modifier count
-  const statsWithModifiers: { stat: string; mod: string }[] = [];
+  const statsWithModifiers: { stat: string; mod: string; weaponScope?: string }[] = [];
   let influencedStats: string[] = [];
 
   const extractModifierValue = (statName: string, keywords: string[]): string | null => {
@@ -621,6 +1043,37 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
       }
     }
 
+    if (statName === 'Wounds') {
+      const strippedForWounds = effectLower
+        .replace(/\(?\s*make\s+(?:a\s+)?wound\s+rolls?\s+(?:for\s+each\s+hit|for\s+each)?\s*\)?/gi, ' ')
+        .replace(/\(?\s*make\s+(?:a\s+)?wound\s+rolls?\s*\)?/gi, ' ');
+      const hasRealWoundKeyword = keywords.some(kw => strippedForWounds.includes(kw));
+      if (!hasRealWoundKeyword) return null;
+    }
+
+    // Check for hard characteristic set / override (e.g. "set the Damage characteristic of its Warplock Musket to 3")
+    const setMatch = effectLower.match(/set\s+(?:the\s+)?(?:attacks|damage|save|rend|wound|hit|move|control)?\s*(?:characteristic)?.*?to\s+(\d+)/i) ||
+                     effectLower.match(/(?:attacks|damage|save|rend|wound|hit|move|control)\s+characteristic.*?to\s+(\d+)/i);
+    if (setMatch) {
+      return `=${setMatch[1]}`;
+    }
+
+    // Check for pure Ward value grant: "has Ward (4+)", "Ward (5+)", "Ward of 6+", "has a Ward of 5+"
+    if (statName === 'Ward') {
+      const wardSetMatch = effectLower.match(/ward\s*(?:\((\d+)\+\)|\s+of\s+(\d+)\+)/i) ||
+                           effectLower.match(/has\s+(?:a\s+)?ward\s*(?:\((\d+)\+\)|\s+of\s+(\d+)\+)/i);
+      if (wardSetMatch) {
+        const val = wardSetMatch[1] || wardSetMatch[2];
+        return `${val}+`;
+      }
+    }
+
+    if (effectLower.includes('2d6 instead of d6') || effectLower.includes('attacks characteristic of 2d6')) {
+      return "2D6";
+    }
+    if (effectLower.includes('add the roll to') || effectLower.includes('add the roll')) {
+      return "+Roll";
+    }
     if (effectLower.includes('double its move') || effectLower.includes('double its movement') || nameLower.includes('speed of hysh')) {
       return "Double";
     }
@@ -652,10 +1105,10 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     'Save': ['save roll', 'save characteristic', 'add 1 to save', 'add 1 to the save'],
     'Ward': ['ward roll', 'ward characteristic', 'add 1 to ward', 'add 1 to the ward', 'ward save', 'has a ward', 'ward (', 'ward of'],
     'Rend': ['rend characteristic', 'add 1 to rend', 'add 1 to the rend'],
-    'Damage': ['damage characteristic', 'add 1 to damage', 'add 1 to the damage'],
+    'Damage': ['damage characteristic', 'add 1 to damage', 'add 1 to the damage', 'damage characteristic to', 'damage characteristic of'],
     'Movement': ['move characteristic', 'movement characteristic', 'move characteristic of', 'double its move', 'move of', 'movement characteristic of'],
     'Charge': ['charge roll', 'charge rolls', 'add 1 to charge', 'charge characteristic', 're-roll charge'],
-    'Control': ['control characteristic', 'objective control', 'control value', 'control of', 'controlling that objective', 'control scores'],
+    'Control': ['control characteristic', 'objective control', 'control value', 'control of', 'controlling that objective', 'control score', 'control scores'],
     'Heal': ['heal', 'return slain', 'reanimate', 'restore', 'heal d3', 'heal 1'],
     'Mortal Wounds': ['mortal wound', 'mortal wounds'],
     'Strike-Last': ['strike-last', 'strike last'],
@@ -665,16 +1118,29 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
   Object.entries(statMapping).forEach(([statName, keywords]) => {
     const mod = extractModifierValue(statName, keywords);
     if (mod) {
-      statsWithModifiers.push({ stat: statName, mod });
+      const scope = ['Attacks', 'Damage', 'Rend', 'Hits', 'Wounds'].includes(statName) ? (weaponScopeResult.scope || undefined) : undefined;
+      statsWithModifiers.push({ stat: statName, mod, weaponScope: scope });
       influencedStats.push(statName);
     }
   });
+
+  if (weaponAbilityGrant) {
+    const scope = weaponAbilityGrant.weaponScope || weaponScopeResult.scope || undefined;
+    statsWithModifiers.push({
+      stat: 'Weapon Ability',
+      mod: `+${weaponAbilityGrant.grantedAbility}`,
+      weaponScope: scope
+    });
+    if (!influencedStats.includes('Weapon Ability')) {
+      influencedStats.push('Weapon Ability');
+    }
+  }
 
   // 5. Determine Applied Phase
   let appliedPhase: string = ability.phase;
 
   if (ability.phase === 'passive') {
-    if (influencedStats.some(s => ['Hits', 'Wounds', 'Attacks', 'Rend', 'Damage', 'Strike-Last', 'Strike-First'].includes(s))) {
+    if (influencedStats.some(s => ['Hits', 'Wounds', 'Attacks', 'Rend', 'Damage', 'Weapon Ability', 'Strike-Last', 'Strike-First'].includes(s))) {
       appliedPhase = 'Combat / Shooting Phases';
     } else if (influencedStats.some(s => ['Save', 'Ward'].includes(s))) {
       appliedPhase = 'Combat / Shooting (Defensive)';
@@ -684,7 +1150,7 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
       appliedPhase = 'Passive (Continuous)';
     }
   } else if (ability.phase === 'hero' || ability.phase === 'start' || (ability.phase as string) === 'any') {
-    if (influencedStats.some(s => ['Hits', 'Wounds', 'Attacks', 'Rend', 'Damage', 'Strike-Last', 'Strike-First'].includes(s))) {
+    if (influencedStats.some(s => ['Hits', 'Wounds', 'Attacks', 'Rend', 'Damage', 'Weapon Ability', 'Strike-Last', 'Strike-First'].includes(s))) {
       appliedPhase = 'Combat Phase';
     } else if (influencedStats.some(s => ['Save', 'Ward'].includes(s))) {
       appliedPhase = 'Combat / Shooting (Defensive)';
@@ -696,22 +1162,33 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
   // 6. Resolve Targeting specifications
   const targetSpecifications: string[] = [];
   const matchesSpecificUnits: string[] = [];
+  const strippedForTargeting = stripProximityClauses(effectLower);
 
   if (faction && faction.units) {
     faction.units.forEach(u => {
-      if (u.name && u.name.length > 4 && effectLower.includes(u.name.toLowerCase())) {
+      if (u.name && u.name.length > 4 && strippedForTargeting.includes(u.name.toLowerCase())) {
         matchesSpecificUnits.push(u.name);
       }
     });
   }
 
+  const declaresPickFriendly = 
+    /(?:declare:\s*)?(?:pick|select|choose|target)\s+(?:an?|1|any)?\s*(?:visible\s+)?friendly\s+(?:unit|model)/i.test(effectLower) ||
+    /declare:\s*pick\s+(?:a|1|any)?\s*friendly/i.test(effectLower) ||
+    /pick\s+(?:an?|1|any|visible)\s+(?:friendly\s+)?(?:[a-zA-Z-]+\s+){0,3}unit/i.test(effectLower) ||
+    /select\s+(?:an?|1|any|visible)\s+(?:friendly\s+)?(?:[a-zA-Z-]+\s+){0,3}unit/i.test(effectLower) ||
+    isTargetingSingularFriendlyUnit(effectLower);
+
   const targetsEnemy = 
+    /(?:declare:\s*)?(?:pick|select|choose|target)\s+(?:an?|1|any)?\s*(?:visible\s+)?enemy/i.test(effectLower) ||
+    declaresEnemyUnit ||
     /pick\s+(an|1|any|a|visible)\s+enemy/i.test(effectLower) ||
     /select\s+(an|1|any|a|visible)\s+enemy/i.test(effectLower) ||
     /choose\s+(an|1|any|a|visible)\s+enemy/i.test(effectLower);
 
   const targetsSelf = 
     !targetsEnemy &&
+    !declaresPickFriendly &&
     (targetingType === 'self' || 
     effectLower.includes('this unit') || 
     effectLower.includes('self') || 
@@ -781,8 +1258,9 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     targetSpecifications.push(`Self: [${resolvedParentName}]`);
   }
 
-  if (matchesSpecificUnits.length > 0) {
-    targetSpecifications.push(`Specific Unit(s): [${matchesSpecificUnits.join(', ')}]`);
+  const uniqueSpecificUnits = Array.from(new Set(matchesSpecificUnits));
+  if (uniqueSpecificUnits.length > 0) {
+    targetSpecifications.push(`Specific Unit(s): [${uniqueSpecificUnits.join(', ')}]`);
   }
 
   if (targetsHeroGeneral) {
@@ -797,8 +1275,23 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     targetSpecifications.push("Enemy Unit");
   }
 
+  const requiresRangedWeapon = 
+    effectLower.includes('pick a ranged weapon') || 
+    effectLower.includes('ranged weapon a friendly unit is armed with') ||
+    effectLower.includes('friendly unit armed with a ranged weapon') ||
+    effectLower.includes('ranged weapon is armed with') ||
+    effectLower.includes('friendly ranged unit');
+
+  if (requiresRangedWeapon) {
+    netEffects.push("Target Restriction: Requires a friendly unit armed with at least one ranged weapon.");
+  }
+
   if (targetsFriendlyUnitSingle && !targetsSelf && !targetsHeroGeneral) {
-    targetSpecifications.push("Friendly Unit");
+    if (requiresRangedWeapon) {
+      targetSpecifications.push("Friendly Unit with Ranged Weapon");
+    } else {
+      targetSpecifications.push("Friendly Unit");
+    }
   }
 
   if (targetsFriendlyUnitsPlural) {
@@ -808,6 +1301,8 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
   if (targetSpecifications.length === 0) {
     if (ability.phase === 'passive') {
       targetSpecifications.push("Passive / Global Aura");
+    } else if (requiresRangedWeapon) {
+      targetSpecifications.push("Friendly Unit with Ranged Weapon");
     } else {
       targetSpecifications.push("Friendly Unit");
     }
@@ -822,7 +1317,8 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
 
   const spatialKeywords = [
     'wholly within', 'while within', ' if ', 'unless', 'provided that', 'visible', 'if there are no',
-    'range of', 'in combat', 'not in combat', 'contesting', 'do not control', 'target a damaged unit'
+    'range of', 'in combat', 'not in combat', 'contesting', 'do not control', 'target a damaged unit',
+    'is damaged', 'while damaged', 'unit is damaged', 'while this unit is damaged'
   ];
   let hasSpatialOrConditionalCheck = 
     spatialKeywords.some(keyword => effectLower.includes(keyword)) ||
@@ -960,6 +1456,44 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
   let finalRollDiceCount = rollDiceCount;
   let finalRollDiceCheckText = rollDiceCheckText;
 
+  // Turn Scoping & Timing Details
+  let activationTurn: 'me' | 'opponent' | 'any' = 'any';
+  const timingLower = (ability.timing || '').toLowerCase();
+  if (timingLower.includes('enemy') || timingLower.includes('reaction: opponent')) {
+    activationTurn = 'opponent';
+    const phaseMatch = ability.timing?.match(/enemy\s+([a-zA-Z]+)\s+phase/i);
+    if (phaseMatch) {
+      finalActivationPhase = `Enemy ${phaseMatch[1].charAt(0).toUpperCase() + phaseMatch[1].slice(1).toLowerCase()} Phase`;
+    } else if (ability.phase && ability.phase !== 'passive') {
+      finalActivationPhase = `Enemy ${ability.phase.charAt(0).toUpperCase() + ability.phase.slice(1).toLowerCase()} Phase`;
+    }
+  } else if (timingLower.includes('your') || timingLower.includes('reaction: you')) {
+    activationTurn = 'me';
+  } else if (timingLower.includes('any')) {
+    activationTurn = 'any';
+  } else if (['hero', 'movement', 'shooting', 'charge'].includes(ability.phase)) {
+    activationTurn = 'me';
+  } else {
+    activationTurn = 'any';
+  }
+
+  // Detect Ability Change
+  const abilityChangeDetail = detectAbilityChange(ability.effect);
+  let abilityChanges: AbilityChangeDetail[] | undefined = undefined;
+  if (abilityChangeDetail) {
+    abilityChanges = [abilityChangeDetail];
+    if (!influencedStats.includes('Ability Change')) {
+      influencedStats.push('Ability Change');
+    }
+    if (!finalStatsWithModifiers.some(s => s.stat === 'Ability Change')) {
+      finalStatsWithModifiers.push({
+        stat: 'Ability Change',
+        mod: abilityChangeDetail.changeText,
+        weaponScope: abilityChangeDetail.targetAbility
+      });
+    }
+  }
+
   const isEyeOfTheGodsRule = nameLower.includes('eye of the gods') || abId.includes('eye-of-the-gods') || abId.includes('eyeofthegods');
 
   if (isEyeOfTheGodsRule) {
@@ -1076,6 +1610,61 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     finalTargetSpecifications = ["Enemy Unit"];
   }
 
+  if (abId === 'skryreconnections' || nameLower.includes('skryre connections') || nameLower.includes('skyrre connections')) {
+    finalStatsWithModifiers = [{ stat: 'Attacks', mod: '2D6', weaponScope: 'Ratling Pistol' }];
+    if (!influencedStats.includes('Attacks')) influencedStats.push('Attacks');
+    finalTargetSpecifications = ["General Only"];
+    netEffects.splice(0, netEffects.length, "Weapon Upgrade: Your general's Ratling Pistol has an Attacks characteristic of 2D6 instead of D6.");
+  }
+
+  if (abId === 'corneredrat' || nameLower.includes('cornered rat')) {
+    finalHasSpatialOrConditionalCheck = true;
+    finalConditionalCheckDescription = "Verify this unit is currently damaged before applying +3 attacks.";
+    finalStatsWithModifiers = [{ stat: 'Attacks', mod: '+3', weaponScope: 'Warpforged Halberd' }];
+    if (!influencedStats.includes('Attacks')) influencedStats.push('Attacks');
+  }
+
+  if (abId === 'moremorewarpenergy' || nameLower.includes('more-more warp energy')) {
+    finalStatsWithModifiers = [{ stat: 'Damage', mod: '=3', weaponScope: 'Warplock Musket' }];
+    if (!influencedStats.includes('Damage')) influencedStats.push('Damage');
+    if (!allowedStats.includes('damage')) allowedStats.push('damage');
+  }
+
+  if (abId === 'unleashedwarpfury' || nameLower.includes('unleashed warp-fury')) {
+    finalStatsWithModifiers = [{ stat: 'Attacks', mod: '+1', weaponScope: 'Melee Weapons' }];
+    if (!influencedStats.includes('Attacks')) influencedStats.push('Attacks');
+    if (!allowedStats.includes('attacks')) allowedStats.push('attacks');
+  }
+
+  if (abId === 'shockgauntlets' || nameLower === 'shock gauntlets' || nameLower.includes('shock gauntlets')) {
+    targetingType = 'self';
+    finalTargetSpecifications = parentUnit ? [`Self: [${parentUnit.name}]`] : ["Self: [Stormfiends]"];
+    allowedStats = ['weapon_ability'];
+    influencedStats = ['Weapon Ability'];
+    finalStatsWithModifiers = [{ stat: 'Weapon Ability', mod: '+Crit (D6 Hits)', weaponScope: 'Shock Gauntlets' }];
+  }
+
+  if (abId === 'warpstonelacedbullets' || nameLower.includes('warpstone-laced bullets')) {
+    targetingType = 'single_friendly';
+    finalTargetSpecifications = ["Friendly Unit with Ranged Weapon"];
+    allowedStats = ['weapon_ability'];
+    influencedStats = ['Weapon Ability'];
+    finalStatsWithModifiers = [{ stat: 'Weapon Ability', mod: '+Crit (Mortal)', weaponScope: 'Ranged Weapons' }];
+  }
+
+  if (abId === 'willofthehornedrat' || nameLower.includes('will of the horned rat')) {
+    targetingType = 'single_friendly';
+    finalTargetSpecifications = ["Friendly Unit"];
+    allowedStats = ['control'];
+    influencedStats = ['Control'];
+    finalStatsWithModifiers = [{ stat: 'Control', mod: '+Roll' }];
+  }
+
+  if (abId === 'wither' || nameLower === 'wither') {
+    targetingType = 'enemy';
+    finalTargetSpecifications = ["Enemy Unit"];
+  }
+
   const isPermanent = 
     effectLower.includes('for the rest of the battle') || 
     effectLower.includes('for the rest of the game') || 
@@ -1083,6 +1672,68 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     effectLower.includes('remainder of the battle') ||
     isEyeOfTheGodsRule ||
     isBloodRitesRule;
+
+  // 11. Determine Selectability & Tabletop effects
+  const isTargetEnemy = targetingType === 'enemy' || finalTargetSpecifications.some(t => t.toLowerCase().includes('enemy'));
+  const isTargetSelf = targetingType === 'self' || finalTargetSpecifications.some(t => t.startsWith('Self:'));
+  const isTargetMulti = targetingType === 'multi_friendly' || finalTargetSpecifications.some(t => t.includes('Multiple') || t.includes('Passive / Global Aura') || t.includes('All Friendly'));
+  const isFixedGeneral = finalTargetSpecifications.includes('General Only') || finalTargetSpecifications.includes('Hero / General Only');
+
+  let isTargetSelectableFromRoster = false;
+  let targetSelectableReason = "No (Non-roster or fixed target)";
+
+  if (isTargetEnemy) {
+    isTargetSelectableFromRoster = false;
+    targetSelectableReason = "No (Targets an enemy unit — resolved via tabletop play)";
+  } else if (isTargetSelf) {
+    isTargetSelectableFromRoster = false;
+    targetSelectableReason = "No (Targets Self — automatically applies to acting parent unit)";
+  } else if (isTargetMulti) {
+    isTargetSelectableFromRoster = false;
+    targetSelectableReason = "No (Applies army-wide to all friendly units)";
+  } else if (isFixedGeneral) {
+    isTargetSelectableFromRoster = false;
+    targetSelectableReason = "No (Fixed target: Hero/General only)";
+  } else if (targetingType === 'single_friendly' || finalTargetSpecifications.some(s => s.startsWith('Friendly Unit'))) {
+    isTargetSelectableFromRoster = true;
+    targetSelectableReason = (requiresRangedWeapon || finalTargetSpecifications.some(s => s.includes('Ranged Weapon')))
+      ? "Yes (Prompts user to select 1 valid friendly target armed with a ranged weapon from roster)"
+      : "Yes (Prompts user to select 1 valid friendly target from roster)";
+  }
+
+  // Influenced application stats selectability:
+  // If > 1 option, user must pick one. If 1 option, it is not selectable (auto-applied).
+  const isBuffSelectable = allowedStats.length > 1;
+  const buffSelectionOptions = isBuffSelectable 
+    ? allowedStats.map(s => {
+        if (s === 'move' && isRelentlessDiscipline) return '+2" Move';
+        if (s === 'ward' && isRelentlessDiscipline) return 'Ward (5+)';
+        if (s === 'weapon_ability') return 'Grant Weapon Ability';
+        return `Modify ${s.charAt(0).toUpperCase() + s.slice(1)}`;
+      })
+    : [];
+
+  const isTabletopEffect = isExternallyTracked || 
+    effectLower.includes('mortal damage') || 
+    effectLower.includes('mortal wound') || 
+    effectLower.includes('mortal wounds') || 
+    effectLower.includes('heal') || 
+    effectLower.includes('return slain') || 
+    effectLower.includes('set up') ||
+    effectLower.includes('teleport');
+
+  let tabletopEffectDetails: string | null = null;
+  if (isTabletopEffect) {
+    if (effectLower.includes('mortal damage') || effectLower.includes('mortal wound') || effectLower.includes('mortal wounds')) {
+      tabletopEffectDetails = "Mortal Damage / Tabletop Resolution";
+    } else if (effectLower.includes('heal') || effectLower.includes('return slain')) {
+      tabletopEffectDetails = "Heal / Return Slain Models";
+    } else if (effectLower.includes('set up') || effectLower.includes('reserve') || effectLower.includes('teleport')) {
+      tabletopEffectDetails = "Reserve / Board Deployment";
+    } else {
+      tabletopEffectDetails = "Tabletop Physical Interaction";
+    }
+  }
 
   return {
     allowedStats,
@@ -1108,7 +1759,113 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     statsWithModifiers: finalStatsWithModifiers,
     isSpecialFactionRule,
     specialFactionRuleExplanation,
-    isPermanent
+    isPermanent,
+    isTargetSelectableFromRoster,
+    targetSelectableReason,
+    isBuffSelectable,
+    buffSelectionOptions,
+    isTabletopEffect,
+    tabletopEffectDetails,
+    requiresRangedWeapon,
+    weaponScope: finalStatsWithModifiers.find(s => s.weaponScope)?.weaponScope || weaponScopeResult.scope,
+    grantedWeaponAbilities: weaponAbilityGrant ? [weaponAbilityGrant.grantedAbility] : undefined,
+    activationTurn,
+    timingDetail: ability.timing,
+    abilityChanges
   };
+}
+
+export interface FactionAnomaly {
+  abilityId: string;
+  abilityName: string;
+  category: 'trait' | 'regiment' | 'enhancement' | 'unit';
+  parentUnitName?: string;
+  issueType: 'targeting' | 'modifier' | 'dice_roll' | 'phase';
+  severity: 'warning' | 'info';
+  message: string;
+}
+
+export function scanFactionForAnomalies(faction: Faction): FactionAnomaly[] {
+  const anomalies: FactionAnomaly[] = [];
+  if (!faction) return anomalies;
+
+  const allAbilities: { ability: Ability; category: 'trait' | 'regiment' | 'enhancement' | 'unit'; parentUnitName?: string }[] = [];
+  
+  (faction.battleTraits || []).forEach(a => allAbilities.push({ ability: a, category: 'trait' }));
+  (faction.regimentAbilities || []).forEach(a => allAbilities.push({ ability: a, category: 'regiment' }));
+  (faction.enhancements || []).forEach(a => allAbilities.push({ ability: a, category: 'enhancement' }));
+  (faction.units || []).forEach(u => {
+    (u.abilities || []).forEach(a => allAbilities.push({ ability: a, category: 'unit', parentUnitName: u.name }));
+  });
+
+  allAbilities.forEach(({ ability, category, parentUnitName }) => {
+    const analysis = analyzeAbilityRule(ability, faction);
+    const effectLower = (ability.effect || '').toLowerCase();
+    
+    // Check 1: Dice roll mentioned but no DC parsed
+    const mentionsRoll = effectLower.includes('roll a dice') || effectLower.includes('roll a d6') || effectLower.includes('make a casting roll');
+    if (mentionsRoll && !analysis.requiredRoll && !analysis.rollDiceCheckText && !analysis.rollDiceCount) {
+      anomalies.push({
+        abilityId: ability.id,
+        abilityName: ability.name,
+        category,
+        parentUnitName,
+        issueType: 'dice_roll',
+        severity: 'warning',
+        message: `Mentions dice roll in rules text, but no specific threshold (e.g. 3+) was parsed.`
+      });
+    }
+
+    // Check 2: Potential stat modification mentioned but no stats captured
+    const mentionsStatChange = (
+      effectLower.includes('add 1 to') || 
+      effectLower.includes('add 2 to') || 
+      effectLower.includes('add 3') || 
+      effectLower.includes('subtract 1') || 
+      effectLower.includes('subtract 2') ||
+      effectLower.includes('set the ') ||
+      effectLower.includes('weapon has ') ||
+      effectLower.includes('weapons have ') ||
+      effectLower.includes('that weapon has ')
+    ) && (
+      effectLower.includes('save') || 
+      effectLower.includes('hit') || 
+      effectLower.includes('wound') || 
+      effectLower.includes('rend') || 
+      effectLower.includes('damage') || 
+      effectLower.includes('attacks') || 
+      effectLower.includes('move') || 
+      effectLower.includes('ward') ||
+      effectLower.includes('control') ||
+      effectLower.includes('crit') ||
+      effectLower.includes('anti-')
+    );
+    if (mentionsStatChange && analysis.statsWithModifiers.length === 0 && analysis.allowedStats.length === 0) {
+      anomalies.push({
+        abilityId: ability.id,
+        abilityName: ability.name,
+        category,
+        parentUnitName,
+        issueType: 'modifier',
+        severity: 'warning',
+        message: `Mentions numeric stat adjustment in text, but no active stat modifiers were parsed.`
+      });
+    }
+
+    // Check 3: Targeting ambiguity
+    if (analysis.targetingType === 'unknown' && (!analysis.targetSpecifications || analysis.targetSpecifications.length === 0)) {
+      anomalies.push({
+        abilityId: ability.id,
+        abilityName: ability.name,
+        category,
+        parentUnitName,
+        issueType: 'targeting',
+        severity: 'warning',
+        message: `Targeting type could not be confidently determined from rules text.`
+      });
+    }
+  });
+
+  return anomalies;
 }
 

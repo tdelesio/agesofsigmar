@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge';
 import { DEFAULT_FACTIONS } from '../data/default-factions';
 import { Faction, Ability, Unit } from '../types';
-import { analyzeAbilityRule, ParsedRuleResult, getActiveBloodRitesRound } from '@/lib/rules-engine';
+import { analyzeAbilityRule, ParsedRuleResult, getActiveBloodRitesRound, scanFactionForAnomalies, FactionAnomaly } from '@/lib/rules-engine';
 
 const mergeFactions = (defaults: Faction[], custom: Faction[]): Faction[] => {
   const map = new Map<string, Faction>();
@@ -324,6 +324,82 @@ export default function TestHarnessPage() {
 
           {selectedFactionId ? (
             <div className="space-y-4">
+              {/* Faction Rules Engine Audit & Anomaly Scanner */}
+              {activeFaction && (() => {
+                const anomalies = scanFactionForAnomalies(activeFaction);
+                if (anomalies.length > 0) {
+                  return (
+                    <div className="p-4 rounded-2xl border border-amber-500/40 bg-amber-500/[0.06] text-left space-y-3 shadow-lg shadow-amber-500/5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-5 w-5 text-amber-400 animate-pulse" />
+                          <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
+                            Faction Rules Engine Audit: {anomalies.length} Potential {anomalies.length === 1 ? 'Anomaly' : 'Anomalies'} / Unsure {anomalies.length === 1 ? 'Text' : 'Texts'} Detected
+                          </h4>
+                        </div>
+                        <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-black uppercase">
+                          Needs Review
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-gray-300 font-medium leading-relaxed">
+                        The rules engine detected potential ambiguities or unparsed mechanics in the following abilities. Click any item to filter and inspect:
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
+                        {anomalies.map((ano, aIdx) => (
+                          <div 
+                            key={aIdx}
+                            onClick={() => {
+                              setSearchQuery(ano.abilityName);
+                              const target = compiledAbilities.find(i => i.ability.id === ano.abilityId);
+                              if (target) {
+                                setSelectedAbilityForSimulation(target.ability);
+                              }
+                            }}
+                            className="p-2.5 rounded-xl border border-amber-500/20 bg-[#161b22] hover:border-amber-400/50 cursor-pointer transition-all flex flex-col gap-1 text-left"
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-xs font-black text-white hover:text-amber-400 truncate">
+                                {ano.abilityName}
+                              </span>
+                              <Badge className="text-[8px] font-black uppercase px-1.5 py-px shrink-0 bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                {ano.issueType}
+                              </Badge>
+                            </div>
+                            {ano.parentUnitName && (
+                              <span className="text-[9px] text-gray-400 font-bold">
+                                Unit: {ano.parentUnitName}
+                              </span>
+                            )}
+                            <p className="text-xxs text-gray-300 font-medium">
+                              {ano.message}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="p-3.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.04] text-left flex items-center justify-between shadow-sm">
+                      <div className="flex items-center gap-2.5">
+                        <ShieldCheck className="h-5 w-5 text-emerald-400 shrink-0" />
+                        <div>
+                          <h4 className="text-xs font-black uppercase tracking-wider text-emerald-400">
+                            Faction Rules Engine Audit: 100% Clean
+                          </h4>
+                          <p className="text-[10px] text-gray-300 font-medium">
+                            All {compiledAbilities.length} abilities across traits, regiments, enhancements, and units were analyzed with zero unparsed mechanics or targeting ambiguities.
+                          </p>
+                        </div>
+                      </div>
+                      <Badge className="bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 text-[9px] font-black uppercase shrink-0">
+                        Zero Anomalies
+                      </Badge>
+                    </div>
+                  );
+                }
+              })()}
+
               {/* Tab Selector bar */}
               <div className="flex border-b border-[#21262d] gap-2 overflow-x-auto pb-px">
                 {(['all', 'traits', 'regiment', 'enhancements', 'units'] as const).map(tab => (
@@ -402,6 +478,16 @@ export default function TestHarnessPage() {
                           </div>
 
                           <div className="flex flex-wrap items-center gap-1.5">
+                            {analysis.activationTurn === 'opponent' && (
+                              <Badge className="bg-red-500/20 text-red-300 border border-red-500/40 text-[8px] font-black tracking-wider uppercase px-2 py-0.5 animate-pulse">
+                                ⚔️ OPPONENT TURN
+                              </Badge>
+                            )}
+                            {analysis.activationTurn === 'me' && (
+                              <Badge className="bg-blue-500/20 text-blue-300 border border-blue-500/40 text-[8px] font-black tracking-wider uppercase px-2 py-0.5">
+                                YOUR TURN
+                              </Badge>
+                            )}
                             <Badge className="bg-[#21262d] text-gray-400 text-[8px] font-black tracking-wider uppercase px-1.5 py-px">
                               {ab.once.toUpperCase()}
                             </Badge>
@@ -426,7 +512,17 @@ export default function TestHarnessPage() {
                               <Hourglass className="h-4.5 w-4.5 text-amber-400 shrink-0" />
                               <div className="space-y-0.5">
                                 <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider block">Activation Phase</span>
-                                <span className="text-xs font-black text-white uppercase tracking-tight">{analysis.activationPhase}</span>
+                                <span className="text-xs font-black text-white uppercase tracking-tight flex items-center gap-1.5">
+                                  {analysis.activationPhase}
+                                  {analysis.activationTurn === 'opponent' && (
+                                    <span className="text-[9px] text-red-400 font-bold">(Opponent's Turn)</span>
+                                  )}
+                                </span>
+                                {ab.timing && (
+                                  <span className="text-[9px] text-amber-400/80 font-medium block">
+                                    Timing: {ab.timing}
+                                  </span>
+                                )}
                               </div>
                             </div>
 
@@ -439,10 +535,33 @@ export default function TestHarnessPage() {
                             </div>
                           </div>
 
-                          {/* 4. Target Section (New Section under phases as requested) */}
+                          {/* 4. Spatial Check */}
                           <div className="p-4 rounded-xl border border-[#21262d] bg-[#0d1117]/30 text-left border-t space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-[9px] font-black uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                                <Compass className="h-3.5 w-3.5 shrink-0 text-purple-400" /> Spatial Check
+                              </h4>
+                              {analysis.hasSpatialOrConditionalCheck ? (
+                                <Badge className="bg-purple-500/15 text-purple-300 border border-purple-500/30 text-[9px] font-black uppercase">
+                                  Required
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-[#21262d] text-gray-400 border border-[#30363d] text-[9px] font-black uppercase">
+                                  None
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs font-semibold text-gray-300 leading-relaxed">
+                              {analysis.hasSpatialOrConditionalCheck 
+                                ? analysis.conditionalCheckDescription 
+                                : 'No spatial distance or conditional board requirements.'}
+                            </p>
+                          </div>
+
+                          {/* 5. Target Specification */}
+                          <div className="p-4 rounded-xl border border-[#21262d] bg-[#0d1117]/30 text-left border-t space-y-3">
                             <h4 className="text-[9px] font-black uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-                              <TargetIcon className="h-3.5 w-3.5 shrink-0 text-amber-500 animate-pulse" /> Target Specification
+                              <TargetIcon className="h-3.5 w-3.5 shrink-0 text-amber-500" /> Target Specification
                             </h4>
                             <div className="flex flex-wrap gap-2">
                               {analysis.targetSpecifications.map((spec, sIdx) => {
@@ -460,16 +579,78 @@ export default function TestHarnessPage() {
                                 );
                               })}
                             </div>
+                            <div className="pt-2 border-t border-[#21262d]/60 flex flex-col md:flex-row md:items-center justify-between gap-2 text-xxs font-medium">
+                              <span className="text-gray-400 font-bold uppercase tracking-wider">
+                                Selectable from Roster (Prompts Target Selection):
+                              </span>
+                              <div className="flex items-center gap-2">
+                                {analysis.isTargetSelectableFromRoster ? (
+                                  <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase">
+                                    Yes (Prompts Unit Selection)
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-[#21262d] text-gray-400 border border-[#30363d] text-[9px] font-black uppercase">
+                                    {analysis.targetSelectableReason}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
                           </div>
 
-                          {/* 5. Influenced Stats Section (Now with Modifier Value count!) */}
-                          {analysis.statsWithModifiers.length > 0 && (
-                            <div className="space-y-1.5 text-left border-t border-[#21262d]/40 pt-4">
-                              <h4 className="text-[9px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
-                                <BarChart3 className="h-3 w-3 text-emerald-500" /> Influenced Application Stats
+                          {/* 6. Dice Roll Check */}
+                          <div className="p-4 rounded-xl border border-[#21262d] bg-[#0d1117]/30 text-left border-t space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-[9px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                                <Dice5 className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> Dice Roll Check
                               </h4>
-                              <div className="flex flex-wrap gap-1.5">
-                                {analysis.statsWithModifiers.map((item, mIdx) => {
+                              {analysis.requiredRoll ? (
+                                <Badge className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase px-3 py-1 shadow-sm">
+                                  Roll: {analysis.requiredRoll}
+                                </Badge>
+                              ) : analysis.rollDiceCount ? (
+                                <Badge className="bg-indigo-600 text-white font-extrabold text-xs uppercase px-3 py-1 shadow-sm">
+                                  Roll: {analysis.rollDiceCount}D6
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-[#21262d] text-gray-400 border border-[#30363d] text-[9px] font-black uppercase">
+                                  None
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs font-semibold text-gray-300 leading-relaxed">
+                              {analysis.requiredRoll 
+                                ? `Requires a physical D6 roll of ${analysis.requiredRoll} to succeed before effects apply.`
+                                : analysis.rollDiceCount 
+                                  ? analysis.rollDiceCheckText 
+                                  : 'No dice check required (deterministic execution).'}
+                            </p>
+                          </div>
+
+                          {/* 7. Influenced Application Stats */}
+                          <div className="p-4 rounded-xl border border-[#21262d] bg-[#0d1117]/30 text-left border-t space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-[9px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                                <BarChart3 className="h-3.5 w-3.5 text-emerald-500" /> Influenced Application Stats
+                              </h4>
+                              {analysis.isBuffSelectable ? (
+                                <Badge className="bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[9px] font-black uppercase">
+                                  Selectable (User Picks 1 of {analysis.allowedStats.length})
+                                </Badge>
+                              ) : analysis.statsWithModifiers.length > 0 || analysis.allowedStats.length === 1 ? (
+                                <Badge className="bg-blue-500/15 text-blue-400 border border-blue-500/30 text-[9px] font-black uppercase">
+                                  Not Selectable (Auto-Applied)
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-[#21262d] text-gray-400 border border-[#30363d] text-[9px] font-black uppercase">
+                                  None
+                                </Badge>
+                              )}
+                            </div>
+
+                            {/* Stat Modifiers Badges */}
+                            <div className="flex flex-wrap gap-1.5">
+                              {analysis.statsWithModifiers.length > 0 ? (
+                                analysis.statsWithModifiers.map((item, mIdx) => {
                                   const isRedBadge = item.mod.startsWith('-');
                                   return (
                                     <Badge 
@@ -479,18 +660,64 @@ export default function TestHarnessPage() {
                                           ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
                                           : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}
                                     >
-                                      ★ {item.stat} ({item.mod})
+                                      ★ {item.stat} ({item.mod}){item.weaponScope ? ` [${item.weaponScope}]` : ''}
                                     </Badge>
                                   );
-                                })}
-                              </div>
+                                })
+                              ) : (
+                                <span className="text-xxs text-gray-400 font-medium">No numerical stat values modified directly.</span>
+                              )}
                             </div>
-                          )}
 
-                          {/* 6. Ability Diagnostics Checklist (Stripped of targeting filters as requested) */}
+                            {/* Ability Modification details */}
+                            {analysis.abilityChanges && analysis.abilityChanges.length > 0 && (
+                              <div className="p-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04] space-y-1">
+                                <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400 block">
+                                  ⚡ Ability Modification:
+                                </span>
+                                {analysis.abilityChanges.map((change, cIdx) => (
+                                  <div key={cIdx} className="text-xxs text-emerald-300 font-semibold">
+                                    Modifies <strong className="text-white underline">{change.targetAbility}</strong>
+                                    {change.targetUnit ? ` on ${change.targetUnit}` : ''}: <span className="text-emerald-400 font-bold">{change.changeText}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Selectable Options in App */}
+                            {analysis.isBuffSelectable && analysis.buffSelectionOptions.length > 0 && (
+                              <div className="p-2.5 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] space-y-1">
+                                <span className="text-[9px] font-black uppercase tracking-wider text-amber-400 block">
+                                  Selectable Buff Options in App:
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {analysis.buffSelectionOptions.map((opt, oIdx) => (
+                                    <Badge key={oIdx} className="bg-[#1c2230] text-amber-300 border border-[#2c3548] text-xxs font-bold">
+                                      {opt}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Tabletop Effect */}
+                            <div className="pt-2 border-t border-[#21262d]/60 flex flex-col md:flex-row md:items-center justify-between gap-1 text-xxs font-medium">
+                              <span className="text-gray-400 font-bold uppercase tracking-wider">Tabletop Effect:</span>
+                              {analysis.isTabletopEffect ? (
+                                <Badge className="bg-pink-500/10 text-pink-400 border border-pink-500/20 text-[9px] font-black uppercase">
+                                  {analysis.tabletopEffectDetails || 'Tabletop Physical Interaction'}
+                                  {analysis.externalTrackedKeywords.length > 0 ? ` [${analysis.externalTrackedKeywords.join(', ')}]` : ''}
+                                </Badge>
+                              ) : (
+                                <span className="text-gray-500">None</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 8. Ability Diagnostics Checklist */}
                           <div className="border border-[#21262d] rounded-xl p-4 bg-[#0d1117]/40 space-y-2.5 text-left border-t pt-4">
                             <h4 className="text-[9px] font-black uppercase tracking-wider text-amber-500 flex items-center gap-1">
-                              <Compass className="h-3 w-3" /> Ability Diagnostics Checklist
+                              <ShieldCheck className="h-3 w-3" /> Ability Diagnostics Checklist
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xxs font-semibold">
                               
@@ -520,45 +747,6 @@ export default function TestHarnessPage() {
                                 </Badge>
                                 <span className={analysis.isDefensive ? 'text-teal-300 font-bold' : 'text-gray-500'}>
                                   {analysis.isDefensive ? '🛡️ Asserted Defensive / Protective Ability' : 'Standard Offensive / Tactical action (non-defensive)'}
-                                </span>
-                              </div>
-
-                              {/* Spatial Check */}
-                              <div className="flex items-center gap-2 p-1.5 rounded-lg border border-[#222834] bg-[#161b22] col-span-1 md:col-span-2">
-                                <Badge className={`h-4.5 min-w-4.5 rounded-full flex items-center justify-center p-0 font-bold
-                                  ${analysis.hasSpatialOrConditionalCheck ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-gray-800 text-gray-500'}`}>
-                                  {analysis.hasSpatialOrConditionalCheck ? '✓' : '—'}
-                                </Badge>
-                                <span className={analysis.hasSpatialOrConditionalCheck ? 'text-gray-200' : 'text-gray-500'}>
-                                  {analysis.hasSpatialOrConditionalCheck 
-                                    ? `Spatial Check: ${analysis.conditionalCheckDescription}` 
-                                    : 'Spatial Check: None'}
-                                </span>
-                              </div>
-
-                              {/* Table Top Effect */}
-                              <div className="flex items-center gap-2 p-1.5 rounded-lg border border-[#222834] bg-[#161b22] col-span-1 md:col-span-2">
-                                <Badge className={`h-4.5 min-w-4.5 rounded-full flex items-center justify-center p-0 font-bold
-                                  ${analysis.isExternallyTracked ? 'bg-pink-500/10 text-pink-400 border border-pink-500/20' : 'bg-gray-800 text-gray-500'}`}>
-                                  {analysis.isExternallyTracked ? '✓' : '—'}
-                                </Badge>
-                                <span className={analysis.isExternallyTracked ? 'text-gray-200' : 'text-gray-500'}>
-                                  {analysis.isExternallyTracked 
-                                    ? `Table Top Effect: [${analysis.externalTrackedKeywords.join(', ')}]` 
-                                    : 'Table Top Effect: None'}
-                                </span>
-                              </div>
-
-                              {/* Roll Dice count check */}
-                              <div className="flex items-center gap-2 p-1.5 rounded-lg border border-[#222834] bg-[#161b22] col-span-1 md:col-span-2">
-                                <Badge className={`h-4.5 min-w-4.5 rounded-full flex items-center justify-center p-0 font-bold
-                                  ${analysis.rollDiceCount ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-gray-800 text-gray-500'}`}>
-                                  {analysis.rollDiceCount ? '✓' : '—'}
-                                </Badge>
-                                <span className={analysis.rollDiceCount ? 'text-gray-200 animate-pulse' : 'text-gray-500'}>
-                                  {analysis.rollDiceCount 
-                                    ? `Dice Check Challenge: ${analysis.rollDiceCheckText}` 
-                                    : 'No dice roll comparisons parsed'}
                                 </span>
                               </div>
 
@@ -602,7 +790,7 @@ export default function TestHarnessPage() {
                             )}
                           </div>
 
-                          {/* 8. Programmed Net Effect Section (Last) */}
+                          {/* 9. Programmed Net Effect Section (Last) */}
                           <div className="space-y-1.5 text-left border-t border-[#21262d]/40 pt-4">
                             <h4 className="text-[9px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1">
                               <Terminal className="h-3 w-3 text-amber-500" /> Programmed Net Effect
@@ -794,10 +982,25 @@ export default function TestHarnessPage() {
                                   ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
                                   : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}
                             >
-                              ★ {item.stat} ({item.mod})
+                              ★ {item.stat} ({item.mod}){item.weaponScope ? ` [${item.weaponScope}]` : ''}
                             </Badge>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Ability Modification details */}
+                    {analysis.abilityChanges && analysis.abilityChanges.length > 0 && (
+                      <div className="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] space-y-1 text-left">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400 block">
+                          ⚡ Ability Modification:
+                        </span>
+                        {analysis.abilityChanges.map((change, cIdx) => (
+                          <div key={cIdx} className="text-xxs text-emerald-300 font-semibold">
+                            Modifies <strong className="text-white underline">{change.targetAbility}</strong>
+                            {change.targetUnit ? ` on ${change.targetUnit}` : ''}: <span className="text-emerald-400 font-bold">{change.changeText}</span>
+                          </div>
+                        ))}
                       </div>
                     )}
 

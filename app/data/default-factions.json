@@ -138,7 +138,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "fleshHounds2",
@@ -171,7 +172,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "clawsOfKaranak",
@@ -204,7 +206,8 @@
             "timing": "Any Combat Phase",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       }
     ],
     "isTested": false
@@ -704,7 +707,8 @@
             "timing": "Once Per Turn, Reaction: You used a command",
             "once": "once-per-turn"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "freeguildSteelhelms1",
@@ -736,7 +740,8 @@
             "timing": "Once Per Turn, Any Combat Phase",
             "once": "once-per-turn"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "freeguildSteelhelms2",
@@ -768,7 +773,8 @@
             "timing": "Once Per Turn, Any Combat Phase",
             "once": "once-per-turn"
           }
-        ]
+        ],
+        "isReinforcement": true
       }
     ]
   },
@@ -959,7 +965,8 @@
             "timing": "Once Per Turn (Army), Your Shooting Phase",
             "once": "once-per-turn"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "freeguildFusiliers2",
@@ -1008,7 +1015,8 @@
             "timing": "Once Per Turn (Army), Your Shooting Phase",
             "once": "once-per-turn"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "wildercorpsHunters",
@@ -1211,7 +1219,8 @@
             "timing": "Your Movement Phase",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "freeguildSteelhelms2",
@@ -1243,7 +1252,8 @@
             "timing": "Your Movement Phase",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "freeguildCavaliers",
@@ -1286,7 +1296,8 @@
             "timing": "Any Charge Phase",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "ironweldGreatCannon",
@@ -1336,7 +1347,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       }
     ]
   },
@@ -1627,7 +1639,8 @@
             "once": "none"
           }
         ],
-        "models": 5
+        "models": 5,
+        "isReinforcement": true
       },
       {
         "id": "unit-1785201284959",
@@ -1660,7 +1673,8 @@
             "once": "none"
           }
         ],
-        "models": 5
+        "models": 5,
+        "isReinforcement": true
       }
     ],
     "isTested": true
@@ -2156,7 +2170,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "tzaangors2",
@@ -2188,7 +2203,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "kairicAcolytes",
@@ -2229,7 +2245,8 @@
             "timing": "Your Shooting Phase",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       }
     ]
   },
@@ -2630,7 +2647,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "morbhegKnights",
@@ -4007,7 +4025,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "slaangorFiendbloods",
@@ -4048,7 +4067,8 @@
             "timing": "Enemy Shooting Phase",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "blissbarbArchers1",
@@ -4089,7 +4109,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "blissbarbArchers2",
@@ -4130,7 +4151,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       }
     ]
   },
@@ -4303,7 +4325,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "daemonettes2",
@@ -4335,7 +4358,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "seekers",
@@ -4522,7 +4546,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "tormentorBombard",
@@ -4613,7 +4638,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "infernalCohort2",
@@ -4654,7 +4680,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       }
     ]
   },
@@ -4884,7 +4911,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "namartiThralls1",
@@ -4917,7 +4945,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "namartiThralls2",
@@ -4950,7 +4979,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       }
     ]
   },
@@ -5199,7 +5229,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       }
     ]
   },
@@ -5491,7 +5522,8 @@
             "timing": "Enemy Movement Phase",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       }
     ]
   },
@@ -5681,7 +5713,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "arkanautCompany2",
@@ -5760,7 +5793,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "skywardens",
@@ -5821,7 +5855,8 @@
             "timing": "End of Any Turn",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "arkanautFrigate",
@@ -6146,7 +6181,8 @@
             "timing": "Any Combat Phase",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       }
     ],
     "isTested": true
@@ -6364,7 +6400,8 @@
             "timing": "Your Shooting Phase",
             "once": "once-per-turn"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "vanariAuralanSentinels2",
@@ -6406,7 +6443,8 @@
             "timing": "Your Shooting Phase",
             "once": "once-per-turn"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "vanariAuralanWardens",
@@ -6439,7 +6477,8 @@
             "timing": "Once Per Battle, Any Combat Phase",
             "once": "once-per-battle"
           }
-        ]
+        ],
+        "isReinforcement": true
       }
     ],
     "isTested": true
@@ -7595,7 +7634,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "chainrasps2",
@@ -7628,7 +7668,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       }
     ]
   },
@@ -8683,7 +8724,8 @@
             "timing": "End of Any Turn",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "ironguts1",
@@ -9286,7 +9328,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "brutes",
@@ -10384,7 +10427,8 @@
             "timing": "Any Combat Phase",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       }
     ]
   },
@@ -10622,7 +10666,7 @@
         "id": "theLurkingVermintide",
         "name": "The Lurking Vermintide",
         "effect": "Declare: Pick a friendly unit that has not been deployed to be the target.\n\nEffect: The target unit is set up in reserve in the tunnels below. Units in the tunnels below that have not used the 'Gnawhole Ambush' ability by the end of the third battle round are destroyed.",
-        "phase": "start",
+        "phase": "deployment",
         "timing": "Once Per Battle, Deployment Phase",
         "once": "once-per-battle"
       },
@@ -10631,7 +10675,7 @@
         "name": "Gnawhole Ambush",
         "effect": "Declare: Pick a friendly unit that is in the tunnels below to use this ability.\n\nEffect: Set up that unit wholly within 6\" of a corner of the battlefield and more than 9\" from all enemy units.",
         "phase": "movement",
-        "timing": "Your Movement Phase",
+        "timing": "Once Per Battle, Your Movement Phase",
         "once": "none"
       }
     ],
@@ -10648,7 +10692,7 @@
         "id": "tooQuickToHitHit",
         "name": "Too Quick to Hit-Hit",
         "effect": "No mortal damage is inflicted on friendly units when they use Retreat abilities.",
-        "phase": "passive",
+        "phase": "movement",
         "timing": "Passive",
         "once": "none"
       }
@@ -10852,7 +10896,8 @@
             "timing": "End of Any Turn",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "clanrats2",
@@ -10884,11 +10929,13 @@
             "timing": "End of Any Turn",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "ratOgors",
         "name": "Rat Ogors",
+        "notes": "This unit has 2 Rat Ogors armed with Claws, Blades and Fangs, and 1 Rat Ogor armed with a Warpfire Gun and Claws, Blades and Fangs.",
         "move": 6,
         "control": 1,
         "health": 4,
@@ -10928,7 +10975,8 @@
           }
         ]
       }
-    ]
+    ],
+    "isTested": true
   },
   {
     "id": "skaven-warpspark-clawpack",
@@ -11040,6 +11088,7 @@
       {
         "id": "stormfiends",
         "name": "Stormfiends",
+        "notes": "This unit has 1 Stormfiend armed with Shock Gauntlets, 1 Stormfiend armed with Windlaunchers and Clubbing Blows, and 1 Stormfiend armed with Ratling Cannons and Clubbing Blows.",
         "move": 6,
         "control": 2,
         "health": 6,
@@ -11073,7 +11122,8 @@
             "hit": 4,
             "wound": 2,
             "rend": 1,
-            "damage": "2"
+            "damage": "2",
+            "abilities": "Crit (D6 Hits)"
           },
           {
             "name": "Clubbing Blows",
@@ -11168,7 +11218,8 @@
             "timing": "End of Any Turn",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "clanratsWarpspark2",
@@ -11200,9 +11251,11 @@
             "timing": "End of Any Turn",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       }
-    ]
+    ],
+    "isTested": true
   },
   {
     "id": "slaves-to-darkness-bloodwind-legion",
@@ -11906,7 +11959,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       },
       {
         "id": "mancrusherGargant2",
@@ -11973,7 +12027,8 @@
             "timing": "Passive",
             "once": "none"
           }
-        ]
+        ],
+        "isReinforcement": true
       }
     ]
   },
@@ -12996,7 +13051,8 @@
             "once": "none"
           }
         ],
-        "models": 3
+        "models": 3,
+        "isReinforcement": true
       },
       {
         "id": "liberators",
@@ -13039,7 +13095,8 @@
             "once": "none"
           }
         ],
-        "models": 5
+        "models": 5,
+        "isReinforcement": true
       }
     ]
   },
@@ -13281,7 +13338,8 @@
             "once": "none"
           }
         ],
-        "models": 5
+        "models": 5,
+        "isReinforcement": true
       }
     ],
     "isTested": true
