@@ -11,17 +11,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing factions array' }, { status: 400 });
     }
 
-    // Only write in development environment to avoid crashing on read-only serverless file systems like Vercel
-    if (process.env.NODE_ENV !== 'development') {
+    // Only skip disk write if in a read-only serverless environment like Vercel
+    if (process.env.VERCEL) {
       return NextResponse.json({
         success: true,
         warning: 'ReadOnlyEnvironment',
-        message: 'Saved changes in-browser memory. Local disk write-back skipped (Server is running in production mode).'
+        message: 'Saved changes in-browser memory. Local disk write-back skipped (Server is running on serverless Vercel).'
       });
     }
 
     const filePath = path.join(process.cwd(), 'app', 'data', 'default-factions.json');
-    fs.writeFileSync(filePath, JSON.stringify(factions, null, 2), 'utf-8');
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(factions, null, 2), 'utf-8');
+    } catch (fsErr: any) {
+      if (fsErr.code === 'EROFS') {
+        return NextResponse.json({
+          success: true,
+          warning: 'ReadOnlyEnvironment',
+          message: 'Saved changes in-browser memory. Local disk write-back skipped (File system is read-only).'
+        });
+      }
+      throw fsErr;
+    }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

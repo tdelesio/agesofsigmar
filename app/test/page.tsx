@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DEFAULT_FACTIONS } from '../data/default-factions';
+import { DEFAULT_FACTIONS, mergeFactions } from '../data/default-factions';
 import { Faction, Unit, GamePhase, Ability } from '../types';
 
 interface UATAssertion {
@@ -41,12 +41,6 @@ const getPhaseLabel = (phase: string) => {
   }
 };
 
-const mergeFactions = (defaults: Faction[], custom: Faction[]): Faction[] => {
-  const map = new Map<string, Faction>();
-  defaults.forEach(f => map.set(f.id, f));
-  custom.forEach(f => map.set(f.id, f));
-  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-};
 
 export default function TestPage() {
   const router = useRouter();

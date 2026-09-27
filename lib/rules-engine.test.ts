@@ -12,6 +12,7 @@ import {
   getActiveAbilityModifications
 } from './rules-engine';
 import { GameState, Faction, Ability } from '@/app/types';
+import { mergeFactions, DEFAULT_FACTIONS } from '../app/data/default-factions';
 
 describe('AoS Companion Rules Engine', () => {
 
@@ -1251,6 +1252,214 @@ describe('AoS Companion Rules Engine', () => {
 
       const khorne = factions.find((f: any) => f.id === 'blades-of-khorne-fangs-of-the-blood-god');
       expect(khorne.units.find((u: any) => u.id === 'karanak').isReinforcement).toBeFalsy();
+    });
+  });
+
+  describe('Sylvaneth Rules Audits: Regrowth & Gnarled Warrior', () => {
+    const filePath = path.resolve(__dirname, '../app/data/default-factions.json');
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const factions = data.factions || data;
+    const sylvaneth = factions.find((f: any) => f.id === 'sylvaneth');
+
+    test('Regrowth parses as Heal (D6), not Heal 1 or Heal +1', () => {
+      const regrowth = sylvaneth.enhancements.find((e: any) => e.id === 'regrowth');
+      expect(regrowth).toBeDefined();
+
+      const analysis = analyzeAbilityRule(regrowth, sylvaneth);
+      expect(analysis.allowedStats).toEqual([]);
+      expect(analysis.statsWithModifiers).toContainEqual({ stat: 'Heal', mod: 'D6' });
+      expect(analysis.statsWithModifiers.find((m: any) => m.stat === 'Heal')?.mod).toBe('D6');
+      expect(analysis.netEffects.some((e: string) => e.toLowerCase().includes('heal') && e.includes('(D6)'))).toBe(true);
+    });
+
+    test('Gnarled Warrior is a tabletop effect ignoring save modifiers, NOT a +1 save characteristic modifier', () => {
+      const gnarledWarrior = sylvaneth.enhancements.find((e: any) => e.id === 'gnarledWarrior');
+      expect(gnarledWarrior).toBeDefined();
+
+      const analysis = analyzeAbilityRule(gnarledWarrior, sylvaneth);
+      // Must not grant +1 Save or put save into allowedStats
+      expect(analysis.allowedStats).not.toContain('save');
+      expect(analysis.statsWithModifiers.some((m: any) => m.stat === 'Save')).toBe(false);
+      expect(analysis.isTabletopEffect).toBe(true);
+      expect(analysis.tabletopEffectDetails).toBe('Ignore Save Modifiers');
+      expect(analysis.netEffects.some((e: string) => e.toLowerCase().includes('ignores negative modifiers to save'))).toBe(true);
+    });
+
+    test('Gnarled Warrior strips negative save modifiers in getActiveModifiers', () => {
+      const mockBranchwych = sylvaneth.units.find((u: any) => u.id === 'branchwych');
+      expect(mockBranchwych).toBeDefined();
+
+      const mockGameState = {
+        round: 1,
+        currentPhase: 'combat',
+        selectedEnhancementId: 'gnarledWarrior',
+        units: [
+          {
+            id: mockBranchwych.id,
+            unitId: mockBranchwych.id,
+            isSlain: false
+          }
+        ],
+        appliedModifiers: [
+          { unitId: mockBranchwych.id, stat: 'save', modifier: -1, label: 'Rend / Save Debuff' },
+          { unitId: mockBranchwych.id, stat: 'save', modifier: 1, label: 'All-out Defence' }
+        ]
+      } as any;
+
+      const mods = getActiveModifiers(mockGameState, sylvaneth, 'save', mockBranchwych.id);
+      // The negative modifier should be stripped/ignored by Gnarled Warrior
+      const hasNegativeSaveMod = mods.some(m => m.modifier < 0);
+      expect(hasNegativeSaveMod).toBe(false);
+      // The positive modifier should remain
+      const hasPositiveSaveMod = mods.some(m => m.modifier > 0);
+      expect(hasPositiveSaveMod).toBe(true);
+    });
+  });
+
+  describe('mergeFactions: Browser LocalStorage Cache Protection', () => {
+    test('stale custom faction with missing or false isTested does NOT un-test a faction marked tested in codebase', () => {
+      const defaultFactions: Faction[] = [
+        {
+          id: 'skaven-warpspark-clawpack',
+          name: 'Skaven',
+          spearheadName: 'Warpspark Clawpack',
+          isTested: true,
+          battleTraits: [],
+          regimentAbilities: [],
+          enhancements: [],
+          units: []
+        },
+        {
+          id: 'sylvaneth-bitterbark-copse',
+          name: 'Sylvaneth',
+          spearheadName: 'Bitterbark Copse',
+          isTested: true,
+          battleTraits: [],
+          regimentAbilities: [],
+          enhancements: [],
+          units: []
+        }
+      ];
+
+      // Simulated stale custom factions array from user's old localStorage
+      const staleCustomFactions: Faction[] = [
+        {
+          id: 'skaven-warpspark-clawpack',
+          name: 'Skaven',
+          spearheadName: 'Warpspark Clawpack',
+          // isTested was undefined or false in old localStorage!
+          isTested: false,
+          battleTraits: [],
+          regimentAbilities: [],
+          enhancements: [],
+          units: []
+        },
+        {
+          id: 'sylvaneth-bitterbark-copse',
+          name: 'Sylvaneth',
+          spearheadName: 'Bitterbark Copse',
+          isTested: true,
+          battleTraits: [],
+          regimentAbilities: [],
+          enhancements: [],
+          units: []
+        }
+      ];
+
+      const merged = mergeFactions(defaultFactions, staleCustomFactions);
+      const skaven = merged.find(f => f.id === 'skaven-warpspark-clawpack');
+      const sylvaneth = merged.find(f => f.id === 'sylvaneth-bitterbark-copse');
+
+      expect(skaven?.isTested).toBe(true);
+      expect(sylvaneth?.isTested).toBe(true);
+    });
+
+    test('preserves isReinforcement: true on default units even when missing in custom cache', () => {
+      const defaultFactions: Faction[] = [
+        {
+          id: 'stormcast',
+          name: 'Stormcast Eternals',
+          spearheadName: 'Yndrasta',
+          battleTraits: [],
+          regimentAbilities: [],
+          enhancements: [],
+          units: [
+            {
+              id: 'annihilators',
+              name: 'Annihilators',
+              move: 4,
+              save: 2,
+              health: 3,
+              control: 1,
+              ward: 0,
+              isHero: false,
+              isReinforcement: true,
+              weapons: [],
+              abilities: []
+            }
+          ]
+        }
+      ];
+
+      const staleCustom: Faction[] = [
+        {
+          id: 'stormcast',
+          name: 'Stormcast Eternals',
+          spearheadName: 'Yndrasta',
+          battleTraits: [],
+          regimentAbilities: [],
+          enhancements: [],
+          units: [
+            {
+              id: 'annihilators',
+              name: 'Annihilators',
+              move: 4,
+              save: 2,
+              health: 3,
+              control: 1,
+              ward: 0,
+              isHero: false,
+              // isReinforcement missing in old cache
+              weapons: [],
+              abilities: []
+            }
+          ]
+        }
+      ];
+
+      const merged = mergeFactions(defaultFactions, staleCustom);
+      const unit = merged[0].units.find(u => u.id === 'annihilators');
+      expect(unit?.isReinforcement).toBe(true);
+    });
+
+    test('new user-created custom factions with unique id are preserved', () => {
+      const defaultFactions: Faction[] = [
+        {
+          id: 'default-1',
+          name: 'Default Army',
+          spearheadName: 'Default Spearhead',
+          battleTraits: [],
+          regimentAbilities: [],
+          enhancements: [],
+          units: []
+        }
+      ];
+
+      const customFactions: Faction[] = [
+        {
+          id: 'custom-user-roster-123',
+          name: 'Homebrew Cohort',
+          spearheadName: 'Custom Battalion',
+          battleTraits: [],
+          regimentAbilities: [],
+          enhancements: [],
+          units: []
+        }
+      ];
+
+      const merged = mergeFactions(defaultFactions, customFactions);
+      expect(merged.length).toBe(2);
+      expect(merged.some(f => f.id === 'custom-user-roster-123')).toBe(true);
     });
   });
 

@@ -14,16 +14,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DEFAULT_FACTIONS } from '../data/default-factions';
+import { DEFAULT_FACTIONS, mergeFactions } from '../data/default-factions';
 import { Faction, Ability, Unit } from '../types';
 import { analyzeAbilityRule, ParsedRuleResult, getActiveBloodRitesRound, scanFactionForAnomalies, FactionAnomaly } from '@/lib/rules-engine';
-
-const mergeFactions = (defaults: Faction[], custom: Faction[]): Faction[] => {
-  const map = new Map<string, Faction>();
-  defaults.forEach(f => map.set(f.id, f));
-  custom.forEach(f => map.set(f.id, f));
-  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-};
 
 export default function TestHarnessPage() {
   const router = useRouter();
@@ -35,14 +28,68 @@ export default function TestHarnessPage() {
   const [selectedFactionId, setSelectedFactionId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'all' | 'traits' | 'regiment' | 'enhancements' | 'units'>('all');
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
 
-  // Simulation State
-  const [selectedAbilityForSimulation, setSelectedAbilityForSimulation] = useState<Ability | null>(null);
-  const [selectedSimTargetUnitId, setSelectedAbilityTargetUnitId] = useState<string>('');
-  const [simulatedRound, setSimulatedRound] = useState<number>(1);
-  const [simEpiphanyUsed, setSimEpiphanyUsed] = useState<boolean>(false);
-  const [simLog, setSimLog] = useState<string[]>([]);
-  const [simActiveModifiers, setSimActiveModifiers] = useState<any[]>([]);
+  const showToast = (message: string, type: 'error' | 'success' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(prev => prev?.message === message ? null : prev);
+    }, 4500);
+  };
+
+  const handleToggleTested = async (id: string, targetTestedStatus?: boolean) => {
+    const factionToUpdate = factions.find(f => f.id === id);
+    if (!factionToUpdate) return;
+
+    const newTested = targetTestedStatus !== undefined 
+      ? targetTestedStatus 
+      : !factionToUpdate.isTested;
+
+    setIsSyncing(true);
+
+    const updatedFactions = factions.map(f => {
+      if (f.id === id) {
+        return { ...f, isTested: newTested };
+      }
+      return f;
+    });
+
+    setFactions(updatedFactions);
+
+    // 1. Sync to in-browser localStorage (immediate cross-page availability in admin)
+    try {
+      localStorage.setItem('custom_factions', JSON.stringify(updatedFactions));
+    } catch (e) {
+      console.error('Failed to save custom factions to localStorage:', e);
+    }
+
+    // 2. Sync directly to codebase disk (default-factions.json)
+    try {
+      const response = await fetch('/api/save-factions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ factions: updatedFactions }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        showToast('Saved in browser, but failed to write to disk: ' + (data.error || 'Unknown error'), 'error');
+      } else if (data.warning === 'ReadOnlyEnvironment') {
+        showToast(`Marked "${factionToUpdate.name}" as ${newTested ? 'Confirmed Tested' : 'Untested'} in browser (server disk read-only).`, 'success');
+      } else {
+        showToast(`Successfully marked "${factionToUpdate.name}" as ${newTested ? 'Confirmed Tested' : 'Untested'} and synced to disk!`, 'success');
+      }
+    } catch (err: any) {
+      console.error('Error syncing factions to disk:', err);
+      showToast(`Marked in browser, but disk sync failed: ${err.message}`, 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
 
   useEffect(() => {
     const savedFactionsStr = localStorage.getItem('custom_factions');
@@ -100,141 +147,7 @@ export default function TestHarnessPage() {
     return false;
   });
 
-  // Handle Simulation Run
-  const runSimulation = () => {
-    if (!selectedAbilityForSimulation) return;
-    const ab = selectedAbilityForSimulation;
 
-    // Construct mock game state for rules engine evaluation
-    const mockGameState = {
-      round: simulatedRound,
-      currentPhase: ab.phase || 'combat',
-      selectedBattleTraitId: 'all',
-      selectedRegimentAbilityId: '',
-      selectedEnhancementId: '',
-      units: activeFaction?.units.map(u => ({ id: u.id, unitId: u.id, isSlain: false, charged: false })) || [],
-      usedAbilities: {
-        murderousEpiphany: simEpiphanyUsed,
-        'murderous-epiphany': simEpiphanyUsed,
-      }
-    } as any;
-
-    const rules = analyzeAbilityRule(ab, activeFaction, mockGameState);
-
-    const logList: string[] = [];
-    const newModifiersList: any[] = [];
-
-    logList.push(`[SYSTEM_TEST] ⚡ Initializing activation simulation for "${ab.name}"...`);
-    logList.push(`[SYSTEM_TEST] 🔍 Rules Engine Input Text: "${ab.effect}"`);
-    logList.push(`[DIAGNOSTIC] Simulated State: Round ${simulatedRound} • Current Phase: "${mockGameState.currentPhase.toUpperCase()}"`);
-
-    const isBloodRitesRule = ab.id === 'bloodRites' || (ab.name || '').toLowerCase().includes('blood rites');
-    if (isBloodRitesRule) {
-      const bloodRitesRound = getActiveBloodRitesRound(mockGameState);
-      logList.push(`[DIAGNOSTIC] Daughters of Khaine Blood Rites level resolved: Round ${bloodRitesRound}`);
-      if (simEpiphanyUsed) {
-        logList.push(`[DIAGNOSTIC] Murderous Epiphany has been activated! Gaining Blood Rites one round early.`);
-      }
-    }
-
-    // Gating check
-    if (ab.once === 'once-per-turn') {
-      logList.push(`[STATE_GATING] Lock Check: Adds "${ab.id}" to gameState.usedAbilities. This will lock duplicate activations until the end of the turn.`);
-    } else if (ab.once === 'once-per-battle') {
-      logList.push(`[STATE_GATING] Lock Check: Flags "${ab.id}" as exhausted. This will lock duplicate activations for the remainder of the battle.`);
-    }
-
-    // Customization assertion log
-    if (rules.isCustomHandled) {
-      logList.push(`[SYSTEM_TEST] ⚠️ ASSERT CUSTOMIZATION: This ability is intercept-handled by dedicated custom faction mechanics in the app codebase.`);
-      logList.push(`[SYSTEM_TEST] ℹ️ Custom details: ${rules.customHandlingDetails}`);
-    } else {
-      logList.push(`[SYSTEM_TEST] 📦 ASSERT GLOBAL ENGINE: This ability compiles under standard global business rules logic.`);
-    }
-
-    // Specific User Tests logging:
-    if (rules.isPassive) {
-      logList.push(`[DIAGNOSTIC] Passive rule detected! Evaluates continuously in background during "${ab.phase}" phase.`);
-    }
-    if (rules.heroOrGeneralOnly) {
-      logList.push(`[DIAGNOSTIC] Restriction Gating: Restricts bonus explicitly to Heroes/General unit tags.`);
-    }
-    if (rules.hasSpatialOrConditionalCheck) {
-      logList.push(`[DIAGNOSTIC] Tabletop Conditional Check: Requires distance / status condition validation ("${rules.conditionalCheckDescription}").`);
-    }
-    if (rules.isExternallyTracked) {
-      logList.push(`[DIAGNOSTIC] Externally Tracked Keywords Found: [${rules.externalTrackedKeywords.join(', ')}]. Status tracked outside Next.js standard modifier arrays.`);
-    }
-    if (rules.rollDiceCount) {
-      logList.push(`[DIAGNOSTIC] Dice Roll Challenge: "${rules.rollDiceCheckText}" (triggers user interaction prompts).`);
-    }
-
-    if (rules.requiredRoll) {
-      logList.push(`[PROMPT] User Interaction: Shows physical roll modal requiring a physical ${rules.requiredRoll} roll.`);
-      logList.push(`[PROMPT] Success Resolution: If the user inputs a successful roll, proceed with modifier application; otherwise, log failure and exit.`);
-    }
-
-    if (rules.targetingType === 'global_passive') {
-      logList.push(`[STATE_CHANGE] Applies continuous global background passive buff "${ab.name}". No target clicks or actions required.`);
-    } else if (rules.targetingType === 'multi_friendly') {
-      logList.push(`[STATE_CHANGE] Iterates over all friendly cohort units. Applying buffs to ALL active friendly units.`);
-      if (activeFaction) {
-        activeFaction.units.forEach(u => {
-          rules.allowedStats.forEach(stat => {
-            const modVal = rules.isRelentlessDiscipline ? 2 : 1;
-            const label = `+${modVal} ${stat.toUpperCase()} (${ab.name})`;
-            logList.push(`[APPLIED_MODIFIER] Modified stats for unit [${u.name}]: Stat: "${stat}", Modifier: ${modVal}, Label: "${label}"`);
-            newModifiersList.push({ unitName: u.name, stat, modifier: modVal, label, phase: ab.phase });
-          });
-        });
-      }
-    } else {
-      // Single Target or Self
-      const targetUnit = activeFaction?.units.find(u => u.id === selectedSimTargetUnitId) || activeFaction?.units[0];
-      if (targetUnit) {
-        logList.push(`[TARGET_RESOLVED] Selected unit [${targetUnit.name}] as the target for "${ab.name}".`);
-        if (rules.allowedStats.length > 0) {
-          rules.allowedStats.forEach(stat => {
-            let modVal = 1;
-            let label = `+${modVal} ${stat.toUpperCase()} (${ab.name})`;
-            if (stat === 'move') {
-              if (ab.name.toUpperCase().includes('SPEED OF HYSH')) {
-                label = `Doubled Move (${ab.name})`;
-              } else if (rules.isRelentlessDiscipline) {
-                modVal = 2;
-                label = `+2" Move (${ab.name})`;
-              } else {
-                label = `+1" Move (${ab.name})`;
-              }
-            } else if (rules.isRelentlessDiscipline && stat === 'ward') {
-              label = `+1 Ward (Relentless Discipline - Ward Enhancement)`;
-            }
-            logList.push(`[APPLIED_MODIFIER] Applied to unit [${targetUnit.name}]: Stat: "${stat}", Modifier: ${modVal}, Label: "${label}" (expires: end of "${ab.phase}" phase)`);
-            newModifiersList.push({ unitName: targetUnit.name, stat, modifier: modVal, label, phase: ab.phase });
-          });
-        } else {
-          logList.push(`[STATE_CHANGE] No direct stat modifiers parsed for "${ab.name}".`);
-          logList.push(`[GAME_LOG] Appended text log to matches activity logger: "🎯 Selected unit [${targetUnit.name}] as the target for "${ab.name}"."`);
-        }
-      } else {
-        logList.push(`[WARNING] No valid target unit specified or found.`);
-      }
-    }
-
-    logList.push(`[SYSTEM_TEST] ✅ Simulation completed with 0 errors!`);
-    setSimLog(logList);
-    setSimActiveModifiers(newModifiersList);
-  };
-
-  // Run simulation automatically when target unit or ability or round state changes
-  useEffect(() => {
-    if (selectedAbilityForSimulation) {
-      runSimulation();
-    } else {
-      setSimLog([]);
-      setSimActiveModifiers([]);
-    }
-  }, [selectedAbilityForSimulation, selectedSimTargetUnitId, simulatedRound, simEpiphanyUsed]);
 
   return (
     <div className="min-h-screen bg-[#0d1117] text-gray-100 font-sans pb-16">
@@ -289,18 +202,32 @@ export default function TestHarnessPage() {
             <CardContent className="p-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5 text-left">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Cohort Faction</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Cohort Faction</label>
+                    {activeFaction && (
+                      activeFaction.isTested ? (
+                        <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] py-0 px-1.5 font-bold flex items-center gap-1">
+                          <Check className="h-2.5 w-2.5 text-emerald-400" /> Tested
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] py-0 px-1.5 font-bold">
+                          Untested
+                        </Badge>
+                      )
+                    )}
+                  </div>
                   <select
                     value={selectedFactionId}
                     onChange={(e) => {
                       setSelectedFactionId(e.target.value);
-                      setSelectedAbilityForSimulation(null);
                     }}
                     className="w-full bg-[#0d1117] border border-[#30363d] focus:border-amber-500 text-white rounded-xl text-xs py-3 px-3 outline-none cursor-pointer font-bold focus:ring-0"
                   >
                     <option value="">-- Choose Roster --</option>
                     {factions.map(f => (
-                      <option key={f.id} value={f.id}>{f.name} ({f.spearheadName})</option>
+                      <option key={f.id} value={f.id}>
+                        {f.name} ({f.spearheadName}) {f.isTested ? '✓ [Tested]' : ''}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -350,10 +277,6 @@ export default function TestHarnessPage() {
                             key={aIdx}
                             onClick={() => {
                               setSearchQuery(ano.abilityName);
-                              const target = compiledAbilities.find(i => i.ability.id === ano.abilityId);
-                              if (target) {
-                                setSelectedAbilityForSimulation(target.ability);
-                              }
                             }}
                             className="p-2.5 rounded-xl border border-amber-500/20 bg-[#161b22] hover:border-amber-400/50 cursor-pointer transition-all flex flex-col gap-1 text-left"
                           >
@@ -435,21 +358,11 @@ export default function TestHarnessPage() {
                   {filteredAbilities.map((item, idx) => {
                     const ab = item.ability;
                     const analysis = analyzeAbilityRule(ab, activeFaction);
-                    const isSelected = selectedAbilityForSimulation?.id === ab.id;
 
                     return (
                       <Card 
                         key={idx}
-                        className={`border transition-all duration-300 rounded-2xl overflow-hidden cursor-pointer text-left
-                          ${isSelected 
-                            ? 'border-amber-500 bg-amber-500/[0.02] shadow-amber-500/5' 
-                            : 'border-[#30363d] bg-[#161b22]/70 hover:border-gray-500/50 hover:bg-[#161b22]/90'}`}
-                        onClick={() => {
-                          setSelectedAbilityForSimulation(ab);
-                          if (activeFaction && activeFaction.units.length > 0) {
-                            setSelectedAbilityTargetUnitId(activeFaction.units[0].id);
-                          }
-                        }}
+                        className="border transition-all duration-300 rounded-2xl overflow-hidden text-left border-[#30363d] bg-[#161b22]/70 hover:border-gray-500/50 hover:bg-[#161b22]/90"
                       >
                         {/* 1. Header (Standard Info) */}
                         <div className="p-4 flex flex-col md:flex-row md:items-start justify-between gap-3 border-b border-[#21262d] bg-[#1d222b]/50">
@@ -808,6 +721,83 @@ export default function TestHarnessPage() {
                   })}
                 </div>
               )}
+
+              {/* Faction Testing & Audit Confirmation Bar */}
+              {activeFaction && (
+                <Card className={`border rounded-2xl overflow-hidden shadow-xl mt-6 transition-all duration-300 ${
+                  activeFaction.isTested 
+                    ? 'border-emerald-500/30 bg-gradient-to-r from-emerald-950/20 via-[#161b22] to-[#161b22]'
+                    : 'border-[#30363d] bg-[#161b22]'
+                }`}>
+                  <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="space-y-1 text-left">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-1.5">
+                          <ShieldCheck className={`h-4 w-4 ${activeFaction.isTested ? 'text-emerald-400' : 'text-amber-400'}`} />
+                          Faction Audit & Confirmation
+                        </h3>
+                        {activeFaction.isTested ? (
+                          <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold py-0.5 px-2 flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Confirmed Tested
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold py-0.5 px-2 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3 text-amber-400" /> Untested Cohort
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xxs text-gray-400 font-medium max-w-xl">
+                        {activeFaction.isTested 
+                          ? `All abilities, keywords, and rules for "${activeFaction.name}" (${activeFaction.spearheadName}) are verified and marked as tested in both browser storage and the codebase on disk.`
+                          : `Review the abilities above. Marking this faction as tested will update its status in the Admin Roster and immediately sync the change to disk (default-factions.json).`
+                        }
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                      {activeFaction.isTested ? (
+                        <>
+                          <Button
+                            onClick={() => handleToggleTested(activeFaction.id, true)}
+                            disabled={isSyncing}
+                            className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs h-10 px-5 rounded-xl shadow-lg shadow-emerald-600/20 flex items-center gap-2"
+                          >
+                            {isSyncing ? (
+                              <RefreshCw className="h-4 w-4 animate-spin text-white" />
+                            ) : (
+                              <Check className="h-4 w-4 text-white" />
+                            )}
+                            <span>Confirmed Tested (Re-sync)</span>
+                          </Button>
+
+                          <Button
+                            onClick={() => handleToggleTested(activeFaction.id, false)}
+                            disabled={isSyncing}
+                            variant="outline"
+                            className="border-[#30363d] bg-[#0d1117] hover:bg-red-950/30 hover:border-red-500/30 text-gray-400 hover:text-red-400 text-xs font-bold h-10 px-3 rounded-xl transition-colors"
+                            title="Mark as Untested"
+                          >
+                            Unmark
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          onClick={() => handleToggleTested(activeFaction.id, true)}
+                          disabled={isSyncing}
+                          className="flex-1 sm:flex-initial bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs h-10 px-6 rounded-xl shadow-lg shadow-emerald-600/20 flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                          {isSyncing ? (
+                            <RefreshCw className="h-4 w-4 animate-spin text-white" />
+                          ) : (
+                            <ShieldCheck className="h-4 w-4 text-white" />
+                          )}
+                          <span>Mark as Confirmed Tested</span>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              )}
             </div>
           ) : (
             <div className="py-24 border border-dashed border-[#30363d] rounded-3xl text-center space-y-4 bg-[#161b22]/20">
@@ -820,249 +810,17 @@ export default function TestHarnessPage() {
           )}
       </div>
 
-      {/* Floating Console Overlay Modal */}
-      {selectedAbilityForSimulation && (() => {
-        const ab = selectedAbilityForSimulation;
-        // Build mock state same as simulation to show dynamic badges and details
-        const mockGameState = {
-          round: simulatedRound,
-          currentPhase: ab.phase || 'combat',
-          selectedBattleTraitId: 'all',
-          selectedRegimentAbilityId: '',
-          selectedEnhancementId: '',
-          units: activeFaction?.units.map(u => ({ id: u.id, unitId: u.id, isSlain: false, charged: false })) || [],
-          usedAbilities: {
-            murderousEpiphany: simEpiphanyUsed,
-            'murderous-epiphany': simEpiphanyUsed,
-          }
-        } as any;
-        const analysis = analyzeAbilityRule(ab, activeFaction, mockGameState);
-
-        return (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 md:p-6 overflow-y-auto">
-            <div 
-              className="bg-[#161b22] border border-[#30363d] rounded-3xl w-full max-w-4xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="p-5 border-b border-[#21262d] bg-[#1d222b] flex items-center justify-between">
-                <div className="space-y-1 text-left">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[8px] font-black uppercase tracking-wider px-2 py-0.5">
-                      Console Audit Overlay
-                    </Badge>
-                    <Badge className="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[8px] font-black uppercase tracking-wider px-2 py-0.5">
-                      ⏱️ {ab.phase.toUpperCase()}
-                    </Badge>
-                  </div>
-                  <h2 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-1.5 mt-1">
-                    <Terminal className="h-5 w-5 text-amber-500" />
-                    {ab.name} Log Console
-                  </h2>
-                </div>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setSelectedAbilityForSimulation(null)}
-                  className="border-[#30363d] hover:border-gray-500 bg-[#0d1117] text-gray-400 hover:text-white text-xs font-bold px-3 py-1 rounded-xl cursor-pointer"
-                >
-                  Close [ESC]
-                </Button>
-              </div>
-
-              {/* Body (scrollable) */}
-              <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Left Side: Ability Info & Sim Controls */}
-                <div className="space-y-5 text-left">
-                  
-                  {/* Rules Text */}
-                  <div className="space-y-1">
-                    <h4 className="text-[9px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
-                      <Info className="h-3 w-3 text-amber-500" /> Ability Rules Text
-                    </h4>
-                    <p className="text-xs font-semibold text-gray-200 leading-relaxed bg-[#0d1117] p-4 rounded-xl border border-[#21262d] whitespace-pre-line">
-                      {ab.effect || "No description provided."}
-                    </p>
-                  </div>
-
-                  {/* Dynamic Simulation Controls */}
-                  <div className="p-4 rounded-xl border border-[#21262d] bg-[#0d1117]/30 space-y-4">
-                    <h4 className="text-[9px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                      <Activity className="h-3.5 w-3.5 text-emerald-400 animate-pulse" /> Simulated Game Variables
-                    </h4>
-                    
-                    {/* Simulated Round Selector */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block">
-                        Simulated Battle Round
-                      </label>
-                      <div className="grid grid-cols-5 gap-1.5">
-                        {[1, 2, 3, 4, 5].map(r => (
-                          <button
-                            key={r}
-                            onClick={() => setSimulatedRound(r)}
-                            className={`py-1.5 text-xxs font-black tracking-wider uppercase border rounded-lg transition-all cursor-pointer
-                              ${simulatedRound === r
-                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/40'
-                                : 'bg-[#0d1117] border-[#30363d] text-gray-400 hover:text-white hover:border-gray-500'}`}
-                          >
-                            Round {r}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Specialized Daughters of Khaine Controls */}
-                    {(activeFaction?.id === 'daughters-of-khaine-heartflayer-troupe' || (ab.name || '').toLowerCase().includes('blood rites') || ab.id === 'bloodRites' || ab.id === 'murderousEpiphany') && (
-                      <div className="space-y-2 p-3.5 rounded-xl border border-purple-500/20 bg-purple-500/[0.02]">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <span className="text-[10px] font-black text-purple-300 uppercase tracking-wider block">Murderous Epiphany</span>
-                            <span className="text-[9px] text-gray-400 font-semibold leading-normal">
-                              Toggle active to apply Blood Rites 1 round early.
-                            </span>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={simEpiphanyUsed}
-                            onChange={(e) => setSimEpiphanyUsed(e.target.checked)}
-                            className="h-4.5 w-4.5 rounded bg-black border-[#30363d] text-purple-500 focus:ring-0 outline-none cursor-pointer"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Target Unit Selector */}
-                    {analysis.targetingType !== 'global_passive' && (
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block">
-                          Choose Target Unit
-                        </label>
-                        <select
-                          value={selectedSimTargetUnitId}
-                          onChange={(e) => setSelectedAbilityTargetUnitId(e.target.value)}
-                          className="w-full bg-[#0d1117] border border-[#30363d] focus:border-amber-500 text-white rounded-xl text-xxs py-2.5 px-3 outline-none cursor-pointer font-bold"
-                        >
-                          {activeFaction?.units.map(u => (
-                            <option key={u.id} value={u.id}>{u.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Target & Stats Display */}
-                  <div className="space-y-3">
-                    {/* Target specification */}
-                    <div className="p-3.5 rounded-xl border border-[#21262d] bg-[#0d1117]/10 flex flex-col gap-1.5">
-                      <span className="text-[9px] font-black text-amber-500 uppercase tracking-wider flex items-center gap-1">
-                        <TargetIcon className="h-3 w-3 shrink-0" /> Target Specification
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {analysis.targetSpecifications.map((spec, sIdx) => (
-                          <Badge key={sIdx} className="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[9px] font-black tracking-wider uppercase px-2 py-0.5">
-                            {spec}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Stats Influenced */}
-                    {analysis.statsWithModifiers.length > 0 && (
-                      <div className="p-3.5 rounded-xl border border-[#21262d] bg-[#0d1117]/10 flex flex-col gap-1.5">
-                        <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1">
-                          <BarChart3 className="h-3 w-3 shrink-0" /> Influenced Application Stats (IAS)
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {analysis.statsWithModifiers.map((item, mIdx) => (
-                            <Badge 
-                              key={mIdx} 
-                              className={`text-[9px] font-black tracking-wider uppercase px-2 py-0.5
-                                ${item.mod.startsWith('-') 
-                                  ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
-                                  : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}
-                            >
-                              ★ {item.stat} ({item.mod}){item.weaponScope ? ` [${item.weaponScope}]` : ''}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Ability Modification details */}
-                    {analysis.abilityChanges && analysis.abilityChanges.length > 0 && (
-                      <div className="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] space-y-1 text-left">
-                        <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400 block">
-                          ⚡ Ability Modification:
-                        </span>
-                        {analysis.abilityChanges.map((change, cIdx) => (
-                          <div key={cIdx} className="text-xxs text-emerald-300 font-semibold">
-                            Modifies <strong className="text-white underline">{change.targetAbility}</strong>
-                            {change.targetUnit ? ` on ${change.targetUnit}` : ''}: <span className="text-emerald-400 font-bold">{change.changeText}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Permanent vs Temporary duration */}
-                    <div className="p-3 rounded-lg border border-[#222834] bg-[#161b22] flex items-center gap-2 text-xxs font-bold">
-                      <Badge className={`h-4.5 min-w-4.5 rounded-full flex items-center justify-center p-0 font-bold
-                        ${analysis.isPermanent ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'bg-gray-800 text-gray-500'}`}>
-                        {analysis.isPermanent ? '✓' : '—'}
-                      </Badge>
-                      <span className={analysis.isPermanent ? 'text-gray-200' : 'text-gray-500'}>
-                        {analysis.isPermanent 
-                          ? 'Permanent Effect (Stays for rest of the game)' 
-                          : 'Temporary Effect (Phase or Turn Duration)'}
-                      </span>
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Right Side: Black Console Terminal */}
-                <div className="flex flex-col h-full min-h-[300px] md:min-h-0">
-                  <h4 className="text-[9px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5 mb-2 text-left">
-                    <Terminal className="h-3.5 w-3.5 text-amber-500" /> Rules Engine Console Output
-                  </h4>
-                  <div className="flex-1 bg-black p-5 rounded-2xl border border-[#21262d] font-mono text-[10px] leading-relaxed text-gray-300 space-y-1.5 overflow-y-auto text-left max-h-[500px]">
-                    {simLog.map((log, i) => {
-                      let colorClass = 'text-gray-400';
-                      if (log.startsWith('[SYSTEM_TEST]')) colorClass = 'text-amber-400 font-bold';
-                      else if (log.startsWith('[TARGET_RESOLVED]')) colorClass = 'text-blue-400';
-                      else if (log.startsWith('[STATE_CHANGE]')) colorClass = 'text-purple-400';
-                      else if (log.startsWith('[APPLIED_MODIFIER]')) colorClass = 'text-emerald-400 font-semibold';
-                      else if (log.startsWith('[PROMPT]')) colorClass = 'text-pink-400';
-                      else if (log.startsWith('[STATE_GATING]')) colorClass = 'text-orange-400';
-                      else if (log.startsWith('[DIAGNOSTIC]')) colorClass = 'text-cyan-400 font-medium';
-                      else if (log.startsWith('[WARNING]')) colorClass = 'text-red-400 font-black';
-
-                      return (
-                        <div key={i} className={colorClass}>
-                          {log}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-              </div>
-              
-              {/* Footer */}
-              <div className="p-4 border-t border-[#21262d] bg-[#1d222b] flex justify-end gap-2.5">
-                <Button 
-                  onClick={() => setSelectedAbilityForSimulation(null)}
-                  className="bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold px-5 h-9 rounded-xl flex items-center gap-2 cursor-pointer"
-                >
-                  DISMISS OVERLAY
-                </Button>
-              </div>
-
-            </div>
+      {/* Non-blocking Toast Feedback */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 left-4 md:left-auto md:max-w-sm z-50 animate-bounce-in">
+          <div className={`p-4 rounded-xl shadow-2xl border flex items-center justify-between gap-3 ${
+            toast.type === 'error' ? 'bg-red-950/90 border-red-500/30 text-red-200' : 'bg-zinc-900/95 border-emerald-500/40 text-emerald-200'
+          }`}>
+            <span className="text-xs font-bold leading-normal">{toast.message}</span>
+            <button onClick={() => setToast(null)} className="text-gray-400 hover:text-white text-xs font-black">✕</button>
           </div>
-        );
-      })()}
-
+        </div>
+      )}
     </div>
   );
 }

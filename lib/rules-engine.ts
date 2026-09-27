@@ -142,7 +142,7 @@ export function evaluateDynamicModifiersForAbility(
       }
     }
   } else if (stat === 'wound') {
-    if (effectLower.includes('add 1 to wound rolls') || effectLower.includes('add 1 to the wound rolls') || effectLower.includes('wound rolls')) {
+    if (effectLower.includes('add 1 to wound rolls') || effectLower.includes('add 1 to the wound rolls') || (effectLower.includes('wound rolls') && !effectLower.includes('ignore'))) {
       if (checkWeaponMatch(weaponName)) {
         mods.push({
           modifier: parseNumModifier(effectLower, 1),
@@ -151,7 +151,7 @@ export function evaluateDynamicModifiersForAbility(
       }
     }
   } else if (stat === 'hit') {
-    if (effectLower.includes('add 1 to hit rolls') || effectLower.includes('add 1 to the hit rolls') || effectLower.includes('hit rolls')) {
+    if (effectLower.includes('add 1 to hit rolls') || effectLower.includes('add 1 to the hit rolls') || (effectLower.includes('hit rolls') && !effectLower.includes('ignore'))) {
       if (checkWeaponMatch(weaponName)) {
         mods.push({
           modifier: parseNumModifier(effectLower, 1),
@@ -160,14 +160,20 @@ export function evaluateDynamicModifiersForAbility(
       }
     }
   } else if (stat === 'save') {
-    if (effectLower.includes('add 1 to save rolls') || effectLower.includes('add 1 to the save rolls') || effectLower.includes('save rolls')) {
+    if (
+      !effectLower.includes('ignore') &&
+      (effectLower.includes('add 1 to save rolls') || effectLower.includes('add 1 to the save rolls') || effectLower.includes('save rolls'))
+    ) {
       mods.push({
         modifier: parseNumModifier(effectLower, 1),
         description: `${ability.name} (${getConditionLabel()})`
       });
     }
   } else if (stat === 'ward') {
-    if (effectLower.includes('add 1 to ward rolls') || effectLower.includes('add 1 to the ward rolls') || effectLower.includes('ward rolls')) {
+    if (
+      !effectLower.includes('ignore') &&
+      (effectLower.includes('add 1 to ward rolls') || effectLower.includes('add 1 to the ward rolls') || effectLower.includes('ward rolls'))
+    ) {
       mods.push({
         modifier: parseNumModifier(effectLower, 1),
         description: `${ability.name} (${getConditionLabel()})`
@@ -335,6 +341,52 @@ export function getActiveModifiers(
       if (uRules) {
         const chargeMods = getDynamicChargeModifiers(uState, uRules, stat, weaponName, faction);
         modifiers.push(...chargeMods);
+      }
+    }
+  }
+
+  // 6. Tabletop Effect: Remove save modifiers if unit has an active ability ignoring them (e.g. Gnarled Warrior)
+  if (stat === 'save' && unitId) {
+    const uState = gameState.units.find(u => u.id === unitId);
+    const uRules = (uState && faction.units) ? faction.units.find(r => r.id === uState.unitId) : null;
+
+    if (uRules) {
+      const activeAbilitiesToCheck: Ability[] = [];
+      if (gameState.selectedBattleTraitId === 'all') {
+        activeAbilitiesToCheck.push(...faction.battleTraits);
+      } else {
+        const trait = faction.battleTraits.find(t => t.id === gameState.selectedBattleTraitId);
+        if (trait) activeAbilitiesToCheck.push(trait);
+      }
+      if (gameState.selectedRegimentAbilityId && gameState.selectedRegimentAbilityId !== 'all') {
+        const reg = faction.regimentAbilities.find(r => r.id === gameState.selectedRegimentAbilityId);
+        if (reg) activeAbilitiesToCheck.push(reg);
+      } else {
+        activeAbilitiesToCheck.push(...faction.regimentAbilities);
+      }
+      const enh = faction.enhancements.find(e => e.id === gameState.selectedEnhancementId);
+      if (enh) activeAbilitiesToCheck.push(enh);
+      if (uRules.abilities) activeAbilitiesToCheck.push(...uRules.abilities);
+
+      let ignoresNegativeSaveMods = false;
+      let ignoresAllSaveMods = false;
+
+      activeAbilitiesToCheck.forEach(ab => {
+        const eff = (ab.effect || '').toLowerCase();
+        const isForGeneral = eff.includes('your general') || eff.includes("general's");
+        if (isForGeneral && !uRules.isHero) return;
+
+        if (eff.includes('ignore all modifiers to save rolls')) {
+          ignoresAllSaveMods = true;
+        } else if (eff.includes('ignore negative modifiers to save rolls') || (eff.includes('ignore negative modifiers') && eff.includes('save'))) {
+          ignoresNegativeSaveMods = true;
+        }
+      });
+
+      if (ignoresAllSaveMods) {
+        return [];
+      } else if (ignoresNegativeSaveMods) {
+        return modifiers.filter(m => m.modifier >= 0);
       }
     }
   }
@@ -879,14 +931,23 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
         netEffects.push("Modifies weapon attacks characteristic (expires at end of active phase).");
       }
     }
+    const isSaveIgnore = effectLower.includes('ignore negative modifiers to save') || 
+                         effectLower.includes('ignore all modifiers to save') || 
+                         effectLower.includes('ignore modifiers to save') ||
+                         (effectLower.includes('ignore negative modifiers') && effectLower.includes('save'));
+
     if (
-      effectLower.includes('save roll') || 
-      effectLower.includes('save characteristic') || 
-      effectLower.includes('add 1 to save') || 
-      effectLower.includes('add 1 to the save')
+      !isSaveIgnore && !effectLower.includes('ignore negative modifiers') && (
+        effectLower.includes('save roll') || 
+        effectLower.includes('save characteristic') || 
+        effectLower.includes('add 1 to save') || 
+        effectLower.includes('add 1 to the save')
+      )
     ) {
       allowedStats.push('save');
       netEffects.push("Increases save characteristic by +1 (grants defensive cover buff).");
+    } else if (isSaveIgnore) {
+      netEffects.push("Tabletop Effect: Ignores negative modifiers to save rolls during physical combat resolution.");
     }
     if (
       effectLower.includes('ward roll') || 
@@ -958,6 +1019,12 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     ) {
       allowedStats.push('control');
       netEffects.push("Modifies target unit's control score for contesting objectives.");
+    }
+
+    const healMatch = effectLower.match(/heal\s*(?:\((d6|d3|\d+|x)\)|\s+(d6|d3|\d+|x)\b)/i);
+    if (healMatch || effectLower.includes('heal') || effectLower.includes('return slain')) {
+      const healAmount = healMatch ? (healMatch[1] || healMatch[2]).toUpperCase() : (effectLower.includes('d6') ? 'D6' : effectLower.includes('d3') ? 'D3' : 'wounds');
+      netEffects.push(`Heal Action: Heals (${healAmount}) damage on the target unit.`);
     }
   }
 
@@ -1041,6 +1108,28 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
       if (isRollComparison) {
         return null;
       }
+      if (
+        effectLower.includes('ignore negative modifiers to save') ||
+        effectLower.includes('ignore all modifiers to save') ||
+        effectLower.includes('ignore modifiers to save') ||
+        (effectLower.includes('ignore negative modifiers') && effectLower.includes('save'))
+      ) {
+        return null;
+      }
+    }
+
+    if (statName === 'Heal') {
+      const healMatch = effectLower.match(/heal\s*(?:\((d6|d3|\d+|x)\)|\s+(d6|d3|\d+|x)\b)/i);
+      if (healMatch) {
+        const val = healMatch[1] || healMatch[2];
+        return val.toUpperCase();
+      }
+      if (effectLower.includes('heal (d6)') || effectLower.includes('heal d6')) return 'D6';
+      if (effectLower.includes('heal (d3)') || effectLower.includes('heal d3')) return 'D3';
+      if (effectLower.includes('heal (3)') || effectLower.includes('heal 3')) return '3';
+      if (effectLower.includes('heal (2)') || effectLower.includes('heal 2')) return '2';
+      if (effectLower.includes('heal (1)') || effectLower.includes('heal 1')) return '1';
+      return 'D3';
     }
 
     if (statName === 'Wounds') {
@@ -1109,7 +1198,7 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     'Movement': ['move characteristic', 'movement characteristic', 'move characteristic of', 'double its move', 'move of', 'movement characteristic of'],
     'Charge': ['charge roll', 'charge rolls', 'add 1 to charge', 'charge characteristic', 're-roll charge'],
     'Control': ['control characteristic', 'objective control', 'control value', 'control of', 'controlling that objective', 'control score', 'control scores'],
-    'Heal': ['heal', 'return slain', 'reanimate', 'restore', 'heal d3', 'heal 1'],
+    'Heal': ['heal', 'return slain', 'reanimate', 'restore', 'heal d6', 'heal d3', 'heal 1'],
     'Mortal Wounds': ['mortal wound', 'mortal wounds'],
     'Strike-Last': ['strike-last', 'strike last'],
     'Strike-First': ['strike-first', 'strike first']
@@ -1587,6 +1676,20 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     ];
   }
 
+  if (abId === 'gnarledwarrior' || nameLower.includes('gnarled warrior')) {
+    allowedStats = [];
+    influencedStats = [];
+    finalStatsWithModifiers = [];
+  }
+
+  if (abId === 'regrowth' || nameLower.includes('regrowth')) {
+    allowedStats = [];
+    influencedStats = ['Heal'];
+    finalStatsWithModifiers = [
+      { stat: 'Heal', mod: 'D6' }
+    ];
+  }
+
   if (abId === 'propelledbyhate' || nameLower.includes('propelled by hate')) {
     allowedStats = [];
     influencedStats = ['Charge'];
@@ -1713,6 +1816,10 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
       })
     : [];
 
+  const isIgnoreModifiers = effectLower.includes('ignore negative modifiers') || 
+                            effectLower.includes('ignore all modifiers') || 
+                            effectLower.includes('ignore modifiers');
+
   const isTabletopEffect = isExternallyTracked || 
     effectLower.includes('mortal damage') || 
     effectLower.includes('mortal wound') || 
@@ -1720,12 +1827,21 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     effectLower.includes('heal') || 
     effectLower.includes('return slain') || 
     effectLower.includes('set up') ||
-    effectLower.includes('teleport');
+    effectLower.includes('teleport') ||
+    isIgnoreModifiers;
 
   let tabletopEffectDetails: string | null = null;
   if (isTabletopEffect) {
     if (effectLower.includes('mortal damage') || effectLower.includes('mortal wound') || effectLower.includes('mortal wounds')) {
       tabletopEffectDetails = "Mortal Damage / Tabletop Resolution";
+    } else if (isIgnoreModifiers) {
+      if (effectLower.includes('save')) {
+        tabletopEffectDetails = "Ignore Save Modifiers";
+      } else if (effectLower.includes('control')) {
+        tabletopEffectDetails = "Ignore Control Modifiers";
+      } else {
+        tabletopEffectDetails = "Ignore Modifiers";
+      }
     } else if (effectLower.includes('heal') || effectLower.includes('return slain')) {
       tabletopEffectDetails = "Heal / Return Slain Models";
     } else if (effectLower.includes('set up') || effectLower.includes('reserve') || effectLower.includes('teleport')) {
@@ -1733,6 +1849,10 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     } else {
       tabletopEffectDetails = "Tabletop Physical Interaction";
     }
+  }
+
+  if (isIgnoreModifiers && !externalTrackedKeywords.includes('Ignore Save Modifiers') && !externalTrackedKeywords.includes('Ignore Modifiers')) {
+    externalTrackedKeywords.push(effectLower.includes('save') ? 'Ignore Save Modifiers' : 'Ignore Modifiers');
   }
 
   return {

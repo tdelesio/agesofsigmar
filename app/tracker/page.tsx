@@ -5825,7 +5825,7 @@ export default function TrackerPage() {
                       allowed = abAnalysis.allowedStats;
                     } else {
                       if (effectLower.includes('attacks characteristic')) allowed.push('attacks');
-                      if (effectLower.includes('save roll')) allowed.push('save');
+                      if (!effectLower.includes('ignore') && effectLower.includes('save roll')) allowed.push('save');
                       if (effectLower.includes('ward roll')) allowed.push('ward');
                       if (effectLower.includes('move')) allowed.push('move');
                       if (effectLower.includes('control')) allowed.push('control');

@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { DEFAULT_FACTIONS } from '../data/default-factions';
+import { DEFAULT_FACTIONS, mergeFactions } from '../data/default-factions';
 import { Faction, Unit, Weapon, Ability } from '../types';
 
 const getAbilityBgClass = (ability: Partial<Ability>) => {
@@ -47,12 +47,6 @@ const getAbilityBgClass = (ability: Partial<Ability>) => {
   }
 };
 
-const mergeFactions = (defaults: Faction[], custom: Faction[]): Faction[] => {
-  const map = new Map<string, Faction>();
-  defaults.forEach(f => map.set(f.id, f));
-  custom.forEach(f => map.set(f.id, f));
-  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-};
 
 export default function AdminPage() {
   const router = useRouter();
