@@ -74,8 +74,8 @@ export default function WarhammerGalleryPage() {
           <div className="text-6xl mb-4">⚠️</div>
           <h2 className="text-2xl font-semibold text-white mb-2">Error Loading Images</h2>
           <p className="text-gray-400">{error}</p>
-          <Link href="/" className="mt-4 inline-block text-amber-500 hover:underline">
-            Back to Companion Home
+          <Link href="/admin" className="mt-4 inline-block text-amber-500 hover:underline">
+            Back to Admin CMS
           </Link>
         </div>
       </div>
@@ -88,10 +88,10 @@ export default function WarhammerGalleryPage() {
         <header className="mb-8">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
             <Link
-              href="/"
+              href="/admin"
               className="inline-flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-white transition-colors bg-[#1c2230] px-3 py-1.5 rounded-lg border border-[#2c3548]"
             >
-              <ArrowLeft className="h-4 w-4" /> Back to Companion Home
+              <ArrowLeft className="h-4 w-4" /> Back to Admin CMS
             </Link>
             <div className="flex items-center gap-2">
               <Link

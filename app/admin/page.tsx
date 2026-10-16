@@ -7,7 +7,8 @@ import {
   ArrowLeft, UploadCloud, FileText, CheckCircle2, 
   AlertCircle, Key, Sparkles, Shield, Heart, ShieldAlert,
   Sword, User, Trash, Plus, Save, Edit, RefreshCw, Layers,
-  Activity, Zap, ShieldCheck, Download, Upload, Copy
+  Activity, Zap, ShieldCheck, Download, Upload, Copy,
+  Camera, Terminal, Images
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -626,10 +627,20 @@ export default function AdminPage() {
               <p className="text-gray-400 text-xs">Manage, create, and refine Warhammer Spearhead custom rules</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Link href="/test">
-              <Button size="sm" variant="outline" className="border-amber-500/20 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500/30 text-xs font-extrabold h-8.5 rounded-lg">
-                🧪 Rules Test Harness
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/warhammer">
+              <Button size="sm" variant="outline" className="border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 text-amber-400 text-xs font-bold h-8.5 rounded-lg gap-1.5">
+                <Camera className="h-3.5 w-3.5" /> Warhammer Models
+              </Button>
+            </Link>
+            <Link href="/malediction">
+              <Button size="sm" variant="outline" className="border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 text-purple-300 text-xs font-bold h-8.5 rounded-lg gap-1.5">
+                <Camera className="h-3.5 w-3.5" /> Malediction Models
+              </Button>
+            </Link>
+            <Link href="/test-harness">
+              <Button size="sm" variant="outline" className="border-amber-500/20 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500/30 text-xs font-extrabold h-8.5 rounded-lg gap-1.5">
+                <Terminal className="h-3.5 w-3.5" /> Test Harness
               </Button>
             </Link>
             <Link href="/">
@@ -1326,7 +1337,40 @@ export default function AdminPage() {
           
           /* Admin Main Portal View */
           <div className="space-y-8">
-            
+
+            {/* Painted Models Gallery Showcase Card */}
+            <Card className="border-[#222834] bg-gradient-to-br from-[#151923] to-[#1c2230] text-white shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between py-4 pb-2">
+                <div className="flex items-center gap-2">
+                  <Camera className="h-5 w-5 text-amber-500" />
+                  <div>
+                    <CardTitle className="text-sm font-bold uppercase tracking-wider">Painted Models Gallery</CardTitle>
+                    <CardDescription className="text-gray-400 text-xs">Miniature showcases for sharing painted models with others</CardDescription>
+                  </div>
+                </div>
+                <Badge variant="outline" className="border-amber-500/30 text-amber-400 text-[10px]">113 Photos</Badge>
+              </CardHeader>
+              <CardContent className="pt-2 pb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  <Link href="/warhammer" className="w-full">
+                    <Button variant="outline" className="w-full h-11 border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 text-amber-300 hover:text-amber-200 text-xs font-bold gap-2 rounded-xl">
+                      <Camera className="h-4 w-4 text-amber-400" /> Warhammer Gallery (74 photos)
+                    </Button>
+                  </Link>
+                  <Link href="/malediction" className="w-full">
+                    <Button variant="outline" className="w-full h-11 border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 text-purple-300 hover:text-purple-200 text-xs font-bold gap-2 rounded-xl">
+                      <Camera className="h-4 w-4 text-purple-400" /> Malediction Gallery (39 photos)
+                    </Button>
+                  </Link>
+                  <Link href="/test-harness" className="w-full">
+                    <Button variant="outline" className="w-full h-11 border-[#2c3548] bg-[#1c2230] hover:bg-[#2c3548] text-gray-300 hover:text-white text-xs font-bold gap-2 rounded-xl">
+                      <Terminal className="h-4 w-4 text-amber-500" /> Rules Test Harness
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* API Key Configurator Panel */}
             <Card className="border-[#222834] bg-gradient-to-br from-[#151923] to-[#1c2230] text-white">
               <CardHeader className="flex flex-row items-center justify-between py-4 pb-2">
