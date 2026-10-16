@@ -19,6 +19,14 @@ export const mergeFactions = (defaults: Faction[], custom: Faction[]): Faction[]
         ...cust,
         // Crucial: A stale browser localStorage cache must NEVER un-test a faction tested in the codebase!
         isTested: Boolean(def.isTested || cust.isTested),
+        battleTraits: (def.battleTraits || []).map(defTrait => {
+          const custTrait = cust.battleTraits?.find(t => t.id === defTrait.id);
+          return {
+            ...defTrait,
+            ...(custTrait || {}),
+            isSpecialized: Boolean(defTrait.isSpecialized || custTrait?.isSpecialized),
+          };
+        }),
         units: def.units.map(defUnit => {
           const custUnit = cust.units?.find(u => u.id === defUnit.id);
           return {

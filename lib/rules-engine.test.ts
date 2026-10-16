@@ -9,7 +9,8 @@ import {
   analyzeAbilityRule,
   isAbilityActiveInTurn,
   detectAbilityChange,
-  getActiveAbilityModifications
+  getActiveAbilityModifications,
+  evaluateDynamicModifiersForAbility
 } from './rules-engine';
 import { GameState, Faction, Ability } from '@/app/types';
 import { mergeFactions, DEFAULT_FACTIONS } from '../app/data/default-factions';
@@ -1460,6 +1461,124 @@ describe('AoS Companion Rules Engine', () => {
       const merged = mergeFactions(defaultFactions, customFactions);
       expect(merged.length).toBe(2);
       expect(merged.some(f => f.id === 'custom-user-roster-123')).toBe(true);
+    });
+  });
+
+  describe('Storm Charge Specialized Trait & Movement Phase Influenced Stats', () => {
+    const stormChargeAbility: Ability = {
+      id: 'stormCharge',
+      name: 'Storm Charge',
+      isSpecialized: true,
+      phase: 'charge',
+      timing: 'Once Per Battle, Your Charge Phase',
+      once: 'once-per-battle',
+      effect: 'Declare: Pick a friendly unit that is not in combat.\nEffect: That unit can use Charge abilities this turn even if it used a Run ability in the same turn.'
+    };
+
+    const mockStormcastFaction: Faction = {
+      id: 'stormcast-eternals-vigilant-brotherhood',
+      name: 'Stormcast Eternals',
+      spearheadName: 'Vigilant Brotherhood',
+      battleTraits: [stormChargeAbility],
+      regimentAbilities: [],
+      enhancements: [],
+      units: [
+        {
+          id: 'liberators',
+          name: 'Liberators',
+          models: 5,
+          save: 3,
+          ward: 0,
+          move: 5,
+          health: 2,
+          control: 1,
+          isHero: false,
+          weapons: [],
+          abilities: []
+        }
+      ]
+    };
+
+    test('analyzeAbilityRule identifies Storm Charge as specialized with Movement Phase applied timing', () => {
+      const analysis = analyzeAbilityRule(stormChargeAbility, mockStormcastFaction);
+      expect(analysis.isSpecialFactionRule).toBe(true);
+      expect(analysis.isCustomHandled).toBe(true);
+      expect(analysis.appliedPhase).toBe('Movement Phase');
+      expect(analysis.influencedStats).toContain('Run');
+      expect(analysis.influencedStats).toContain('Charge');
+      expect(analysis.influencedStats).toContain('Ability Change');
+
+      expect(analysis.statsWithModifiers).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ stat: 'Run', mod: 'Can still Charge' }),
+          expect.objectContaining({ stat: 'Charge', mod: 'Allowed after Run' })
+        ])
+      );
+
+      expect(analysis.abilityChanges).toBeDefined();
+      expect(analysis.abilityChanges![0].targetAbility).toBe('Run');
+      expect(analysis.abilityChanges![0].changeText).toContain('even if it used a Run ability');
+    });
+
+    test('getActiveAbilityModifications returns Storm Charge for Run only when unused', () => {
+      const unusedState: GameState = {
+        factionId: 'stormcast-eternals-vigilant-brotherhood',
+        selectedBattleTraitId: 'all',
+        selectedRegimentAbilityId: 'none',
+        selectedEnhancementId: '',
+        round: 1,
+        currentPhase: 'movement',
+        activeTurn: 'me',
+        units: [],
+        usedAbilities: {},
+        victoryPoints: 0,
+        opponentVictoryPoints: 0,
+        logs: []
+      };
+
+      // 1. Unused state: should return modification on Run
+      const modsUnused = getActiveAbilityModifications(unusedState, mockStormcastFaction, 'Run');
+      expect(modsUnused.length).toBe(1);
+      expect(modsUnused[0].sourceAbilityName).toBe('Storm Charge');
+      expect(modsUnused[0].detail.targetAbility).toBe('Run');
+      expect(modsUnused[0].toValue).toBe('can still charge');
+
+      // 2. Used state: should be empty because it has already been expended
+      const usedState: GameState = {
+        ...unusedState,
+        usedAbilities: { stormCharge: true }
+      };
+      const modsUsed = getActiveAbilityModifications(usedState, mockStormcastFaction, 'Run');
+      expect(modsUsed.length).toBe(0);
+    });
+
+    test('evaluateDynamicModifiersForAbility bypasses automated parsing for Storm Charge', () => {
+      const mods = evaluateDynamicModifiersForAbility(stormChargeAbility, {}, mockStormcastFaction.units[0], 'charge');
+      expect(mods).toEqual([]);
+    });
+
+    test('mergeFactions preserves isSpecialized on battle traits against stale cache', () => {
+      const defaults: Faction[] = [mockStormcastFaction];
+      const customCache: Faction[] = [
+        {
+          ...mockStormcastFaction,
+          battleTraits: [
+            {
+              id: 'stormCharge',
+              name: 'Storm Charge',
+              phase: 'charge',
+              timing: 'Once Per Battle, Your Charge Phase',
+              once: 'once-per-battle',
+              effect: 'Declare: Pick a friendly unit that is not in combat.'
+              // Notice: isSpecialized is omitted/undefined here as from an older cached version
+            }
+          ]
+        }
+      ];
+
+      const merged = mergeFactions(defaults, customCache);
+      const mergedTrait = merged[0].battleTraits.find(t => t.id === 'stormCharge');
+      expect(mergedTrait?.isSpecialized).toBe(true);
     });
   });
 

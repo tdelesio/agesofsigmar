@@ -228,6 +228,16 @@ export default function TrackerPage() {
     return <div className="text-white p-8">Faction not found. Reset match in setup.</div>;
   }
 
+  // Stormcast Eternals Vigilant Brotherhood: Storm Charge specialized trait checks
+  const hasStormChargeTrait = Boolean(
+    faction.battleTraits?.some(t => t.id === 'stormCharge' || t.name.toLowerCase().includes('storm charge')) &&
+    (gameState.selectedBattleTraitId === 'all' || gameState.selectedBattleTraitId === 'stormCharge')
+  );
+  const isStormChargeUsed = Boolean(
+    gameState.usedAbilities && (gameState.usedAbilities['stormCharge'] || gameState.usedAbilities['storm-charge'])
+  );
+  const isStormChargeActiveAndUnused = hasStormChargeTrait && !isStormChargeUsed;
+
   const phases: { id: GamePhase; name: string; color: string }[] = [];
   if (gameState.round === 1) {
     phases.push({ id: 'deployment', name: 'Deployment', color: 'bg-emerald-600 border-emerald-400' });
@@ -3321,22 +3331,55 @@ export default function TrackerPage() {
           </Badge>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-          {list.map((ab, idx) => (
-            <Card key={idx} className="bg-[#151923]/45 border border-[#2c3548]/30 hover:border-sky-500/30 transition-all p-3.5 space-y-1.5 shadow-sm relative overflow-hidden">
-              <div className="flex justify-between items-start gap-1">
-                <div>
-                  <span className="text-[8px] font-extrabold text-sky-400 uppercase tracking-widest block">{ab.type}</span>
-                  <h5 className="text-xs font-black text-white mt-0.5">{ab.name}</h5>
+          {list.map((ab, idx) => {
+            const isRun = phase === 'movement' && ab.name === 'Run';
+            const showStormChargeOnRun = isRun && isStormChargeActiveAndUnused;
+
+            return (
+              <Card key={idx} className={`bg-[#151923]/45 border transition-all p-3.5 space-y-1.5 shadow-sm relative overflow-hidden ${showStormChargeOnRun ? 'border-amber-500/40 hover:border-amber-500/60 bg-amber-950/10' : 'border-[#2c3548]/30 hover:border-sky-500/30'}`}>
+                <div className="flex justify-between items-start gap-1">
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[8px] font-extrabold text-sky-400 uppercase tracking-widest block">{ab.type}</span>
+                      {showStormChargeOnRun && (
+                        <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[8px] font-black uppercase tracking-wider animate-pulse">
+                          ⚡ INFLUENCED STAT: STORM CHARGE READY
+                        </Badge>
+                      )}
+                    </div>
+                    <h5 className="text-xs font-black text-white mt-0.5">{ab.name}</h5>
+                  </div>
+                  {ab.ruleRef && (
+                    <Badge variant="outline" className="text-gray-500 border-gray-800 text-[8px] font-semibold py-0">
+                      {ab.ruleRef}
+                    </Badge>
+                  )}
                 </div>
-                {ab.ruleRef && (
-                  <Badge variant="outline" className="text-gray-500 border-gray-800 text-[8px] font-semibold py-0">
-                    {ab.ruleRef}
-                  </Badge>
+                {showStormChargeOnRun ? (
+                  <div className="space-y-2">
+                    <p className="text-[10px] text-gray-300 leading-normal font-medium">
+                      Pick 1 friendly unit that has not yet moved this phase. Add D6&quot; to its Move characteristic for the phase. It cannot shoot or <span className="line-through text-gray-500">charge</span> <strong className="text-amber-400 font-bold underline">can still charge via Storm Charge</strong> later this turn.
+                    </p>
+                    <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-1 text-left">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                          <Sparkles className="h-3 w-3 text-amber-400" /> Influenced Application Stat: Storm Charge
+                        </span>
+                        <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[8px] font-black uppercase">
+                          Once Per Battle • Unused
+                        </Badge>
+                      </div>
+                      <p className="text-[10px] text-amber-200/90 leading-relaxed font-medium">
+                        ⚡ <strong>Specialized Trait:</strong> Charge is after movement, so remember that you can <strong>Run</strong> in this phase and still declare <strong>Storm Charge</strong> in the Charge Phase to charge this turn!
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-gray-300 leading-normal font-medium">{ab.effect}</p>
                 )}
-              </div>
-              <p className="text-[10px] text-gray-300 leading-normal font-medium">{ab.effect}</p>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       </div>
     );
@@ -4208,9 +4251,23 @@ export default function TrackerPage() {
                               }
                               return null;
                             })()}
+                            {isStormChargeActiveAndUnused && (
+                              <div className="text-amber-400 font-extrabold text-[10px] flex items-center gap-1 mt-0.5" title="Storm Charge (Once Per Battle): Unit can run and still charge later this turn">
+                                <Sparkles className="h-2.5 w-2.5 text-amber-400 animate-pulse" />
+                                <span>Influenced Stat: Storm Charge (Can Run & Charge)</span>
+                                <Badge className="bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[8px] font-bold py-0 px-1">
+                                  ONCE PER BATTLE
+                                </Badge>
+                              </div>
+                            )}
+                            {u.ran && isStormChargeActiveAndUnused && (
+                              <div className="text-[9px] text-amber-300 font-extrabold flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded mt-0.5 self-start">
+                                <span>⚡</span> Ran: Can still charge via Storm Charge!
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-1.5 items-center">
                           <button
                             onClick={() => toggleUnitStateFlag(u.id, 'moved')}
                             className={`px-2 py-1 rounded text-xxs font-bold transition-all
@@ -4229,6 +4286,18 @@ export default function TrackerPage() {
                           >
                             Ran
                           </button>
+                          {isStormChargeActiveAndUnused && (
+                            <Badge 
+                              variant="outline" 
+                              className={`text-[8px] font-black uppercase py-0.5 px-1.5 transition-all
+                                ${u.ran 
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse' 
+                                  : 'bg-amber-500/10 text-amber-400/80 border-amber-500/20'}`}
+                              title="Storm Charge available: This unit can run and still charge in the Charge Phase!"
+                            >
+                              ⚡ Storm Charge Ready
+                            </Badge>
+                          )}
                           <button
                             onClick={() => toggleUnitStateFlag(u.id, 'retreated')}
                             className={`px-2 py-1 rounded text-xxs font-bold transition-all
@@ -4689,32 +4758,64 @@ export default function TrackerPage() {
                             )}
                           </h4>
                           <div className="flex flex-col gap-0.5 mt-0.5">
-                            {u.ran && <Badge variant="destructive" className="text-xxs font-bold self-start">RAN (Cannot Charge)</Badge>}
                             {(() => {
-                              const chargeMods = getActiveModifiers('charge', u.id);
-                              if (chargeMods.length > 0 && !u.ran) {
-                                const totalMod = chargeMods.reduce((acc, m) => acc + m.modifier, 0);
-                                return (
-                                  <div className="text-emerald-400 font-extrabold text-[10px] flex items-center gap-0.5 self-start">
-                                    <Sparkles className="h-2.5 w-2.5 animate-pulse" /> +{totalMod} to Charge Rolls active
-                                  </div>
-                                );
-                              }
-                              return null;
+                              const isUnitStormChargeEligible = hasStormChargeTrait && (
+                                !isStormChargeUsed || 
+                                Boolean(gameState.appliedModifiers?.some(m => m.unitId === u.id && m.sourceAbilityId?.toLowerCase().includes('stormcharge')))
+                              );
+                              const cannotChargeDueToRun = u.ran && !isUnitStormChargeEligible;
+
+                              return (
+                                <>
+                                  {u.ran && (
+                                    isUnitStormChargeEligible ? (
+                                      <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xxs font-bold self-start">
+                                        ⚡ RAN (Can Charge via Storm Charge)
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="destructive" className="text-xxs font-bold self-start">RAN (Cannot Charge)</Badge>
+                                    )
+                                  )}
+                                  {(() => {
+                                    const chargeMods = getActiveModifiers('charge', u.id);
+                                    if (chargeMods.length > 0 && !cannotChargeDueToRun) {
+                                      const totalMod = chargeMods.reduce((acc, m) => acc + m.modifier, 0);
+                                      return (
+                                        <div className="text-emerald-400 font-extrabold text-[10px] flex items-center gap-0.5 self-start">
+                                          <Sparkles className="h-2.5 w-2.5 animate-pulse" /> +{totalMod} to Charge Rolls active
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </>
+                              );
                             })()}
                           </div>
                         </div>
                         <div className="flex gap-1">
-                          <button
-                            disabled={u.ran}
-                            onClick={() => toggleUnitStateFlag(u.id, 'charged')}
-                            className={`px-3 py-1 rounded text-xxs font-bold transition-all
-                              ${u.charged 
-                                ? 'bg-orange-600 text-white font-extrabold animate-pulse' 
-                                : 'bg-[#151923] text-gray-400 border border-[#2c3548] hover:text-white'}`}
-                          >
-                            Charged
-                          </button>
+                          {(() => {
+                            const isUnitStormChargeEligible = hasStormChargeTrait && (
+                              !isStormChargeUsed || 
+                              Boolean(gameState.appliedModifiers?.some(m => m.unitId === u.id && m.sourceAbilityId?.toLowerCase().includes('stormcharge')))
+                            );
+                            const cannotChargeDueToRun = u.ran && !isUnitStormChargeEligible;
+
+                            return (
+                              <button
+                                disabled={cannotChargeDueToRun}
+                                onClick={() => toggleUnitStateFlag(u.id, 'charged')}
+                                className={`px-3 py-1 rounded text-xxs font-bold transition-all
+                                  ${u.charged 
+                                    ? 'bg-orange-600 text-white font-extrabold animate-pulse' 
+                                    : cannotChargeDueToRun
+                                      ? 'bg-[#151923] text-gray-600 border border-[#2c3548]/40 cursor-not-allowed'
+                                      : 'bg-[#151923] text-gray-400 border border-[#2c3548] hover:text-white'}`}
+                              >
+                                Charged
+                              </button>
+                            );
+                          })()}
                         </div>
                       </div>
                     );
@@ -5937,6 +6038,13 @@ export default function TrackerPage() {
                           const isRollControl = effectLower.includes('add the roll');
                           modifierVal = isRollControl ? 3 : 1;
                           labelVal = isRollControl ? `+Roll Control (${selectUnitToBuffAbility.name})` : `+Control (${selectUnitToBuffAbility.name})`;
+                        } else if (singleStat === 'charge') {
+                          if (selectUnitToBuffAbility.abilityId === 'stormCharge' || selectUnitToBuffAbility.name.toLowerCase().includes('storm charge')) {
+                            modifierVal = 0;
+                            labelVal = `Can Run & Charge (${selectUnitToBuffAbility.name})`;
+                          } else {
+                            labelVal = `+${modifierVal} Charge (${selectUnitToBuffAbility.name})`;
+                          }
                         }
                         
                         const effectLowerForTurn = (selectUnitToBuffAbility.effect || '').toLowerCase();

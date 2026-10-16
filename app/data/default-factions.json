@@ -12847,6 +12847,7 @@
       {
         "id": "stormCharge",
         "name": "Storm Charge",
+        "isSpecialized": true,
         "effect": "Declare: Pick a friendly unit that is not in combat.\nEffect: That unit can use Charge abilities this turn even if it used a Run ability in the same turn.",
         "phase": "charge",
         "timing": "Once Per Battle, Your Charge Phase",

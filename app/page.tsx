@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { 
   Sparkles, Shield, Sword, ShieldAlert, Play, Plus, 
   Trash, Swords, User, Users, RefreshCw, AlertCircle,
-  Terminal, Database
+  Terminal, Database, Camera
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -218,6 +218,28 @@ export default function HomePage() {
             )}
           </CardFooter>
         </Card>
+
+        {/* Painted Models Showcase */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Camera className="h-3.5 w-3.5 text-amber-500" /> Painted Models Gallery
+            </span>
+            <span className="text-[11px] text-gray-500">113 Painted Miniature Photos</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Link href="/warhammer" className="w-full">
+              <Button variant="outline" className="w-full h-12 border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 text-amber-300 hover:text-amber-200 rounded-xl text-xs font-bold gap-2 shadow-sm">
+                <Camera className="h-4 w-4 text-amber-400" /> Warhammer Painted Models (74 Photos)
+              </Button>
+            </Link>
+            <Link href="/malediction" className="w-full">
+              <Button variant="outline" className="w-full h-12 border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 text-purple-300 hover:text-purple-200 rounded-xl text-xs font-bold gap-2 shadow-sm">
+                <Camera className="h-4 w-4 text-purple-400" /> Malediction Painted Models (39 Photos)
+              </Button>
+            </Link>
+          </div>
+        </div>
 
         {/* Developer & CMS Tools */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

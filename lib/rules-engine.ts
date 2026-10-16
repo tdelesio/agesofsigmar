@@ -38,7 +38,10 @@ export function evaluateDynamicModifiersForAbility(
     abId === 'blood-rites' || 
     nameLower.includes('blood rites') ||
     abId === 'gravesandshard' ||
-    nameLower.includes('grave-sand shard')
+    nameLower.includes('grave-sand shard') ||
+    abId === 'stormcharge' ||
+    abId === 'storm-charge' ||
+    nameLower.includes('storm charge')
   ) {
     return []; // Return empty; specialized abilities should never follow normal dynamic text parsing rules.
   }
@@ -794,6 +797,28 @@ export function getActiveAbilityModifications(
   }
 
   for (const ab of activeAbilities) {
+    // Specialized trait: Storm Charge modifies Run in Movement phase
+    const abIdLower = (ab.id || '').toLowerCase();
+    const abNameLower = (ab.name || '').toLowerCase();
+    if (abIdLower === 'stormcharge' || abIdLower === 'storm-charge' || abNameLower.includes('storm charge')) {
+      const isUsed = !!(gameState.usedAbilities && (gameState.usedAbilities[ab.id] || gameState.usedAbilities['stormCharge'] || gameState.usedAbilities['storm-charge']));
+      if (!isUsed && targetAbilityLower === 'run') {
+        results.push({
+          sourceAbilityName: ab.name,
+          changeText: 'Unit can use Charge abilities this turn even if it used a Run ability',
+          fromValue: 'cannot shoot or charge',
+          toValue: 'can still charge',
+          detail: {
+            targetAbility: 'Run',
+            changeText: 'Unit can use Charge abilities this turn even if it used a Run ability',
+            fromValue: 'cannot shoot or charge',
+            toValue: 'can still charge'
+          }
+        });
+      }
+      continue;
+    }
+
     const detail = detectAbilityChange(ab.effect);
     if (detail && detail.targetAbility.toLowerCase() === targetAbilityLower) {
       if (detail.targetUnit && unitNameLower && !unitNameLower.includes(detail.targetUnit.toLowerCase())) {
@@ -1526,6 +1551,9 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
   } else if (nameLower.includes('grave-sand shard') || abId.includes('gravesandshard')) {
     isSpecialFactionRule = true;
     specialFactionRuleExplanation = "🌟 SPECIAL FACTION RULE (Soulblight Gravelords): Grave-Sand Shard enhancement. Adds +1 to each Skeleton Legion roll when active.";
+  } else if (nameLower.includes('storm charge') || abId === 'stormcharge' || abId.includes('storm-charge')) {
+    isSpecialFactionRule = true;
+    specialFactionRuleExplanation = "🌟 SPECIAL FACTION RULE (Stormcast Eternals - Vigilant Brotherhood): Storm Charge. Specialized battle trait shown in the Movement Phase as an influenced application stat on Run, allowing a unit to run and still charge if unused.";
   }
 
   let customHandlingDetails = specialFactionRuleExplanation;
@@ -1634,6 +1662,34 @@ export function analyzeAbilityRule(ability: Ability, faction?: Faction, gameStat
     if (activeLevel >= 2) { allowedStats.push('charge'); influencedStats.push('Charge'); }
     if (activeLevel >= 3) { allowedStats.push('hit'); influencedStats.push('Hit'); }
     if (activeLevel >= 4) { allowedStats.push('wound'); influencedStats.push('Wound'); }
+  }
+
+  const isStormChargeRule = nameLower.includes('storm charge') || abId === 'stormcharge' || abId.includes('storm-charge');
+
+  if (isStormChargeRule) {
+    finalTargetSpecifications = ["Friendly Unit (Not in Combat)"];
+    finalActivationPhase = "Your Charge Phase";
+    finalAppliedPhase = "Movement Phase";
+    targetingType = 'single_friendly';
+    allowedStats = ['charge'];
+    
+    // Influenced Application Stats:
+    // It influences Run (allowing a charge after running) and Charge
+    finalStatsWithModifiers = [
+      { stat: 'Run', mod: 'Can still Charge' },
+      { stat: 'Charge', mod: 'Allowed after Run' }
+    ];
+
+    if (!influencedStats.includes('Run')) influencedStats.push('Run');
+    if (!influencedStats.includes('Charge')) influencedStats.push('Charge');
+    if (!influencedStats.includes('Ability Change')) influencedStats.push('Ability Change');
+
+    abilityChanges = [{
+      targetAbility: 'Run',
+      changeText: 'Unit can use Charge abilities this turn even if it used a Run ability',
+      fromValue: 'cannot shoot or charge',
+      toValue: 'can still charge'
+    }];
   }
 
   // 10. Rules Engine Overrides for Heightened Reflexes and Overwhelming Heat

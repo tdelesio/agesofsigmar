@@ -216,6 +216,7 @@ export const DEFAULT_FACTIONS: Faction[] = [
       {
         id: 'stormCharge',
         name: 'Storm Charge',
+        isSpecialized: true,
         effect: 'Pick a friendly Stormcast unit not in combat. That unit can charge this turn even if it ran in the movement phase.',
         phase: 'charge',
         timing: 'Your Charge Phase',
